@@ -52,22 +52,28 @@ router.get('/endpoint', asyncHandler(async (req, res) => {
 - 응답은 공용 응답 헬퍼로만. **응답 키 계약을 프로젝트 초기에 정하고 혼용 금지** — 신규 프로젝트는 단일 봉투(예: 모든 헬퍼가 `data` 키) 권장, 계약은 CLAUDE.md에 기록.
 - 에러 응답 본문 키도 계약으로 고정 (예: `message` + `error` + `field`).
 
-## 3. Service
+## 3. Service — 경계 검증 = zod (STRICT)
 
-```js
-export const getItems = async (params) => {
-  utils.checkRequiredParams(params, ['scope_key']);   // ① 필수 파라미터 검증 최상단
-  const queryParams = {
-    scope_key: utils.toNumberOrNull(params.scope_key), // ② 타입 정규화 = 서비스 책임
-    keyword:   utils.toStringOrEmpty(params.keyword),
-  };
-  // ③ 비즈니스 규칙 위반: throw new ValidationError('메시지')
-  // ④ DB 에러: catch 없이 상위로 throw (asyncHandler → errorHandler가 처리)
-  return await itemQuery.findItems(conn, queryParams);
+외부 입력(요청 body/query/params)은 서비스 진입 시 **zod 스키마로 검증·파싱**한다 — TypeScript 타입은 런타임에 사라지므로(patterns.md 4절) 스키마 검증이 실제 방어선이다.
+
+```ts
+const GetItemsParams = z.object({
+  scope_key: z.coerce.number().int(),      // coerce/default가 타입 정규화를 대신한다
+  keyword:   z.string().trim().default(''),
+});
+type GetItemsParams = z.infer<typeof GetItemsParams>;  // 검증과 타입을 한 곳에서 — 이중 정의 금지
+
+export const getItems = async (raw: unknown) => {
+  const params = GetItemsParams.parse(raw);  // ① 검증+정규화 최상단 — 실패(ZodError)는 errorHandler가 400으로
+  // ② 비즈니스 규칙 위반: throw new ValidationError('메시지')
+  // ③ DB 에러: catch 없이 상위로 throw (asyncHandler → errorHandler가 처리)
+  return await itemQuery.findItems(conn, params);
 };
 ```
 
-- 쿼리 함수 내부의 인라인 형변환(`String(params.x ?? '')`) 금지 — 정규화는 여기서 끝낸다.
+- ZodError는 중앙 errorHandler에서 400 + 에러 키 계약(`message`/`error`/`field`)으로 변환한다.
+- 쿼리 함수에는 검증된 값만 전달하고, 쿼리 함수 내부의 인라인 형변환(`String(params.x ?? '')`)은 금지 — 정규화는 여기서 끝낸다.
+- 기존 JS 프로젝트는 기존 방식(`checkRequiredParams` + `toNumberOrNull` 유틸) 유지.
 
 ## 4. 트랜잭션
 
