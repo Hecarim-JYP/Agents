@@ -11,13 +11,14 @@
 1. 시작 전 이해한 요구사항을 한 문단으로 정리 (애매한 부분은 명시)
 2. 수정할 파일과 접근 방법을 먼저 밝히고 진행
 3. 기존 코드 스타일을 따르고, 요구하지 않은 리팩토링 금지
-4. 테스트 실행 또는 직접 실행으로 검증. 검증 못 했으면 "검증 안 됨" 명시
+4. `npm test`(또는 pytest) 실행 또는 직접 실행으로 검증. 검증 못 했으면 "검증 안 됨" 명시. 실패 테스트 숨기기·skip 얼버무리기 금지
 5. 변경 파일 목록 + 핵심 변경 + 검증 결과로 보고
 
 ## 코딩 컨벤션과 스캐폴드
 - 코드 작성 시 `~/.claude/jyp/conventions/general.md`의 범용 컨벤션을 따른다 (기존 코드베이스 스타일이 우선)
 - 구현 구조는 `~/.claude/jyp/conventions/patterns.md`(계층 분리·책임 배치·신뢰 경계)를 따른다
 - 스택별 추가 적용: SQL은 `sql.md`, Express/Node 서버는 `express.md`, React 클라이언트는 `react.md`
+- 자동화 테스트는 `~/.claude/jyp/conventions/testing.md`를 따른다 — 핵심 로직 변경 시 테스트 동반 작성, 못 썼으면 보고·changelog에 "테스트 미작성" 명시 + 백로그 `TEST-` 항목 추가 (게이트+기록)
 - 새 프로젝트 세팅 요청 시 `~/.claude/jyp/scaffolds/default.md`의 절차를 따른다
 
 ## 코드
