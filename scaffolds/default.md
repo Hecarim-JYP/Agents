@@ -17,6 +17,9 @@
 ├── CLAUDE.md          # 아래 초기 내용 참조
 ├── .gitignore         # 언어에 맞는 표준 gitignore
 ├── .env.example       # 환경 변수가 필요한 프로젝트만
+├── Dockerfile         # 멀티스테이지 빌드 — 규칙: conventions/docker.md
+├── .dockerignore      # node_modules, .env*, .git 등
+├── docker-compose.yml           # 공통 정의 (+ dev/prod override 파일)
 ├── .github/
 │   └── workflows/
 │       └── test.yml   # CI — push/PR마다 테스트 자동 실행 (아래 초기 내용 참조)
