@@ -1,4 +1,4 @@
-# JYP Agents 설치 스크립트
+﻿# JYP Agents 설치 스크립트
 # 이 저장소의 에이전트와 템플릿을 ~/.claude 에 복사한다.
 # 사용법: 저장소 루트에서  .\install.ps1
 
