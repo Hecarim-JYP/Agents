@@ -55,10 +55,10 @@
 <목적 한 줄>
 
 ## 작업 규칙
-@C:/Users/USER/JYP/Agents/rules/dev-rules.md
+@~/.claude/jyp/rules/dev-rules.md
 
 ## 코딩 컨벤션
-@C:/Users/USER/JYP/Agents/conventions/general.md
+@~/.claude/jyp/conventions/general.md
 
 ## 프로젝트 참고사항
 <!-- 이 프로젝트만의 규칙, 주의점을 여기에 추가 -->

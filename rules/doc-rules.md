@@ -1,7 +1,7 @@
 # 문서 작업 규칙 (JYP)
 
 <!-- 프로젝트 CLAUDE.md에서 @로 import해서 사용:
-     @C:/Users/USER/JYP/Agents/rules/doc-rules.md -->
+     @~/.claude/jyp/rules/doc-rules.md -->
 
 ## 기본
 - 모든 문서는 한국어, 기술 용어는 영어 병기 가능

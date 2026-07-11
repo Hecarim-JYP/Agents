@@ -9,7 +9,7 @@ $agentsDir = Join-Path $claudeDir "agents"
 $jypDir    = Join-Path $claudeDir "jyp"
 
 New-Item -ItemType Directory -Force $agentsDir | Out-Null
-foreach ($sub in "templates", "conventions", "scaffolds") {
+foreach ($sub in "templates", "conventions", "scaffolds", "rules") {
     New-Item -ItemType Directory -Force (Join-Path $jypDir $sub) | Out-Null
     Copy-Item (Join-Path $PSScriptRoot "$sub\*.md") (Join-Path $jypDir $sub) -Force
 }
@@ -25,7 +25,7 @@ if (Test-Path $oldTemplatesDir) {
 Write-Host ""
 Write-Host "설치 완료:"
 Write-Host "  에이전트              -> $agentsDir  (dev-claude, doc-claude)"
-Write-Host "  템플릿/컨벤션/스캐폴드 -> $jypDir"
+Write-Host "  템플릿/컨벤션/스캐폴드/규칙 -> $jypDir"
 Write-Host ""
 Write-Host "이제 어느 폴더에서든 Claude Code에서 다음처럼 사용할 수 있습니다:"
 Write-Host '  "dev-claude로 새 프로젝트 세팅해줘"'

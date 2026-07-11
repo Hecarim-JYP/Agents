@@ -1,7 +1,7 @@
 # 개발 작업 규칙 (JYP)
 
 <!-- 프로젝트 CLAUDE.md에서 @로 import해서 사용:
-     @C:/Users/USER/JYP/Agents/rules/dev-rules.md -->
+     @~/.claude/jyp/rules/dev-rules.md -->
 
 ## 소통
 - 설명과 보고는 한국어, 코드와 기술 용어는 영어 원문 유지
@@ -15,9 +15,9 @@
 5. 변경 파일 목록 + 핵심 변경 + 검증 결과로 보고
 
 ## 코딩 컨벤션과 스캐폴드
-- 코드 작성 시 `C:/Users/USER/JYP/Agents/conventions/general.md`의 범용 컨벤션을 따른다 (기존 코드베이스 스타일이 우선)
-- SQL 작성 시 `C:/Users/USER/JYP/Agents/conventions/sql.md`의 스타일을 추가로 따른다
-- 새 프로젝트 세팅 요청 시 `C:/Users/USER/JYP/Agents/scaffolds/default.md`의 절차를 따른다
+- 코드 작성 시 `~/.claude/jyp/conventions/general.md`의 범용 컨벤션을 따른다 (기존 코드베이스 스타일이 우선)
+- SQL 작성 시 `~/.claude/jyp/conventions/sql.md`의 스타일을 추가로 따른다
+- 새 프로젝트 세팅 요청 시 `~/.claude/jyp/scaffolds/default.md`의 절차를 따른다
 
 ## 코드
 - 새 의존성 추가는 사전 보고
@@ -33,9 +33,9 @@
 ## 문서 생태계와 "작업 정리" 명령
 - 프로젝트 문서 역할 분리: CLAUDE.md(헌법) / `docs/dev_log/YYYY-MM-DD_CHANGELOG.md`(작업 이력) / `docs/REFACTORING_BACKLOG.md`(개선 과제 SSOT — 발견 즉시 추가)
 - 사용자가 **"작업 정리"**(또는 "오늘 작업을 정리해줘")를 요청하면:
-  1. changelog 작성/갱신 — 작업 단위 = **현재 브랜치의 미커밋 변경 전체**(`git status`+`git diff HEAD`, untracked 포함). "이번 세션에서 건드린 파일"만 정리 금지. 같은 날짜 파일은 누적/갱신 (템플릿: `C:/Users/USER/JYP/Agents/templates/changelog.md`)
+  1. changelog 작성/갱신 — 작업 단위 = **현재 브랜치의 미커밋 변경 전체**(`git status`+`git diff HEAD`, untracked 포함). "이번 세션에서 건드린 파일"만 정리 금지. 같은 날짜 파일은 누적/갱신 (템플릿: `~/.claude/jyp/templates/changelog.md`)
   2. CLAUDE.md 갱신 — 새 컨벤션·Pitfall 반영, 기존 항목과 겹치면 새 번호 대신 기존 항목 갱신
-  3. 백로그 동기화 — **발견 ≠ 완료 (STRICT)**: `git diff` 근거가 있는 실제 해결 건만 `☑ (YYYY-MM-DD)`, 일부 처리는 `◐`, 새 발견 이슈는 추가 (템플릿: `C:/Users/USER/JYP/Agents/templates/backlog.md`)
+  3. 백로그 동기화 — **발견 ≠ 완료 (STRICT)**: `git diff` 근거가 있는 실제 해결 건만 `☑ (YYYY-MM-DD)`, 일부 처리는 `◐`, 새 발견 이슈는 추가 (템플릿: `~/.claude/jyp/templates/backlog.md`)
   4. 기록 위치와 백로그 대조 결과를 요약 보고. 커밋/푸시는 명시 요청 시에만
 
 ## 통합 테스트 명령

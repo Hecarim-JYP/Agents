@@ -23,7 +23,7 @@ cd jyp-agents
 .\install.ps1
 ```
 
-에이전트는 `~/.claude/agents/`에, 템플릿·컨벤션·스캐폴드는 `~/.claude/jyp/`에 복사된다.
+에이전트는 `~/.claude/agents/`에, 템플릿·컨벤션·스캐폴드·규칙은 `~/.claude/jyp/`에 복사된다.
 전역 설치이므로 어느 폴더에서 Claude Code를 열어도 사용할 수 있다.
 
 ## 사용법
@@ -43,10 +43,11 @@ doc-claude로 이 PDF 내용 정리해줘
 특정 프로젝트에서 항상 규칙을 적용하고 싶으면, 그 프로젝트의 `CLAUDE.md`에 import 한 줄을 추가한다:
 
 ```markdown
-@C:/Users/USER/JYP/Agents/rules/dev-rules.md
+@~/.claude/jyp/rules/dev-rules.md
 ```
 
 이러면 서브에이전트를 부르지 않아도 메인 Claude가 항상 그 규칙대로 일한다.
+모든 참조 경로는 저장소 클론 위치가 아니라 **설치 경로(`~/.claude/jyp/`) 기준**이므로, 다른 기기에서도 클론 → `install.ps1` 실행만 하면 동일하게 동작한다.
 
 ## 수정/관리
 
