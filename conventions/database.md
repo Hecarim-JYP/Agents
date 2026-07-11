@@ -19,6 +19,7 @@
 | PK | **`{테이블명}_id`** (전체 테이블명 + `_id`) | `ct_request_id`, `preservative_test_item_id` |
 | FK 컬럼 | 참조 테이블의 PK 컬럼명 그대로 | 자식 테이블에 `ct_request_id` |
 | 인덱스 | `idx_{테이블}_{컬럼}`, 유니크는 `uq_` 접두사 | `idx_ct_request_status`, `uq_ct_request_no` |
+| FK 제약 | `fk_{테이블}_{참조테이블}` | `fk_user_role`, `fk_role_permission_role` |
 
 ## 3. 공통 컬럼 (모든 업무 테이블 필수)
 
@@ -54,3 +55,31 @@ updated_by   BIGINT,
 - 운영 DB는 슬로우 쿼리 로그를 활성화하고, 배포 후 정기적으로 확인한다 (성능 문제의 조기 발견).
 - canonical DDL 파일(테이블 원본 정의)을 저장소에 유지하고 마이그레이션과 동기화한다 (migration.md 5절).
 - 운영 DB에 수동 쿼리로 데이터를 직접 수정하지 않는다 — 불가피하면 실행 전 백업 + 실행 쿼리를 changelog에 기록.
+
+## 7. 테이블 생성 규칙 (DDL, STRICT)
+
+- 테이블 생성·변경은 **반드시 마이그레이션 파일로** 한다 (migration.md) — DB 툴에서 즉석 CREATE 금지. 기초 테이블은 표준 스키마(1절) 복사로 시작.
+- **모든 CREATE TABLE에 명시**: `IF NOT EXISTS`(멱등) + `ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`.
+- **PK 없는 테이블 금지** — `{테이블명}_id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY`.
+- 코드값·구분값 컬럼에는 인라인 주석으로 의미를 남긴다 (예: `-- '{module}.{action}' 형식`).
+
+```sql
+CREATE TABLE IF NOT EXISTS example_item (
+    example_item_id  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    example_id       BIGINT UNSIGNED NOT NULL,        -- 부모 FK
+    item_name        VARCHAR(100) NOT NULL,
+    status           VARCHAR(20)  NOT NULL DEFAULT 'PENDING',  -- common_code: ITEM_STATUS
+    sort_order       INT NOT NULL DEFAULT 0,
+    is_active        TINYINT(1) NOT NULL DEFAULT 1,
+    created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by       BIGINT,
+    updated_at       DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+    updated_by       BIGINT,
+    UNIQUE KEY uq_example_item_name (example_id, item_name),
+    KEY idx_example_item_example_id (example_id, is_active),
+    CONSTRAINT fk_example_item_example FOREIGN KEY (example_id) REFERENCES example (example_id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+- 포맷: 컬럼명 + **공백 정렬** + 타입 (sql.md SELECT 컬럼 정렬과 동일 원칙). 순서 = PK → FK → 업무 컬럼 → 상태/플래그 → 공통 컬럼(3절), 제약(UNIQUE/KEY/CONSTRAINT)은 컬럼 뒤에 모아서.
+- 작성 스타일의 살아있는 레퍼런스 = 표준 스키마(`~/.claude/jyp/schemas/*.sql`).
