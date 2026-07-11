@@ -35,7 +35,7 @@ updated_by   BIGINT,
 
 - **금액·정밀 수치는 `DECIMAL`** — `FLOAT`/`DOUBLE` 금지 (근거: 부동소수점 오차로 합계가 안 맞는 버그).
 - 불리언: `TINYINT(1)` 0/1.
-- ID: `BIGINT UNSIGNED AUTO_INCREMENT` (드라이버 BigInt 직렬화 주의: express.md 6절).
+- ID: `BIGINT UNSIGNED AUTO_INCREMENT` (드라이버 BigInt 직렬화 주의: express.md 7절).
 - 상태·구분값: 매직 넘버 금지 — 코드 문자열 또는 공통코드 테이블 FK로. 의미는 스키마나 CLAUDE.md에 문서화.
 - 날짜만 필요하면 `DATE`, 시각 포함은 `DATETIME`. 문자열로 날짜 저장 금지.
 

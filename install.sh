@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # JYP Agents 설치 스크립트 (Mac/Linux)
-# 이 저장소의 에이전트, 템플릿, 컨벤션, 스캐폴드, 규칙을 ~/.claude 에 복사한다.
+# 이 저장소의 에이전트, 템플릿, 컨벤션, 스캐폴드, 규칙, 스킬을 ~/.claude 에 복사한다.
 # 사용법: 저장소 루트에서  ./install.sh
 
 set -euo pipefail

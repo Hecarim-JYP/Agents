@@ -96,7 +96,16 @@ try {
 - 소유권/배정 비교도 클라 전송값이 아니라 `req.user.id` 기준. `null == null` 거짓 통과 방지를 위해 양쪽 null 가드 필수.
 - 관리자/설정 엔드포인트는 로그인 여부(`authenticateToken`)만으로 부족 — `requireRole`/`requirePermission` 같은 권한 게이트를 반드시 부착한다 (근거: 게이트를 정의만 하고 라우트에 미적용하면 일반 사용자가 관리 API를 호출할 수 있다).
 
-## 6. 기타
+## 6. 파일 업로드 (STRICT)
+
+- **저장 파일명은 서버가 생성**(UUID/타임스탬프) — 사용자가 보낸 파일명·경로를 저장 경로에 사용 금지 (근거: 경로 트래버설 공격의 원천 차단). 원본 파일명은 DB 메타에만 보관.
+- 저장 경로는 `uploads/{module}/{type}/` 구조로 서버가 정적으로 결정. 검증: 확장자 화이트리스트 + MIME + 크기 제한.
+- **파일과 DB 메타는 항상 쌍**: 원본 파일명, 저장 경로, 크기, 소속(module/reference_id), `created_by`를 기록한다 — 어느 하나만 있으면 고아 파일/깨진 링크가 된다. 트랜잭션 롤백 시 저장된 파일도 삭제(4절).
+- 다운로드는 **권한 검사 후** DB에 기록된 경로로만 제공 (요청 파라미터의 경로 사용 금지). 미리보기는 `disposition=inline` 분기.
+- 클라이언트 FormData는 텍스트 필드를 먼저, 파일(`files`)을 마지막에 append — multipart 파서가 필드를 파일보다 먼저 읽어야 하는 제약. 키 케이싱은 서버와 일치.
+- 업로드 폴더는 git 비추적(`.gitignore`), 컨테이너에서는 볼륨(docker.md 4절), 백업 대상(ops.md 6절).
+
+## 7. 기타
 
 - MariaDB/MySQL 드라이버가 BigInt를 반환하는 값(count, affectedRows, insertId)은 `Number()` 변환 후 사용 (근거: BigInt는 JSON 직렬화 시 오류를 일으킨다).
 - 환경변수 시크릿/내부 주소에 하드코딩 폴백 금지 — 미설정 시 부팅 실패 (patterns.md 4절).

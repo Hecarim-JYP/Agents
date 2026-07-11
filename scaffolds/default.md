@@ -4,10 +4,27 @@
 
 ## 생성 절차
 
-1. **확인**: 프로젝트명(폴더명), 목적 한 줄, 사용 언어를 확인한다. 언어가 미정이면 목적을 듣고 추천한다.
+1. **확인**: 프로젝트명(폴더명), 목적 한 줄과 함께 아래 **시작 결정 체크리스트**를 사용자와 확정한다. 미정 항목은 목적을 듣고 추천한다.
 2. **생성**: 아래 기본 구조를 만들고, 언어별 조정표에 따라 변형한다.
 3. **초기화**: `git init` 후 첫 커밋 (`chore: 프로젝트 초기 구조 생성`)
 4. **보고**: 생성된 구조를 트리로 보여주고, 다음 단계(의존성 설치 등)를 안내한다.
+
+## 시작 결정 체크리스트
+
+컨벤션 곳곳의 "프로젝트 시작 시 결정" 항목을 모은 목록. 확정값은 생성되는 CLAUDE.md의 "프로젝트 참고사항"에 기록한다.
+
+| # | 결정 항목 | 기본값 | 근거 문서 |
+|---|---|---|---|
+| 1 | 언어/스택 | TypeScript (react-ts / Express TS) | react.md·express.md 0절 |
+| 2 | 구조 | 풀스택이면 모노레포(client/+server/) | 아래 모노레포 절 |
+| 3 | UI 모드 | 업무 시스템 모드 | design.md 4절 |
+| 4 | 다크모드 지원 | 프로젝트별 결정 | design.md 3절 |
+| 5 | 브랜드 색 (`:root` 변수) | shadcn 기본 → 프로젝트 색 | design.md 2절 |
+| 6 | DB 종류 / 시간대 | MariaDB/MySQL / Asia/Seoul | database.md 1절 |
+| 7 | API 응답 봉투 계약 | 단일 봉투 (모든 헬퍼 `data` 키) | express.md 2절 |
+| 8 | 테스트 파일 위치 | `tests/` 미러링 | testing.md 4절 |
+| 9 | HTTPS 가능 여부 (사내망 제약) | 프록시 자동 HTTPS (Caddy) | docker.md 7절 |
+| 10 | GitHub 원격/CI 사용 여부 | 사용 (test.yml 생성) | 아래 CI 절 |
 
 ## 기본 구조
 
@@ -118,10 +135,16 @@ jobs:
           node-version: 22
       - run: npm ci
       - run: npm test
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t ci-build-check .
 ```
 
 - Python 프로젝트는 `setup-python` + `pip install -e .[dev]` + `pytest`로 대체.
-- 모노레포(client/server 분리)는 디렉토리별 job으로 분리.
+- 모노레포(client/server 분리)는 test·docker 모두 디렉토리별 job으로 분리 (`working-directory` / `docker build client/` 등).
+- docker job은 이미지 빌드 성공만 검증한다 — Dockerfile이 깨진 채 배포 시점까지 가는 것을 방지 (push/실행은 하지 않음).
 
 ## 주의
 
