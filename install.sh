@@ -30,8 +30,14 @@ for skill in "$REPO_DIR/skills/"*/; do
   cp -r "$skill" "$SKILLS_DIR/$name"
 done
 
+# 훅 설치 — 이 저장소의 훅 스크립트만 교체 (사용자의 다른 훅은 보존)
+HOOKS_DIR="$CLAUDE_DIR/hooks"
+mkdir -p "$HOOKS_DIR"
+cp "$REPO_DIR/hooks/"*.mjs "$HOOKS_DIR/"
+
 echo ""
 echo "설치 완료:"
 echo "  에이전트                    -> $AGENTS_DIR  (dev-claude, doc-claude)"
 echo "  템플릿/컨벤션/스캐폴드/규칙 -> $JYP_DIR"
 echo "  스킬                        -> $SKILLS_DIR  (/work-log, /deploy-check, /paper-test, /new-project)"
+echo "  훅                          -> $HOOKS_DIR  (post-edit-check, stop-test)"

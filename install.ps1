@@ -28,6 +28,11 @@ foreach ($skill in Get-ChildItem (Join-Path $PSScriptRoot "skills") -Directory) 
     Copy-Item $skill.FullName $dest -Recurse
 }
 
+# 훅 설치 — 이 저장소의 훅 스크립트만 교체 (사용자의 다른 훅은 보존)
+$hooksDir = Join-Path $claudeDir "hooks"
+New-Item -ItemType Directory -Force $hooksDir | Out-Null
+Copy-Item (Join-Path $PSScriptRoot "hooks\*.mjs") $hooksDir -Force
+
 # 구버전 설치 경로 정리
 $oldTemplatesDir = Join-Path $claudeDir "jyp-templates"
 if (Test-Path $oldTemplatesDir) {
@@ -40,6 +45,7 @@ Write-Host "설치 완료:"
 Write-Host "  에이전트              -> $agentsDir  (dev-claude, doc-claude)"
 Write-Host "  템플릿/컨벤션/스캐폴드/규칙 -> $jypDir"
 Write-Host "  스킬                  -> $skillsDir  (/work-log, /deploy-check, /paper-test, /new-project)"
+Write-Host "  훅                    -> $hooksDir  (post-edit-check, stop-test)"
 Write-Host ""
 Write-Host "이제 어느 폴더에서든 Claude Code에서 다음처럼 사용할 수 있습니다:"
 Write-Host '  "dev-claude로 새 프로젝트 세팅해줘"'
