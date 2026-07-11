@@ -21,7 +21,9 @@
 │   └── workflows/
 │       └── test.yml   # CI — push/PR마다 테스트 자동 실행 (아래 초기 내용 참조)
 ├── docs/              # 설계 문서, 결정 기록
-│   └── dev_log/       # 작업 이력 ("작업 정리" 명령이 changelog를 여기에 생성)
+│   ├── dev_log/       # 작업 이력 ("작업 정리" 명령이 changelog를 여기에 생성)
+│   └── incidents/     # 장애 기록 (운영 프로젝트만 — incident 템플릿)
+├── migrations/        # DB 사용 프로젝트만 — 규칙: conventions/migration.md
 ├── src/               # 소스 코드 (언어별 조정표 참조)
 ├── tests/             # 테스트 코드 (testing.md — Vitest/pytest, npm test로 실행)
 └── scripts/           # 빌드/배포/유틸 스크립트
