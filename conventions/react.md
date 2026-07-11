@@ -13,11 +13,11 @@ LTMS에서 검증된 React 구현 패턴. `patterns.md`(언어 무관)를 전제
 
 ```
 src/
-├── features/{Module}/{feature}/
-│   ├── pages/        # {Module}_{Feature}_{Action}.jsx (예: CT_Request_Read.jsx)
-│   ├── hooks/        # use{Module}{Feature}Api.jsx 등 역할별 훅
-│   ├── constants/    # {Module}_{Feature}_{Action}_Constants.js (컬럼 정의 등)
-│   └── components/   # 화면 구성 섹션 컴포넌트
+├── features/{module}/{feature}/
+│   ├── pages/        # CtRequestRead.tsx (PascalCase — 모듈+기능+동작)
+│   ├── hooks/        # useCtRequestApi.ts 등 역할별 훅 (camelCase)
+│   ├── constants/    # ctRequestRead.constants.ts (컬럼 정의 등)
+│   └── components/   # 화면 구성 섹션 컴포넌트 (PascalCase)
 └── shared/
     ├── contexts/     # 인증, 공통코드, 다이얼로그 등 전역 컨텍스트
     ├── hooks/        # 공용 훅
@@ -25,7 +25,21 @@ src/
     └── utils/
 ```
 
-- 모듈(도메인) 단위로 묶고, 화면 로직은 **역할별 훅으로 분리**한다: API 훅(`use*Api`) / 폼 상태(`use*Form`) / 검증(`use*Validation`) / 검색·필터(`use*Search`). 페이지 컴포넌트는 훅 조립과 레이아웃만.
+**네이밍 (React 생태계 표준 — 2026-07-11 PascalCase로 확정)**:
+
+| 대상 | 패턴 | 예시 |
+|---|---|---|
+| 컴포넌트/페이지 파일 | PascalCase, 언더스코어 없음 | `CtRequestRead.tsx`, `CtRequestSearchForm.tsx` |
+| 훅 파일 | camelCase, `use` 접두사 | `useCtRequestApi.ts`, `useCtCreateForm.ts` |
+| 상수 파일 | camelCase + `.constants.ts` | `ctRequestRead.constants.ts` |
+| 유틸/일반 모듈 | camelCase | `printDocument.ts`, `dateUtils.ts` |
+| 폴더 | 소문자 camelCase | `features/ct/request/` |
+
+- 파일명에 모듈 접두사(`Ct`, `Internal` 등)는 유지한다 — 폴더 밖에서도 검색·식별이 쉽도록 (구 언더스코어 컨벤션의 grep 편의성 보존).
+- 컴포넌트 이름과 파일명은 일치시킨다 (`CtRequestRead.tsx` → `export default function CtRequestRead()`).
+- **기존 프로젝트(LTMS 등)는 기존 언더스코어 컨벤션(`CT_Request_Read.jsx`) 유지** — 한 코드베이스 안에서 두 스타일 혼용이 최악이다. 신규 프로젝트부터 적용.
+
+모듈(도메인) 단위로 묶고, 화면 로직은 **역할별 훅으로 분리**한다: API 훅(`use*Api`) / 폼 상태(`use*Form`) / 검증(`use*Validation`) / 검색·필터(`use*Search`). 페이지 컴포넌트는 훅 조립과 레이아웃만.
 
 ## 2. 권한 게이트
 
