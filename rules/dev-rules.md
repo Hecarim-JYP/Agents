@@ -16,6 +16,7 @@
 
 ## 코딩 컨벤션과 스캐폴드
 - 코드 작성 시 `C:/Users/USER/JYP/Agents/conventions/general.md`의 범용 컨벤션을 따른다 (기존 코드베이스 스타일이 우선)
+- SQL 작성 시 `C:/Users/USER/JYP/Agents/conventions/sql.md`의 스타일을 추가로 따른다
 - 새 프로젝트 세팅 요청 시 `C:/Users/USER/JYP/Agents/scaffolds/default.md`의 절차를 따른다
 
 ## 코드
