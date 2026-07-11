@@ -2,6 +2,27 @@
 
 LTMS에서 검증된 서버 구현 패턴. `patterns.md`(언어 무관)를 전제로 한다.
 
+## 0. 언어 (신규 프로젝트)
+
+- **신규 Express/Node 서버는 TypeScript(`.ts`) 기본**, `tsconfig.json`은 `strict: true` 고정. JavaScript는 사용자가 명시적으로 요청할 때만 (react.md 0절과 동일 근거 — 2026-07-11 확정).
+- `any` 사용 금지 — 타입을 모르면 `unknown`으로 받아 좁혀서 사용.
+- 실행/빌드: 개발은 `tsx watch src/index.ts`, 배포는 `tsc`로 `dist/` 빌드 후 `node dist/index.js`.
+- `req.user` 같은 커스텀 필드는 타입 확장(declaration merging)으로 선언해 전 컨트롤러에서 타입 안전하게 사용 — 신뢰값 주입(5절)의 재료가 타입으로 보장된다:
+
+```ts
+// src/types/express.d.ts
+declare global {
+  namespace Express {
+    interface Request {
+      user?: { id: number; companyId: number; roleCode: string };
+    }
+  }
+}
+```
+
+- 응답 헬퍼·에러 클래스·쿼리 함수의 파라미터/반환값에 타입을 선언해 **응답 키 계약(2절)과 계층 간 계약을 컴파일 타임에 강제**한다. 단, 런타임엔 타입이 사라지므로 외부 입력 검증(3절)과 신뢰값 주입(5절)은 타입과 별개로 유지.
+- 기존 JS 프로젝트(LTMS 등)는 전환하지 않는다 — 현행 유지.
+
 ## 1. 계층 구조
 
 ```
