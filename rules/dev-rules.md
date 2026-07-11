@@ -16,7 +16,8 @@
 
 ## 코딩 컨벤션과 스캐폴드
 - 코드 작성 시 `~/.claude/jyp/conventions/general.md`의 범용 컨벤션을 따른다 (기존 코드베이스 스타일이 우선)
-- SQL 작성 시 `~/.claude/jyp/conventions/sql.md`의 스타일을 추가로 따른다
+- 구현 구조는 `~/.claude/jyp/conventions/patterns.md`(계층 분리·책임 배치·신뢰 경계)를 따른다
+- 스택별 추가 적용: SQL은 `sql.md`, Express/Node 서버는 `express.md`, React 클라이언트는 `react.md`
 - 새 프로젝트 세팅 요청 시 `~/.claude/jyp/scaffolds/default.md`의 절차를 따른다
 
 ## 코드
