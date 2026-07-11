@@ -4,6 +4,7 @@
  * 최초등록 : 2026-07-12 [박진영]
  * 참고 : 멀티테넌트 프로젝트는 각 테이블에 스코프 컬럼(company_id 등)을 추가하고
  *        조회 인덱스 선두에 배치한다 (database.md 3절)
+ *        FK는 논리적 참조만 — FOREIGN KEY 제약 미선언, FK 컬럼 인덱스 필수 (database.md 5절)
  */
 
 CREATE TABLE IF NOT EXISTS role (
@@ -37,8 +38,7 @@ CREATE TABLE IF NOT EXISTS role_permission (
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by          BIGINT,
     UNIQUE KEY uq_role_permission (role_id, permission_id),
-    CONSTRAINT fk_role_permission_role       FOREIGN KEY (role_id)       REFERENCES role (role_id)             ON DELETE RESTRICT,
-    CONSTRAINT fk_role_permission_permission FOREIGN KEY (permission_id) REFERENCES permission (permission_id) ON DELETE RESTRICT
+    KEY idx_role_permission_permission_id (permission_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `user` (
@@ -58,8 +58,7 @@ CREATE TABLE IF NOT EXISTS `user` (
     updated_at          DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
     updated_by          BIGINT,
     UNIQUE KEY uq_user_login_id (login_id),
-    KEY idx_user_role_id (role_id),
-    CONSTRAINT fk_user_role FOREIGN KEY (role_id) REFERENCES role (role_id) ON DELETE RESTRICT
+    KEY idx_user_role_id (role_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS login_history (

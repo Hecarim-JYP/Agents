@@ -19,7 +19,6 @@
 | PK | **`{테이블명}_id`** (전체 테이블명 + `_id`) | `ct_request_id`, `preservative_test_item_id` |
 | FK 컬럼 | 참조 테이블의 PK 컬럼명 그대로 | 자식 테이블에 `ct_request_id` |
 | 인덱스 | `idx_{테이블}_{컬럼}`, 유니크는 `uq_` 접두사 | `idx_ct_request_status`, `uq_ct_request_no` |
-| FK 제약 | `fk_{테이블}_{참조테이블}` | `fk_user_role`, `fk_role_permission_role` |
 
 ## 3. 공통 컬럼 (모든 업무 테이블 필수)
 
@@ -45,7 +44,8 @@ updated_by   BIGINT,
 
 - WHERE/JOIN에 반복 사용되는 컬럼에 인덱스를 건다. 멀티테넌트는 `(scope_key, ...)` 복합 인덱스의 선두에 스코프 컬럼.
 - **유일성은 DB의 UNIQUE 제약으로 보장한다** — 앱 검증만으로는 동시 요청 경쟁에서 뚫린다 (채번 규칙과 연계: sql.md 7절).
-- FK 제약은 걸되 `ON DELETE`는 **RESTRICT 기본**. CASCADE는 소프트삭제 체계와 충돌하므로 금지에 가깝게 신중히.
+- **FK는 논리적(암묵적) 참조로만 관리한다 — FOREIGN KEY 제약을 선언하지 않는다 (2026-07-12 확정).** 관계는 컬럼 네이밍(참조 테이블 PK명 그대로)으로 표현하고, 정합성은 앱 계층이 책임진다: 저장 시 참조 대상 존재 검증(서비스 계층), 삭제 시 자식 데이터 확인(소프트삭제 체계와 결합). (근거: 소프트삭제 중심 설계에서는 물리 삭제가 드물어 제약의 실익이 작고, 마이그레이션·시드·테이블 재구성 시 순서 제약과 잠금이 운영 부담 — 대규모 서비스 실무의 일반적 선택.)
+- ⚠ **FK 컬럼에는 인덱스를 직접 건다 (STRICT)** — FK 제약이 자동 생성해주던 인덱스가 사라지므로, 빼먹으면 JOIN 성능이 조용히 무너진다.
 - 대량 테이블의 인덱스 추가·컬럼 변경 마이그레이션은 테이블 잠금 시간을 확인하고 배포 시간대를 조정한다.
 
 ## 6. 커넥션·운영
@@ -76,10 +76,9 @@ CREATE TABLE IF NOT EXISTS example_item (
     updated_at       DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
     updated_by       BIGINT,
     UNIQUE KEY uq_example_item_name (example_id, item_name),
-    KEY idx_example_item_example_id (example_id, is_active),
-    CONSTRAINT fk_example_item_example FOREIGN KEY (example_id) REFERENCES example (example_id) ON DELETE RESTRICT
+    KEY idx_example_item_example_id (example_id, is_active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
-- 포맷: 컬럼명 + **공백 정렬** + 타입 (sql.md SELECT 컬럼 정렬과 동일 원칙). 순서 = PK → FK → 업무 컬럼 → 상태/플래그 → 공통 컬럼(3절), 제약(UNIQUE/KEY/CONSTRAINT)은 컬럼 뒤에 모아서.
+- 포맷: 컬럼명 + **공백 정렬** + 타입 (sql.md SELECT 컬럼 정렬과 동일 원칙). 순서 = PK → FK 컬럼 → 업무 컬럼 → 상태/플래그 → 공통 컬럼(3절), UNIQUE/KEY는 컬럼 뒤에 모아서. FOREIGN KEY 제약은 선언하지 않는다(5절) — 대신 FK 컬럼 인덱스 필수.
 - 작성 스타일의 살아있는 레퍼런스 = 표준 스키마(`~/.claude/jyp/schemas/*.sql`).
