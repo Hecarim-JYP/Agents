@@ -21,7 +21,17 @@ for sub in templates conventions scaffolds rules; do
 done
 cp "$REPO_DIR/agents/"*.md "$AGENTS_DIR/"
 
+# 스킬 설치 — 이 저장소의 스킬 폴더만 교체 (사용자의 다른 스킬은 보존)
+SKILLS_DIR="$CLAUDE_DIR/skills"
+mkdir -p "$SKILLS_DIR"
+for skill in "$REPO_DIR/skills/"*/; do
+  name="$(basename "$skill")"
+  rm -rf "$SKILLS_DIR/$name"
+  cp -r "$skill" "$SKILLS_DIR/$name"
+done
+
 echo ""
 echo "설치 완료:"
 echo "  에이전트                    -> $AGENTS_DIR  (dev-claude, doc-claude)"
 echo "  템플릿/컨벤션/스캐폴드/규칙 -> $JYP_DIR"
+echo "  스킬                        -> $SKILLS_DIR  (/work-log, /deploy-check, /paper-test, /new-project)"

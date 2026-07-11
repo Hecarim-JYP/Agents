@@ -19,6 +19,15 @@ foreach ($sub in "templates", "conventions", "scaffolds", "rules") {
 }
 Copy-Item (Join-Path $PSScriptRoot "agents\*.md") $agentsDir -Force
 
+# 스킬 설치 — 이 저장소의 스킬 폴더만 교체 (사용자의 다른 스킬은 보존)
+$skillsDir = Join-Path $claudeDir "skills"
+New-Item -ItemType Directory -Force $skillsDir | Out-Null
+foreach ($skill in Get-ChildItem (Join-Path $PSScriptRoot "skills") -Directory) {
+    $dest = Join-Path $skillsDir $skill.Name
+    if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
+    Copy-Item $skill.FullName $dest -Recurse
+}
+
 # 구버전 설치 경로 정리
 $oldTemplatesDir = Join-Path $claudeDir "jyp-templates"
 if (Test-Path $oldTemplatesDir) {
@@ -30,6 +39,7 @@ Write-Host ""
 Write-Host "설치 완료:"
 Write-Host "  에이전트              -> $agentsDir  (dev-claude, doc-claude)"
 Write-Host "  템플릿/컨벤션/스캐폴드/규칙 -> $jypDir"
+Write-Host "  스킬                  -> $skillsDir  (/work-log, /deploy-check, /paper-test, /new-project)"
 Write-Host ""
 Write-Host "이제 어느 폴더에서든 Claude Code에서 다음처럼 사용할 수 있습니다:"
 Write-Host '  "dev-claude로 새 프로젝트 세팅해줘"'
