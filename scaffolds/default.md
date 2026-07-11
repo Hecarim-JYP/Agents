@@ -29,8 +29,8 @@
 | 언어 | 조정 내용 |
 |---|---|
 | Python | `pyproject.toml` 추가, `src/<패키지명>/` 레이아웃, `src/<패키지명>/__init__.py` |
-| TypeScript/Node | `package.json`, `tsconfig.json` 추가, 테스트는 `tests/` 또는 프레임워크 관례 |
-| React/Next.js | 프레임워크 CLI(`create-next-app` 등)가 있으면 그걸 우선 사용하고, 그 위에 CLAUDE.md와 docs/만 추가 |
+| TypeScript/Node | `package.json`, `tsconfig.json`(`strict: true`) 추가, 테스트는 `tests/` 또는 프레임워크 관례 |
+| React/Next.js | **TypeScript 기본** — Vite는 `react-ts` 템플릿, Next.js는 `create-next-app --typescript`. `tsconfig.json`은 `strict: true` 고정. JavaScript(JSX)는 사용자가 명시적으로 요청할 때만. 프레임워크 CLI 산출물 위에 CLAUDE.md와 docs/만 추가 |
 | 기타 | 해당 언어 커뮤니티의 표준 레이아웃을 조사해서 따르고, CLAUDE.md/docs/는 항상 추가 |
 
 ## 초기 파일 내용

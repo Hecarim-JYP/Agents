@@ -2,6 +2,13 @@
 
 LTMS에서 검증된 React 구현 패턴. `patterns.md`(언어 무관)를 전제로 한다.
 
+## 0. 언어 (신규 프로젝트)
+
+- **신규 React 프로젝트는 TypeScript(`.tsx`) 기본**, `tsconfig.json`은 `strict: true` 고정. JavaScript(JSX)는 사용자가 명시적으로 요청할 때만 (근거: 응답 키 계약·props 문서화·`??` vs `||` 같은 STRICT 규칙의 상당수가 타입으로 컴파일 타임에 강제되어 규칙 의존이 줄어듦 — 2026-07-11 확정).
+- `any` 사용 금지 — 타입을 모르면 `unknown`으로 받아 좁혀서 사용. 외부 데이터(API 응답)는 타입 선언만으로 보장되지 않으므로 경계 검증(patterns.md 4절)은 여전히 적용.
+- props 타입은 `interface`로 선언 — 타입 선언이 JSDoc `@param`의 역할을 대신한다 (설명이 더 필요한 prop만 주석 보강).
+- 기존 JSX 프로젝트(LTMS 등)는 전환하지 않는다 — 현행 유지.
+
 ## 1. 구조와 네이밍
 
 ```
