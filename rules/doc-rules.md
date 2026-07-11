@@ -9,7 +9,7 @@
 - 파일명: `YYYY-MM-DD_문서제목.md`
 
 ## 템플릿
-문서 종류에 맞는 템플릿(`~/.claude/jyp-templates/`)의 구조를 따른다:
+문서 종류에 맞는 템플릿(`~/.claude/jyp/templates/`)의 구조를 따른다:
 - 업무 보고서 → `report.md`
 - 기술 문서 → `tech-doc.md`
 - 기획/제안서 → `proposal.md`
