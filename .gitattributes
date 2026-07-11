@@ -1,0 +1,4 @@
+# 줄바꿈 정규화 — 저장소에는 LF로 저장, 체크아웃은 파일 유형별 규칙
+* text=auto
+*.ps1 text eol=crlf
+*.sh  text eol=lf
