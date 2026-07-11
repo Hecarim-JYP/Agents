@@ -15,9 +15,9 @@ mkdir -p "$AGENTS_DIR"
 # 저장소에서 삭제/이름변경된 파일이 설치 경로에 잔존하지 않도록 비우고 새로 복사
 rm -rf "$JYP_DIR"
 
-for sub in templates conventions scaffolds rules; do
+for sub in templates conventions scaffolds rules schemas; do
   mkdir -p "$JYP_DIR/$sub"
-  cp "$REPO_DIR/$sub/"*.md "$JYP_DIR/$sub/"
+  cp "$REPO_DIR/$sub/"* "$JYP_DIR/$sub/"
 done
 cp "$REPO_DIR/agents/"*.md "$AGENTS_DIR/"
 

@@ -68,6 +68,12 @@
 - Dockerfile은 각 서비스별로, compose가 전체를 조립한다 (docker.md).
 - CLAUDE.md·docs·migrations는 루트에서 공유 — "작업 정리"도 저장소 단위 1회.
 
+## 기초 테이블 (DB 사용 프로젝트)
+
+- `~/.claude/jyp/schemas/`의 표준 스키마 5종(schema_migrations / 인증·권한 / 공통코드 / 파일 메타 / 감사 로그)을 `migrations/001_core_tables.sql`(DDL이므로 필요 시 분할)로 복사해 첫 마이그레이션으로 삼는다.
+- 프로젝트 요구에 맞게 조정한다: 멀티테넌트면 스코프 컬럼 추가(database.md 3절), 불필요한 테이블(예: 파일 업로드 없는 프로젝트의 files)은 제외.
+- 초기 관리자 계정·기본 역할(ADMIN 등) 시드는 별도 마이그레이션 파일로, `NOT EXISTS` 가드와 함께.
+
 ## 언어별 조정표
 
 | 언어 | 조정 내용 |

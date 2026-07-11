@@ -5,6 +5,7 @@
 ## 1. 기본
 
 - 표준 DB: **MariaDB/MySQL**. 다른 DB를 채택할 경우 프로젝트 시작 시 결정하고 CLAUDE.md에 기록한다 (이 문서의 원칙은 동일 적용).
+- **기초 테이블은 표준 스키마(`~/.claude/jyp/schemas/`)로 시작한다**: schema_migrations, 인증·권한(user/role/permission/login_history), 공통코드, 파일 메타, 감사 로그 — 새로 설계하지 말고 이 DDL을 프로젝트 첫 마이그레이션으로 복사·조정한다.
 - 운영은 Docker 컨테이너 + named volume (docker.md 4절), 백업·복구 절차는 ops.md 6절.
 - 문자셋·정렬: **`utf8mb4` / `utf8mb4_unicode_ci` 고정** (근거: utf8은 이모지·일부 한자에서 깨진다).
 - 시간대: 서버·DB·앱의 시간대를 하나로 통일하고(기본 `Asia/Seoul`) CLAUDE.md에 기록 — 저장은 `DATETIME`, 변환은 앱 계층에서.
