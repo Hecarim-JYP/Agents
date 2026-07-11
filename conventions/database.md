@@ -7,7 +7,10 @@
 - 표준 DB: **MariaDB/MySQL**. 다른 DB를 채택할 경우 프로젝트 시작 시 결정하고 CLAUDE.md에 기록한다 (이 문서의 원칙은 동일 적용).
 - **기초 테이블은 표준 스키마(`~/.claude/jyp/schemas/`)로 시작한다**: schema_migrations, 인증·권한(user/role/permission/login_history), 공통코드, 파일 메타, 감사 로그 — 새로 설계하지 말고 이 DDL을 프로젝트 첫 마이그레이션으로 복사·조정한다.
 - 운영은 Docker 컨테이너 + named volume (docker.md 4절), 백업·복구 절차는 ops.md 6절.
-- 문자셋·정렬: **`utf8mb4` / `utf8mb4_unicode_ci` 고정** (근거: utf8은 이모지·일부 한자에서 깨진다).
+- **지원 최소 버전: MariaDB 10.4+ / MySQL 8.0+** (근거: 구버전은 인덱스 키 한계가 767바이트라 utf8mb4 `VARCHAR(255)` UNIQUE 생성이 실패한다 — 최신 버전은 DYNAMIC 행 포맷 기본으로 3,072바이트). Docker로 DB를 직접 기동하므로(docker.md) 버전은 compose에서 고정한다.
+- 문자셋·정렬: **`utf8mb4` / `utf8mb4_unicode_ci` 고정** (근거: utf8=utf8mb3은 3바이트까지만 저장하는 불완전 UTF-8이라 이모지·일부 한자에서 깨진다. `utf8mb4_0900_ai_ci`는 MariaDB에 없어 MySQL↔MariaDB 이관이 깨지므로 양쪽 지원되는 unicode_ci 채택).
+  - `_ci`는 대소문자를 무시하고 비교한다 — 대소문자 구분이 필요한 컬럼(토큰, 외부 시스템 키 등)은 해당 컬럼만 `utf8mb4_bin`으로 예외 선언.
+- **커넥션 문자셋도 utf8mb4로 명시 (STRICT)**: 드라이버 풀 설정에 `charset: 'utf8mb4'` — 테이블만 utf8mb4이고 커넥션이 utf8이면 이모지 저장 시 `Incorrect string value` 에러 또는 깨짐이 발생한다.
 - 시간대: 서버·DB·앱의 시간대를 하나로 통일하고(기본 `Asia/Seoul`) CLAUDE.md에 기록 — 저장은 `DATETIME`, 변환은 앱 계층에서.
 
 ## 2. 네이밍
@@ -81,4 +84,26 @@ CREATE TABLE IF NOT EXISTS example_item (
 ```
 
 - 포맷: 컬럼명 + **공백 정렬** + 타입 (sql.md SELECT 컬럼 정렬과 동일 원칙). 순서 = PK → FK 컬럼 → 업무 컬럼 → 상태/플래그 → 공통 컬럼(3절), UNIQUE/KEY는 컬럼 뒤에 모아서. FOREIGN KEY 제약은 선언하지 않는다(5절) — 대신 FK 컬럼 인덱스 필수.
+
+## 8. 타 DB 채택 시 (PostgreSQL / MSSQL / Oracle 등)
+
+이 문서의 **원칙 층은 DB 무관**이다: 네이밍(2절), 공통 컬럼(3절), 타입 원칙(4절 — DECIMAL·매직넘버 금지), 논리 FK·UNIQUE(5절), 커넥션·운영(6절). **MySQL 구현 층**은 1절 문자셋·버전, 7절 DDL 문법, 표준 스키마(`~/.claude/jyp/schemas/`)다.
+
+다른 DB를 채택하면 아래 매핑으로 구현 층을 치환한다:
+
+| 항목 | MySQL/MariaDB (기준) | PostgreSQL | MSSQL | Oracle |
+|---|---|---|---|---|
+| 자동증가 PK | `AUTO_INCREMENT` | `GENERATED AS IDENTITY` | `IDENTITY(1,1)` | `IDENTITY` (12c+) |
+| 불리언 | `TINYINT(1)` | `BOOLEAN` | `BIT` | `NUMBER(1)` |
+| 문자 인코딩 | `utf8mb4` | DB 인코딩 `UTF8` | `NVARCHAR` / UTF-8 collation | `AL32UTF8` |
+| `updated_at` 자동 갱신 | `ON UPDATE CURRENT_TIMESTAMP` | 트리거 또는 앱 계층 | 트리거 또는 앱 계층 | 트리거 또는 앱 계층 |
+| 페이징 | `LIMIT ? OFFSET ?` | 동일 | `OFFSET…FETCH` | `OFFSET…FETCH` (12c+) |
+| 바인딩 파라미터 | `:name` | `$1` | `@name` | `:name` |
+| DDL 트랜잭션 | 암묵 커밋 (분리 필수) | **롤백 가능** | 롤백 가능 | 암묵 커밋 (분리 필수) |
+
+채택 시점 조치 (auth.md 6절의 스택 매핑과 동일 패턴):
+1. 표준 스키마를 해당 DB 문법으로 변환해 `schemas/{db}/`로 작성 (미리 만들어두지 않는다 — 성급한 추상화 방지).
+2. migration.md의 DDL/DML 분리 근거 재검토 — PostgreSQL/MSSQL은 DDL도 롤백되므로 분리는 유지하되 이유가 달라진다.
+3. 드라이버 고유 이슈 확인 — express.md의 BigInt `Number()` 변환은 mariadb/mysql2 드라이버 전용, pg/mssql은 별도 확인.
+4. 확정 내용을 프로젝트 CLAUDE.md와 이 표에 반영한다.
 - 작성 스타일의 살아있는 레퍼런스 = 표준 스키마(`~/.claude/jyp/schemas/*.sql`).
