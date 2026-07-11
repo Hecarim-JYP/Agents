@@ -1,6 +1,6 @@
 # 구현 패턴 — Express/Node 서버 (JYP)
 
-LTMS에서 검증된 서버 구현 패턴. `patterns.md`(언어 무관)를 전제로 한다.
+실무에서 검증된 Express 서버 구현 패턴. `patterns.md`(언어 무관)를 전제로 한다.
 
 ## 0. 언어 (신규 프로젝트)
 
@@ -21,7 +21,7 @@ declare global {
 ```
 
 - 응답 헬퍼·에러 클래스·쿼리 함수의 파라미터/반환값에 타입을 선언해 **응답 키 계약(2절)과 계층 간 계약을 컴파일 타임에 강제**한다. 단, 런타임엔 타입이 사라지므로 외부 입력 검증(3절)과 신뢰값 주입(5절)은 타입과 별개로 유지.
-- 기존 JS 프로젝트(LTMS 등)는 전환하지 않는다 — 현행 유지.
+- 기존 JavaScript 프로젝트는 전환하지 않는다 — 현행 유지.
 
 ## 1. 계층 구조
 
@@ -49,8 +49,8 @@ router.get('/endpoint', asyncHandler(async (req, res) => {
 ```
 
 - 모든 라우트는 `asyncHandler`로 감싼다. 직접 try-catch 금지 (예외: SSE처럼 스트림을 직접 관리하는 특수 라우트만 — 예외는 CLAUDE.md에 사유와 함께 기록).
-- 응답은 공용 응답 헬퍼로만. **헬퍼별 응답 키 계약을 정하고 혼용 금지** (LTMS 계약: `listResponse`/`detailResponse` → `result` 키, `createdResponse`/`updatedResponse`/`deletedResponse` → `data` 키).
-- 에러 응답 본문 키도 계약으로 고정 (LTMS: `message` + `error` + `field`).
+- 응답은 공용 응답 헬퍼로만. **응답 키 계약을 프로젝트 초기에 정하고 혼용 금지** — 신규 프로젝트는 단일 봉투(예: 모든 헬퍼가 `data` 키) 권장, 계약은 CLAUDE.md에 기록.
+- 에러 응답 본문 키도 계약으로 고정 (예: `message` + `error` + `field`).
 
 ## 3. Service
 
@@ -92,12 +92,12 @@ try {
 
 ## 5. 신뢰값 주입 (STRICT)
 
-- 스코프 값(테넌트/회사 ID)·행위자 값(`created_by`/`updated_by`)·권한 판단 재료는 **클라이언트 전송값을 무시하고 `req.user`(토큰 검증값)로 강제 주입**한다. 인증 미들웨어 직후 단일 지점에서 덮어쓰는 방식이 누락이 없다 (근거: LTMS SEC-01/SEC-18/SEC-19).
+- 스코프 값(테넌트/회사 ID)·행위자 값(`created_by`/`updated_by`)·권한 판단 재료는 **클라이언트 전송값을 무시하고 `req.user`(토큰 검증값)로 강제 주입**한다. 인증 미들웨어 직후 단일 지점에서 덮어쓰는 방식이 누락이 없다.
 - 소유권/배정 비교도 클라 전송값이 아니라 `req.user.id` 기준. `null == null` 거짓 통과 방지를 위해 양쪽 null 가드 필수.
-- 관리자/설정 엔드포인트는 로그인 여부(`authenticateToken`)만으로 부족 — `requireRole`/`requirePermission` 같은 권한 게이트를 반드시 부착한다 (근거: LTMS SEC-02 — 정의만 있고 미적용이라 일반 사용자가 관리 API 호출 가능했음).
+- 관리자/설정 엔드포인트는 로그인 여부(`authenticateToken`)만으로 부족 — `requireRole`/`requirePermission` 같은 권한 게이트를 반드시 부착한다 (근거: 게이트를 정의만 하고 라우트에 미적용하면 일반 사용자가 관리 API를 호출할 수 있다).
 
 ## 6. 기타
 
-- MariaDB/MySQL 드라이버가 BigInt를 반환하는 값(count, affectedRows, insertId)은 `Number()` 변환 후 사용 (근거: LTMS #34 — BigInt 직렬화 오류).
+- MariaDB/MySQL 드라이버가 BigInt를 반환하는 값(count, affectedRows, insertId)은 `Number()` 변환 후 사용 (근거: BigInt는 JSON 직렬화 시 오류를 일으킨다).
 - 환경변수 시크릿/내부 주소에 하드코딩 폴백 금지 — 미설정 시 부팅 실패 (patterns.md 4절).
 - 소프트삭제·쿼리 스타일은 `sql.md` 참조.
