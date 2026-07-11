@@ -32,6 +32,25 @@
 └── scripts/           # 빌드/배포/유틸 스크립트
 ```
 
+## 풀스택 모노레포 구조 (client + server)
+
+웹 서비스(프론트+백엔드)는 **한 저장소에 client/·server/를 두는 모노레포**를 기본으로 한다:
+
+```
+<프로젝트명>/
+├── README.md / CLAUDE.md / .gitignore / .env.example
+├── docker-compose.yml           # client·server·db 통합 기동 (+ dev/prod override)
+├── .github/workflows/test.yml   # client·server 디렉토리별 job 분리
+├── docs/                        # 공유 (dev_log/, incidents/, 설계 문서)
+├── migrations/                  # DB 마이그레이션 (공유)
+├── client/                      # React (react-ts) — 자체 package.json, Dockerfile
+└── server/                      # Express TS — 자체 package.json, Dockerfile, src/ 계층 구조
+```
+
+- 패키지 관리는 client/·server/ 각자 개별 수행 (루트 package.json 없이 시작 — 필요해지면 워크스페이스 도입).
+- Dockerfile은 각 서비스별로, compose가 전체를 조립한다 (docker.md).
+- CLAUDE.md·docs·migrations는 루트에서 공유 — "작업 정리"도 저장소 단위 1회.
+
 ## 언어별 조정표
 
 | 언어 | 조정 내용 |

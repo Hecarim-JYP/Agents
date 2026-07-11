@@ -20,7 +20,8 @@
 - 스택별 추가 적용: SQL은 `sql.md`, DB 스키마 설계·운영은 `database.md`(네이밍·공통 컬럼·타입·인덱스/제약), Express/Node 서버는 `express.md`, React 클라이언트는 `react.md`
 - 자동화 테스트는 `~/.claude/jyp/conventions/testing.md`를 따른다 — 핵심 로직 변경 시 테스트 동반 작성, 못 썼으면 보고·changelog에 "테스트 미작성" 명시 + 백로그 `TEST-` 항목 추가 (게이트+기록)
 - 배포·운영은 `~/.claude/jyp/conventions/ops.md`(환경 분리·로깅·보안 체크리스트·백업), DB 마이그레이션은 `migration.md`(번호·멱등성·DDL/DML 분리·2단계 배포)를 따른다
-- 모든 서비스는 개발·운영 공통 **Docker 컨테이너**로 배포·운영 — `~/.claude/jyp/conventions/docker.md` (멀티스테이지·non-root·.env 이미지 포함 금지·태그=git 태그·롤백=직전 이미지)
+- 모든 서비스는 개발·운영 공통 **Docker 컨테이너**로 배포·운영 — `~/.claude/jyp/conventions/docker.md` (멀티스테이지·non-root·.env 이미지 포함 금지·태그=git 태그·롤백=직전 이미지·앞단 리버스 프록시+HTTPS)
+- 인증·권한은 `auth.md`(bcrypt/argon2, access 짧게+refresh, 서버측 무효화, 권한 코드 `module.action`, default deny), API 설계는 `api.md`(리소스 URL·상태코드·page/size/sort 표준·snake_case 필드)를 따른다
 - 화면 디자인·테마·UX는 `~/.claude/jyp/conventions/design.md`를 따른다 — Tailwind + shadcn/ui 표준, 색상은 시맨틱 토큰만(hex 직접 지정 금지), 업무/서비스 UI 모드, 로딩·빈 상태·에러 3종 필수
 - 새 프로젝트 세팅 요청 시 `~/.claude/jyp/scaffolds/default.md`의 절차를 따른다
 

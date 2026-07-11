@@ -61,3 +61,11 @@ CMD ["node", "dist/index.js"]
 
 - 컨테이너 앱은 **stdout/stderr로만 로그를 출력**한다 — 파일로 직접 쓰지 않는다 (`docker logs`가 수집). 로그 내용 규칙은 ops.md 3절.
 - 운영은 로깅 드라이버 옵션으로 로테이션 설정 (`max-size`, `max-file`) — 디스크 풀 방지.
+
+## 7. 리버스 프록시·HTTPS
+
+- 컨테이너 앞단에는 **리버스 프록시 1개**를 둔다. 권장: **Caddy**(자동 HTTPS — 인증서 발급·갱신 무설정) 또는 nginx + certbot.
+- **80/443 포트는 프록시만 노출**하고, 앱·DB 컨테이너는 compose 내부 네트워크로만 통신한다 (외부 직접 접근 차단).
+- HTTPS 종단은 프록시에서 처리하고 앱은 내부 HTTP로 받는다 — Express는 `app.set('trust proxy', 1)`로 `X-Forwarded-*`를 신뢰 설정해야 클라이언트 IP·프로토콜 판별이 정상 동작한다.
+- React 정적 빌드는 프록시(또는 전용 정적 서빙 컨테이너)에서 서빙하고, `/api/*`만 서버 컨테이너로 프록시한다 — CORS 문제를 동일 출처로 원천 해소.
+- 사내망 등 HTTPS 불가 환경이면 그 제약을 프로젝트 CLAUDE.md에 기록한다 (브라우저의 HTTP 제약 — blob 다운로드 차단, secure cookie 불가 등을 설계 시 인지).
