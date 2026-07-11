@@ -76,7 +76,7 @@ try {
 - 네이티브 `window.confirm`/`alert`/`prompt` 금지 — 공용 다이얼로그(`showAlert`/`showConfirm`) 사용 (UI 일관성).
 - 평문 "로딩 중..." 텍스트 금지 — 공용 `<Loading>` 컴포넌트 사용.
 - render 중 다이얼로그 등 상태 변경 side-effect 직접 호출 금지 — 이벤트 핸들러나 effect에서만 (render 중 상태 변경은 React 경고·무한 리렌더의 원인).
-- CSS 관리 정책(단일 파일 vs 모듈별)은 프로젝트 초기에 결정해 CLAUDE.md에 기록하고 예외 없이 따른다. 신규 keyframe·클래스에는 모듈 접두사를 붙여 충돌 방지. 새 창(window.open) 렌더링 컴포넌트는 전역 CSS가 적용되지 않으므로 컴포넌트 내부 `<style>` 삽입 패턴 사용.
+- **신규 프로젝트의 스타일링·테마·UX 규칙은 `design.md`를 따른다** (Tailwind + shadcn/ui 표준, 시맨틱 토큰, 업무/서비스 두 모드). 기존 프로젝트는 그 프로젝트의 기존 CSS 정책을 유지하고, 신규 keyframe·클래스에 모듈 접두사를 붙여 충돌을 방지한다. 새 창(window.open) 렌더링 컴포넌트는 전역 CSS가 적용되지 않으므로 컴포넌트 내부 `<style>` 삽입 패턴 사용.
 
 ## 6. 성능
 

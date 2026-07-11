@@ -35,7 +35,7 @@
 |---|---|
 | Python | `pyproject.toml` 추가, `src/<패키지명>/` 레이아웃, `src/<패키지명>/__init__.py`. 테스트: **pytest** |
 | Node/Express 서버 | **TypeScript 기본** — `package.json`(`"type": "module"`), `tsconfig.json`(`strict: true`), 개발 `tsx watch` / 배포 `tsc` 빌드. JavaScript는 사용자가 명시적으로 요청할 때만. 계층 구조는 `conventions/express.md` 1절. 테스트: **Vitest + supertest**, `npm test` 스크립트 등록 |
-| React/Next.js | **TypeScript 기본** — Vite는 `react-ts` 템플릿, Next.js는 `create-next-app --typescript`. `tsconfig.json`은 `strict: true` 고정. JavaScript(JSX)는 사용자가 명시적으로 요청할 때만. 프레임워크 CLI 산출물 위에 CLAUDE.md와 docs/만 추가. 테스트: **Vitest + Testing Library**, `npm test` 스크립트 등록 |
+| React/Next.js | **TypeScript 기본** — Vite는 `react-ts` 템플릿, Next.js는 `create-next-app --typescript`. `tsconfig.json`은 `strict: true` 고정. JavaScript(JSX)는 사용자가 명시적으로 요청할 때만. 프레임워크 CLI 산출물 위에 CLAUDE.md와 docs/만 추가. 스타일링: **Tailwind CSS + shadcn/ui** 셋업(`conventions/design.md` — UI 모드와 다크모드 지원 여부를 사용자에게 확인해 CLAUDE.md에 기록). 테스트: **Vitest + Testing Library**, `npm test` 스크립트 등록 |
 | 기타 | 해당 언어 커뮤니티의 표준 레이아웃을 조사해서 따르고, CLAUDE.md/docs/는 항상 추가. 테스트 도구는 해당 언어 표준 채택 |
 
 ## 초기 파일 내용
