@@ -10,7 +10,11 @@
   1. Spring Initializr 산출물 사용 (기본)
   2. 로컬에 Gradle이 없고 Initializr도 못 쓸 때: **컨테이너로 생성** — `docker run --rm -v "$PWD:/app" -w /app gradle:9-jdk21 gradle wrapper --gradle-version 9.0` (2026-07-14 검증)
 - ⚠ **Windows에서 생성한 `gradlew`는 실행 비트가 유실된다** — Linux CI/컨테이너에서 `Permission denied`로 깨진다. 조치: `git update-index --chmod=+x gradlew` 커밋 또는 Dockerfile/CI에서 `chmod +x gradlew`.
-- 데이터 접근 기본: **Spring JDBC의 `JdbcClient`**(순수 SQL 유지 — sql.md 스타일을 그대로 적용, 1st-party라 Boot 버전 호환 문제가 없다). **MyBatis도 표준으로 허용**하되 ⚠ **MyBatis 스타터는 Boot 4.0.x까지만 호환**된다(4.1 미지원, 2026-07-14 기준) — 채택 시 Boot 버전을 4.0.x로 고정하고 CLAUDE.md에 기록한다. JPA는 사용자가 명시적으로 선택할 때만 (선택 시 N+1·즉시로딩 정책을 함께 정한다).
+- **데이터 접근은 프로젝트 시작 시 사용자에게 묻는다** (scaffolds/default.md 체크리스트 24 — 리포지토리 계층·의존성·Boot 버전 제약이 통째로 갈리는 되돌리기 어려운 결정이다). 선택지와 근거:
+  - **(a) `JdbcClient`** (Spring JDBC, **기본**) — 순수 SQL 유지(sql.md 스타일 그대로), Spring 1st-party라 Boot 버전 호환 문제가 없다. CRUD·조회 위주면 이걸로 충분하다.
+  - **(b) JPA(+QueryDSL)** — 도메인 로직이 무거운 시스템(상태 전이·이력·복잡한 연관)에서 생산성이 크다. **선택 시 N+1·즉시로딩 정책을 함께 정한다**(지연로딩 기본 강제, fetch join/`@EntityGraph`/batch size). 동적 조회는 QueryDSL 병용이 표준. 결정과 정책을 CLAUDE.md에 기록.
+  - **(c) MyBatis** — SQL을 완전 통제하되 XML Mapper 자산·익숙함이 있을 때. ⚠ **MyBatis 스타터는 Boot 4.0.x까지만 호환**된다(4.1 미지원, 2026-07-14 기준) — 채택 시 **Boot 버전을 4.0.x로 고정**하고 CLAUDE.md에 기록한다.
+  - 여러 방식 혼용도 가능하다(예: JPA로 도메인 + 무거운 통합 조회는 JdbcClient). 혼용 시 Boot 버전 제약은 가장 강한 것(MyBatis 포함 시 4.0.x)을 따른다.
 - 마이그레이션은 **Flyway**를 쓰되 **`spring.flyway.enabled=false`로 앱 기동 시 자동 실행을 끈다 (STRICT)** — 배포 절차의 별도 단계(`docker compose run --rm migrate`)로만 적용한다 (근거: 기동 시 자동 실행은 docker.md 5절의 "앱 기동과 분리" 원칙을 깨고, 앱이 여러 개면 동시에 마이그레이션을 돌리는 경쟁이 생긴다). 마이그레이션 파일은 저장소 루트 `migrations/`에 두고(모노레포 공유), migrate 서비스가 `filesystem:` 위치로 읽는다 — `src/main/resources/db/migration`에 두지 않는다.
 
 ## 1. 계층 구조
@@ -19,16 +23,16 @@
 src/main/java/{base}/
 ├── controller/{module}/    # 라우팅 + 응답 반환 (봉투 래핑만)
 ├── service/{module}/       # 비즈니스 로직 + 트랜잭션 경계
-├── repository/{module}/    # MyBatis Mapper 인터페이스 (SQL은 sql.md 스타일)
+├── repository/{module}/    # 데이터 접근 (JdbcClient Repository / MyBatis Mapper / JPA Repository — 0절 선택에 따름, SQL은 sql.md 스타일)
 ├── external/{system}/      # 사내·외부 API 연동 클라이언트 (연동 프로젝트만 — integration.md)
 ├── common/                 # 봉투·예외·유틸 등 횡단 요소
-└── config/                 # Security, Jackson, MyBatis 설정
+└── config/                 # Security, Jackson, 데이터 접근(MyBatis 등) 설정
 src/main/resources/
-├── mapper/{module}/        # MyBatis XML (쿼리 원문)
+├── mapper/{module}/        # MyBatis XML (쿼리 원문 — MyBatis 채택 시에만)
 └── application.yml         # + application-{profile}.yml
 ```
 
-- 흐름은 단방향(controller → service → repository — patterns.md 1절). 네이밍: `{Module}Controller` / `{Module}Service` / `{Module}Mapper`.
+- 흐름은 단방향(controller → service → repository — patterns.md 1절). 네이밍: `{Module}Controller` / `{Module}Service` / 데이터 접근은 방식에 따라 `{Module}Repository`(JdbcClient/JPA) 또는 `{Module}Mapper`(MyBatis).
 - 프로파일: `application.yml`(공통) + `application-dev.yml`/`application-prod.yml`. 시크릿은 yml에 쓰지 않고 환경변수 참조(`${DB_PASSWORD}`)로만 — 하드코딩 폴백(`${DB_PASSWORD:1234}`) 금지 (patterns.md 4절).
 
 ## 2. Controller — 봉투 구현 (MANDATORY)

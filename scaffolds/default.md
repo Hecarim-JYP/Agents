@@ -44,6 +44,7 @@
 | 21 | **테스트 DB 사용 여부** — 있으면 실제 DB로 서비스·쿼리 검증(동시성·제약까지), 없으면 쿼리 목킹 | (a) 사용 — compose에 `db-test` + CI에도 구성 | testing.md 0절 |
 | 22 | **예상 규모** — 동시 사용자 수, 주요 테이블의 연간 증가 건수 | 사내 업무 시스템(동시 수십 명, 연 수만 건) — 단일 인스턴스 | patterns.md 0-3절 — 페이징 상한·인덱스·배치·다중화 필요성의 근거. 규모가 이를 크게 넘으면 다중 인스턴스 전제로 재검토 |
 | 23 | **배포 호스트 구성** — 운영·개발서버가 물리적으로 분리인가, **한 PC에 공존**인가 | 분리 (각 서버 1대) | docker.md 7-2절 — 공존이면 `COMPOSE_PROJECT_NAME`·디렉토리·DB 자격·프록시 포트를 스택별로 분리 (미분리 시 볼륨이 겹쳐 개발이 운영 DB를 붙잡는다) |
+| 24 | **Spring 데이터 접근 — 백엔드=Spring일 때 반드시 묻는다**: (a) JdbcClient / (b) JPA(+QueryDSL) / (c) MyBatis | (a) JdbcClient (순수 SQL·Boot 버전 자유) | spring.md 0절 — 리포지토리 계층·의존성·Boot 버전 제약이 갈린다. MyBatis 채택 시 Boot 4.0.x 고정, JPA 채택 시 N+1·지연로딩 정책을 CLAUDE.md에 함께 기록 |
 
 ## 기본 구조
 
@@ -109,7 +110,7 @@
 |---|---|
 | Python | `pyproject.toml` 추가, `src/<패키지명>/` 레이아웃, `src/<패키지명>/__init__.py`. 테스트: **pytest** |
 | Node/Express 서버 | **TypeScript 기본** — `package.json`(`"type": "module"`), `tsconfig.json`(`strict: true`), 개발 `tsx watch` / 배포 `tsc` 빌드. 계층 구조는 `conventions/express.md` 1절, 경계 검증은 **zod**. 테스트: **Vitest + supertest** — 의존성 설치 + `"test"` 스크립트 등록까지 스캐폴드가 한다. DB 사용 시 **마이그레이션 러너**(`npm run migrate` — migration.md 5절) 포함 |
-| Spring Boot 서버 | **Java 21 + Gradle** — 구조·패턴은 `conventions/spring.md`. Spring Initializr 산출물로 시작(web, validation, actuator, mybatis, flyway + DB 드라이버). **Gradle wrapper jar 확보 필수**(오프라인 생성 불가 — Initializr 산출물 사용) + `git update-index --chmod=+x gradlew`(Windows 실행 비트 유실 — spring.md 0절). 마이그레이션: **Flyway**(`spring.flyway.enabled=false` + 별도 단계). 테스트: **JUnit 5**, `./gradlew test`. **자동 강제: Spotless + Checkstyle을 `check`에 연결**(spring.md 7절) |
+| Spring Boot 서버 | **Java 21 + Gradle** — 구조·패턴은 `conventions/spring.md`. Spring Initializr 산출물로 시작(web, validation, actuator, flyway + DB 드라이버). **데이터 접근 의존성은 체크리스트 24 선택에 따른다**: JdbcClient=`spring-boot-starter-jdbc`(별도 ORM 없음) / JPA=`spring-boot-starter-data-jpa`(+ QueryDSL) / MyBatis=`mybatis-spring-boot-starter`(⚠ Boot 4.0.x 고정). **Gradle wrapper jar 확보 필수**(오프라인 생성 불가 — Initializr 산출물 사용) + `git update-index --chmod=+x gradlew`(Windows 실행 비트 유실 — spring.md 0절). 마이그레이션: **Flyway**(`spring.flyway.enabled=false` + 별도 단계). 테스트: **JUnit 5**, `./gradlew test`. **자동 강제: Spotless + Checkstyle을 `check`에 연결**(spring.md 7절) |
 | React/Next.js | **TypeScript 기본** — Vite는 `react-ts` 템플릿, Next.js는 `create-next-app --typescript`, `strict: true` 고정 (JS는 체크리스트 1에서 명시 확인된 경우만). **CLI 산출물 위에 얹은 뒤 데모 잔재를 정리한다**: 데모 App/CSS/로고 에셋 제거, `index.html`의 `<title>`·메타를 프로젝트명으로 치환, favicon 결정. 스타일링: **Tailwind + shadcn/ui — `design.md` 8절 셋업 레시피의 체크리스트 전 항목 수행**(JS 프로젝트면 `components.json`의 `tsx: false` 포함). 테스트: **Vitest + Testing Library** — ⚠ Vite 템플릿에는 test 스크립트가 없다: 의존성 설치 + `"test": "vitest run --passWithNoTests"` 등록까지 해야 CI `npm test`가 깨지지 않는다 |
 | 기타 | 해당 언어 커뮤니티의 표준 레이아웃을 조사해서 따르고, CLAUDE.md/docs/는 항상 추가. 테스트 도구는 해당 언어 표준 채택 |
 
