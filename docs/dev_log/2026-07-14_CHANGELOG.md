@@ -1,9 +1,9 @@
 # 변경 이력 — 2026-07-14
 
-> 작업 베이스 커밋(f978fd8, 2026-07-12) 이후 누적된 **미커밋 변경 전체** 정리.
-> 핵심 주제: **① 스택 확장(Spring·다국어·멀티테넌트) ② 계약/구현 층 분리 ③ 컨테이너 운영 표준 재정의 ④ 바깥 경계 규칙 신설(연동·인증 소스·배치) ⑤ 동시성·설계 우선순위**
+> 작업 베이스 커밋(f978fd8, 2026-07-12) 이후 이 날짜에 수행한 변경 전체.
+> 핵심 주제: **① 스택 확장(Spring·다국어·멀티테넌트) ② 계약/구현 층 분리 ③ 컨테이너 운영 표준 재정의 ④ 바깥 경계 규칙 신설(연동·인증 소스·배치) ⑤ 동시성·설계 우선순위 ⑥ 산출물 실물화(템플릿) ⑦ 실효성 개선(프로필·린트 강제·인덱스화)**
 >
-> 계기: 이 저장소의 규칙만으로 새 프로젝트(React + Spring + MariaDB)를 실제로 세팅해 보며 발견한 결함 15건(A~D) + 이후 실무 관점 재검증에서 발견한 갭.
+> 계기: 이 저장소의 규칙만으로 새 프로젝트(React + Spring + MariaDB)를 실제로 세팅해 보며 발견한 결함 15건(A~D) → 실무 관점 재검증 갭 → 종이 실행(paper-test) 결함 → 실효성 진단(반복 생성 효율·강제 수단).
 
 ---
 
@@ -162,6 +162,87 @@
 
 ---
 
+---
+
+## 7. 산출물 실물화 — 스캐폴드 템플릿 (커밋 b8a5fdf)
+
+### 7-1. compose 템플릿 부재 (종이 실행에서 발견한 최대 결함)
+
+기존: 스캐폴드가 "base + dev + deploy 3분할"을 지시하면서도 **전문 예시가 없었다.** Dockerfile·Caddyfile·CI는 예시가 있는데, 정작 규칙이 가장 많이 걸린 compose만 매번 즉흥 작성해야 했다 — 포트 `${VAR:?}`, base 최소, db-test, 배치 컨테이너, 프록시 배선이 지켜질지 불확실했다.
+변경: `scaffolds/templates/`에 **실물 파일**을 넣었다 — docker-compose(base/dev/deploy) · Caddyfile · nginx.conf. deploy에는 `migrate`·`batch` 서비스를 `profiles: ["tools"]`로 정의해 `up`에 딸려 올라가지 않고 `docker compose run --rm`으로만 실행되게 했다.
+
+### 7-2. 정적 서빙 주체 모순 · Flyway 실행 시점 충돌 · CI 테스트 DB 누락
+
+기존: 정적 서빙을 client(nginx)가 하는지 Caddy가 하는지 문서 3곳이 서로 다른 그림을 그렸고(Caddyfile은 `file_server`, 조정표는 nginx 이미지, release.yml은 client 이미지 빌드), Spring의 Flyway는 기동 시 자동 실행이 기본이라 docker.md "앱 기동과 분리" 원칙과 정면 충돌했으며, 테스트 DB 사용이 기본값인데 CI에는 DB 서비스가 없었다.
+변경: **정적 서빙 = client(nginx), 프록시 = HTTPS 종단·라우팅만**으로 확정(사용자 결정). Flyway는 `spring.flyway.enabled=false` + `docker compose run --rm migrate` 단계로 통일하고 마이그레이션 파일은 루트 `migrations/` 공유 유지. CI test.yml에 `services:` 블록과 `.env.example`에 `TEST_DB_*` 추가.
+
+### 7-3. 부수 수정
+
+- 배치 호스트 cron 등록 스니펫(`CRON_TZ` + `compose run --rm batch`)을 batch.md에 추가.
+- 스캐폴드 질문 방식 규칙: 체크리스트를 순서대로 다 묻지 않는다.
+- **install 스크립트 버그**: `Copy-Item`에 `-Recurse`, `cp`에 `-r`이 없어 **하위 폴더(`scaffolds/templates/`)가 아예 복사되지 않았다** — 템플릿을 만들어도 설치가 안 되는 상태였다.
+
+**변경 파일**
+- `scaffolds/templates/docker-compose.yml`·`.dev.yml`·`.deploy.yml`·`Caddyfile`·`nginx.conf` — (신규)
+- `conventions/docker.md` — 2-3절 정적 서빙 표준, 5절 migrate 단계, 7절 역할 분담·템플릿 참조
+- `conventions/spring.md` — Flyway 자동 실행 끄기(STRICT)
+- `conventions/batch.md` — cron 등록 스니펫
+- `scaffolds/default.md` — 템플릿 복사 지시, 질문 방식, CI 테스트 DB, `.env.example` 확장
+- `install.ps1`·`install.sh` — 재귀 복사
+
+---
+
+## 8. 한 호스트에 운영·개발 스택 공존 (커밋 20501e4)
+
+기존: "서버 1대 = 프로젝트 1개"를 전제해, 물리 서버 한 대에 운영·개발 스택을 함께 올리는 실제 상황에 대한 규칙이 없었다. 포트만 바꾸면 기동은 되지만 **compose 프로젝트명이 겹쳐 볼륨을 공유**하므로 개발 스택이 운영 DB 볼륨을 붙잡는다 — 포트를 아무리 나눠도 막지 못하는 사고다.
+변경: docker.md 7-2절을 신설했다. ①**스택 격리(STRICT)**: `COMPOSE_PROJECT_NAME`·디렉토리·DB 자격을 스택별로 분리 ②**외부 노출 2방식**: (a) 포트 분리(운영 80/443, 개발 8080/8443 — ⚠ ACME는 표준 포트로만 검증되므로 개발은 자동 HTTPS 불가) / (b) 공용 프록시 + 도메인 분기(권장) ③자원 경합·디스크 2배·구성 문서화. 템플릿의 프록시 포트도 `${HTTP_PORT}`/`${HTTPS_PORT}`로 변수화했다.
+
+**변경 파일**
+- `conventions/docker.md` — 7절 전제 수정(스택 1개 = 앱 인스턴스 1개), 7-2절 신설
+- `scaffolds/templates/docker-compose.deploy.yml` — 프록시 포트 변수화
+- `scaffolds/default.md` — 체크리스트 23번(배포 호스트 구성), `.env.example`에 `COMPOSE_PROJECT_NAME`·`HTTP_PORT`·`HTTPS_PORT`
+
+---
+
+## 9. 실효성 개선 — 프로필·린트 강제·인덱스화 (커밋 71fe920, 7c761f5, 4694a2b)
+
+실무 적합성 진단("여러 프로젝트 생성" vs "하나를 깊이")에서 나온 세 약점에 대한 조치.
+
+### 9-1. 프로필 도입 — 반복 생성의 결정 피로 (약점: 매번 같은 답을 23번 한다)
+
+기존: 체크리스트가 23항목까지 늘어 결정 누락은 없어졌지만, 프로젝트를 반복 생성하면 20개는 매번 같은 답이었다.
+변경: `profiles/project-default.md`를 신설해 **결정 항목의 기본 답안**으로 삼았다. `/new-project`는 프로필을 먼저 읽고 **[확인] 4개**(프로젝트명·목적 / 인증 소스 / 사내 API 연동 / 특수 요구)만 묻고, [고정] 항목은 표로 보여주고 이견만 받는다. "프로젝트마다 같은 예외를 반복하면 프로필을 고친다"는 갱신 규칙도 함께.
+
+### 9-2. 규칙을 문서에서 도구로 — 준수율 (약점: 규칙이 기대일 뿐 강제가 아니다)
+
+기존: `any` 금지, hex 색상 금지, `=== 200` 비교 금지 같은 규칙이 **린트로 강제 가능한데 문서로만** 존재했다. 코드가 커지면 사람도 에이전트도 17개 문서를 다 읽지 못한다. 게다가 훅은 Node 전용이라 **새로 추가한 Spring 지원에는 자동 검증이 전혀 붙지 않았다.**
+변경: ESLint 템플릿 2종(client/server)을 만들어 10개 규칙을 실제 린트 룰로 옮겼다(any, 순환 의존, `=== 200`, hex·팔레트 색상, 네이티브 alert, 토큰 스토리지 저장, axios 직접 import, `process.env || 폴백`, `console.error(err)` 한 줄, SQL 템플릿 리터럴 보간). Java는 Spotless + Checkstyle을 `check`에 연결. **훅을 Gradle까지 확장**(`.java` 수정 시 spotlessCheck·compileJava, 턴 종료 시 `./gradlew test`). CI에 `npm run lint` / `./gradlew check` 연결. general.md 메타 규칙에 **"새 규칙은 도구로 강제 가능한지 먼저 묻는다"** 추가.
+
+**실전 검증 결과 (실제 프로젝트 생성 후 실행)**: 위반 코드 → client 7건·server 4건 **전부 검출**, 정상 코드 → **오탐 0건**. 검증 중 템플릿 버그 3건을 발견·수정했다:
+1. `(?i)` 인라인 플래그 — JS 정규식 미지원이라 **ESLint가 크래시**했다
+2. `process.env || 폴백` 셀렉터 오작동 — 규칙이 조용히 무력화된 상태였다
+3. `@eslint/js` 최신(v10)과 eslint@9의 **ERESOLVE 충돌** — 버전 고정 없이는 설치 자체가 실패한다
+
+### 9-3. OVERVIEW 인덱스화 — 드리프트 차단 (약점: 요약본 이중 관리)
+
+기존: OVERVIEW가 각 컨벤션을 요약해 중복 보관하고 있었고, 실제로 원문과 어긋났다("보안 체크리스트 9항목" vs 실제 10항목, 줄 수 표기 등). 저장소가 스스로 금지한 SSOT 위반이며 규칙이 늘수록 악화되는 구조였다.
+변경: 4-4절(컨벤션 요약 183줄)을 **링크 인덱스 표**로 교체했다(435줄 → 279줄). "이 문서도 컨벤션 내용을 요약하지 않는다"를 명시적 규칙으로 박았다.
+
+### 9-4. 네이밍 정리
+
+- 프로필 파일명 `jyp-default.md` → `project-default.md` (개인 이름을 딴 파일명이 과하게 읽힘).
+- 컨벤션 17종·규칙 2종·스캐폴드의 H1 제목에서 `(JYP)` 제거 — 저장소 자체가 네임스페이스다. 내용 변경 없음.
+
+**변경 파일**
+- `profiles/project-default.md` — (신규) 사내 표준 프로필
+- `scaffolds/templates/eslint.config.client.mjs`·`eslint.config.server.mjs` — (신규) 린트 강제
+- `conventions/spring.md` — 7절 Spotless·Checkstyle
+- `conventions/general.md` — 9절 메타 규칙(도구 우선)
+- `hooks/post-edit-check.mjs`·`stop-test.mjs` — JVM 스택 지원
+- `docs/OVERVIEW.md` — 4-4절 인덱스화, 4-5·4-8절 축약
+- `rules/dev-rules.md`·`scaffolds/default.md`·`README.md` — 프로필·린트 연결
+- 컨벤션 17종·규칙 2종·스캐폴드 — 제목 정리
+
 ## 커밋 코멘트
 
 ```
@@ -197,4 +278,18 @@
 ■ 규칙·스캐폴드
 - dev-rules 작업 절차 강화 + 단순성·수정 범위 섹션
 - 스캐폴드 체크리스트 22항목, .env 자동 생성, CI 스택별 job, shadcn 셋업 레시피
+
+■ 산출물 실물화 (b8a5fdf)
+- scaffolds/templates/ 신설 (compose 3종·Caddyfile·nginx.conf)
+- 정적 서빙 = client(nginx) 확정, Flyway는 별도 단계로 통일, CI 테스트 DB 추가
+- install 재귀 복사 버그 수정 (하위 폴더가 복사되지 않던 문제)
+
+■ 한 호스트 스택 공존 (20501e4)
+- docker.md 7-2절: COMPOSE_PROJECT_NAME 분리(STRICT — 볼륨 겹침 방지), 포트/도메인 2방식
+
+■ 실효성 개선 (71fe920, 7c761f5, 4694a2b)
+- profiles/project-default.md: 매번 묻는 것은 4개로 축소
+- ESLint 템플릿 2종 + Spotless/Checkstyle + 훅 JVM 확장 — 규칙을 도구가 강제
+- OVERVIEW 인덱스화 (435줄 → 279줄), 문서 제목의 (JYP) 제거
+- 실전 검증: 위반 11건 전부 검출·오탐 0, 템플릿 버그 3건 발견·수정
 ```
