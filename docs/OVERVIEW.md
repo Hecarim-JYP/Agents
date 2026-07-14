@@ -54,10 +54,14 @@ Agents/
 ├── templates/         # 문서 템플릿 8종 (doc-claude용 6 + 개발용 2)
 ├── hooks/             # 자동 검증 훅 스크립트 2종 (post-edit-check, stop-test)
 ├── docs/              # 저장소 자체 문서 (이 파일)
+├── scripts/           # 검증·설치 보조 (verify-templates, register-hooks)
 ├── install.ps1        # Windows 설치 스크립트
 ├── install.sh         # Mac/Linux 설치 스크립트
+├── CLAUDE.md          # 이 저장소를 고칠 때의 규칙 (수정 사이클·SSOT·인코딩·검증)
 └── README.md
 ```
+
+⚠ 루트의 `CLAUDE.md`는 **이 저장소 자체의 유지보수 규칙**이고, `rules/`·`conventions/`는 **다른 프로젝트에 적용할 규칙**이다 — 성격이 다르므로 섞지 않는다(그래서 이 저장소의 CLAUDE.md는 `dev-rules.md`를 import하지 않는다).
 
 ### 3-2. 설치 경로 매핑
 
