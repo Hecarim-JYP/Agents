@@ -4,8 +4,11 @@
 
 ## 생성 절차
 
-1. **확인**: 프로젝트명(폴더명), 목적 한 줄과 함께 아래 **시작 결정 체크리스트**를 사용자와 확정한다. 미정 항목은 목적을 듣고 추천한다.
-2. **생성**: 아래 기본 구조를 만들고, 스택별 조정표에 따라 변형한다.
+1. **확인**: 프로젝트명(폴더명)과 목적 한 줄을 듣고, 아래 **시작 결정 체크리스트**를 확정한다. 22개를 순서대로 다 묻지 않는다 — 다음 순서로 진행한다:
+   1. **반드시 묻는다 (5개)**: ①프론트 TS/JS ②인증 소스 ③사내 API 연동 여부 ④사내 도메인 유무 ⑤가동 모니터링 주체. 되돌리기 비용이 크거나 환경마다 답이 달라 추측이 위험한 항목이다 (patterns.md 0-1절).
+   2. **목적에서 갈리는 것만 묻는다**: 백엔드 스택, 멀티테넌트, 다국어, 정기 배치, 예상 규모.
+   3. **나머지는 기본값을 표로 제시하고 이견만 받는다** (UI 모드·다크모드·브랜드 색·DB·포트·봉투·테스트 위치·테스트 DB·CI).
+2. **생성**: 아래 기본 구조를 만들고, 스택별 조정표에 따라 변형한다. **compose·프록시·nginx 설정은 `~/.claude/jyp/scaffolds/templates/`의 파일을 복사해 프로젝트에 맞게 조정한다** — 즉흥 작성 금지 (docker.md 규칙이 이미 반영된 파일이다).
 3. **first-run 준비**: `.env.example`에서 **`.env`를 자동 생성**하고 결정된 값(DB 포트, 노출 포트 등)을 채운다 — compose 변수 치환(`${DB_NAME}`)은 `.env`가 없으면 빈 값으로 기동돼 첫 실행이 깨진다. `.env`는 `.gitignore` 대상임을 재확인.
 4. **초기화**: `git init` 후 첫 커밋 (`chore: 프로젝트 초기 구조 생성`)
 5. **보고**: 생성된 구조를 트리로 보여주고, 다음 단계(의존성 설치, `docker compose up` 등)를 안내한다. **노출 포트가 다른 로컬 프로젝트와 충돌할 수 있음을 함께 고지** (충돌 시 `.env`의 포트 변수만 변경).
@@ -70,19 +73,24 @@
 ```
 <프로젝트명>/
 ├── README.md / CLAUDE.md / .gitignore / .env.example / .env
-├── docker-compose.yml           # base + dev/deploy override — 규칙: docker.md 4-1절
+├── docker-compose.yml           # base            ┐
+├── docker-compose.dev.yml       # 개발 모드        ├ templates/에서 복사 (docker.md 4-1절)
+├── docker-compose.deploy.yml    # 배포 모드        ┘
 ├── proxy/
-│   └── Caddyfile                # 프록시 설정 — 템플릿: docker.md 7절
-├── .github/workflows/test.yml   # client·server 디렉토리별 job 분리 (이종 스택이면 툴체인도 각각)
+│   └── Caddyfile                # HTTPS 종단 + 라우팅 (정적 서빙은 client가 담당)
+├── .github/workflows/
+│   ├── test.yml                 # 스택별 job (+ 테스트 DB 서비스)
+│   └── release.yml              # 태그 push → ghcr.io 이미지 빌드·push
 ├── docs/                        # 공유 (dev_log/, incidents/, 설계 문서)
-├── migrations/                  # DB 마이그레이션 (공유)
-├── client/                      # React (react-ts) — 자체 package.json, Dockerfile
-└── server/                      # Express TS 또는 Spring Boot — 자체 빌드 파일, Dockerfile
+├── migrations/                  # DB 마이그레이션 (공유 — migrate 서비스가 읽는다)
+├── client/                      # React — package.json, Dockerfile, nginx.conf(정적 서빙)
+└── server/                      # Express TS 또는 Spring Boot — 빌드 파일, Dockerfile
 ```
 
 - 패키지 관리는 client/·server/ 각자 개별 수행 (루트 package.json 없이 시작 — 필요해지면 워크스페이스 도입).
 - Dockerfile은 각 서비스별로, compose가 전체를 조립한다 (docker.md).
-- **프록시(Caddy) 서비스와 Caddyfile은 스캐폴드에 반드시 포함** — 배포 모드(deploy override)가 이것 없이 나가면 외부 접근 경로가 없다 (docker.md 7절). 로컬 개발 모드는 Vite `server.proxy`로 `/api/*`를 서버에 연결해 동일 출처 유지.
+- **정적 서빙은 client(nginx) 컨테이너, 프록시(Caddy)는 HTTPS 종단 + 라우팅** (docker.md 2-3·7절). 프록시 서비스와 Caddyfile은 반드시 포함 — 없으면 배포 모드에 외부 접근 경로가 없다. 로컬 개발 모드는 프록시 없이 Vite `server.proxy`로 `/api/*`를 서버에 연결해 동일 출처를 유지한다.
+- **compose·Caddyfile·nginx.conf는 `~/.claude/jyp/scaffolds/templates/`에서 복사**하고 프로젝트 결정값(스택·DB 위치·테스트 DB·배치 유무)에 맞게 불필요한 서비스를 지운다.
 - CLAUDE.md·docs·migrations는 루트에서 공유 — "작업 정리"도 저장소 단위 1회.
 
 ## 기초 테이블 (DB 사용 프로젝트)
@@ -150,7 +158,7 @@
 ```
 
 ### .env.example
-결정된 값을 변수로 — 최소한 다음을 포함. 각 항목의 규칙: 모드·포트는 docker.md 4-1절, DB 접속은 4-3절 매트릭스, SITE_ADDRESS·DEPLOY_TAG는 5·7절. compose에서는 폴백 없이 `${VAR:?}`로 참조한다.
+결정된 값을 변수로 — 최소한 다음을 포함. 각 항목의 규칙: 모드·포트는 docker.md 4-1절, DB 접속은 4-3절 매트릭스, SITE_ADDRESS·DEPLOY_TAG는 5·7절, 테스트 DB는 testing.md 0절. compose에서는 폴백 없이 `${VAR:?}`로 참조한다.
 ```
 # 모드 선택 (로컬=dev, 서버=deploy)
 COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml
@@ -163,9 +171,16 @@ DB_HOST=db
 DB_NAME=<프로젝트명>
 DB_USER=
 DB_PASSWORD=
+DB_ROOT_PASSWORD=
+# 테스트 DB (체크리스트 21 — 사용 시)
+TEST_DB_NAME=<프로젝트명>_test
+TEST_DB_USER=
+TEST_DB_PASSWORD=
+TEST_DB_PORT=3307
 # 프록시 접근 주소 (도메인 확보 시 값 교체)
 SITE_ADDRESS=:80
-# 배포 이미지 태그 (서버 .env에서만 사용)
+# 배포 이미지 (서버 .env에서만 사용 — CI가 push한 ghcr 경로와 태그)
+IMAGE_PREFIX=ghcr.io/<계정>/<저장소>
 DEPLOY_TAG=
 # 사내 API 연동 (체크리스트 18 — 연동 프로젝트만, integration.md 3절)
 INTERNAL_API_URL=
@@ -191,10 +206,28 @@ jobs:
       - run: npm ci
       - run: npm test
 
-  # JVM job (Spring 서버)
+  # JVM job (Spring 서버) — 테스트 DB를 쓰면 서비스 컨테이너로 띄운다 (체크리스트 21)
   test-server:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: server } }
+    services:
+      db-test:
+        image: mariadb:11.4
+        env:
+          MARIADB_DATABASE: app_test
+          MARIADB_USER: app
+          MARIADB_PASSWORD: test
+          MARIADB_ROOT_PASSWORD: test
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    env:
+      TEST_DB_HOST: 127.0.0.1
+      TEST_DB_PORT: 3306
+      TEST_DB_NAME: app_test
+      TEST_DB_USER: app
+      TEST_DB_PASSWORD: test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -212,7 +245,8 @@ jobs:
       - run: docker build -t ci-server-check server/
 ```
 
-- 단일 구조 프로젝트는 해당 스택 job 하나 + docker job으로 축소 (`working-directory` 제거, `docker build .`). 서버가 Node면 test-server도 Node job 형태로.
+- 단일 구조 프로젝트는 해당 스택 job 하나 + docker job으로 축소 (`working-directory` 제거, `docker build .`). 서버가 Node면 test-server도 Node job 형태로 하되 **`services:`와 `env:` 블록은 그대로 유지**한다.
+- **테스트 DB를 쓰지 않기로 했으면(체크리스트 21-b) `services:`·`env:` 블록을 제거**한다 — 대신 쿼리 목킹으로 테스트한다.
 - Python 프로젝트는 `setup-python` + `pip install -e .[dev]` + `pytest`로 대체.
 - docker job은 이미지 빌드 성공만 검증한다 — Dockerfile이 깨진 채 배포 시점까지 가는 것을 방지 (push/실행은 하지 않음).
 

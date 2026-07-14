@@ -13,9 +13,10 @@ New-Item -ItemType Directory -Force $agentsDir | Out-Null
 # 저장소에서 삭제/이름변경된 파일이 설치 경로에 잔존하지 않도록 비우고 새로 복사
 if (Test-Path $jypDir) { Remove-Item -Recurse -Force $jypDir }
 
+# -Recurse 필수: scaffolds/templates/ 같은 하위 폴더까지 복사한다
 foreach ($sub in "templates", "conventions", "scaffolds", "rules", "schemas") {
     New-Item -ItemType Directory -Force (Join-Path $jypDir $sub) | Out-Null
-    Copy-Item (Join-Path $PSScriptRoot "$sub\*") (Join-Path $jypDir $sub) -Force
+    Copy-Item (Join-Path $PSScriptRoot "$sub\*") (Join-Path $jypDir $sub) -Recurse -Force
 }
 Copy-Item (Join-Path $PSScriptRoot "agents\*.md") $agentsDir -Force
 

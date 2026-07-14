@@ -1,0 +1,76 @@
+# 배포 모드 — 개발서버·운영서버 공통 (docker.md 4-1절)
+# 두 서버의 차이는 이 파일이 아니라 각 서버 .env의 값뿐 (SITE_ADDRESS, DB 자격, DEPLOY_TAG).
+# 로컬에서 배포 전 검증할 때도 같은 파일을 쓴다.
+# 이미지는 CI가 빌드해 ghcr.io에 push한 것을 pull만 한다 (docker.md 5절) — build: 금지.
+
+services:
+  proxy:
+    image: caddy:2-alpine
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?SITE_ADDRESS 미설정}
+    ports:
+      - "80:80"
+      - "443:443"                       # 외부에 열리는 포트는 프록시뿐 (docker.md 7절)
+    volumes:
+      - ./proxy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data                # 발급받은 인증서 — 지우면 재발급 (rate limit 주의)
+      - caddy-config:/config
+    depends_on: [client, server]
+    restart: unless-stopped
+    networks: [app]
+
+  client:
+    image: ${IMAGE_PREFIX:?IMAGE_PREFIX 미설정}-client:${DEPLOY_TAG:?DEPLOY_TAG 미설정}
+    restart: unless-stopped
+
+  server:
+    image: ${IMAGE_PREFIX:?IMAGE_PREFIX 미설정}-server:${DEPLOY_TAG:?DEPLOY_TAG 미설정}
+    volumes:
+      - uploads:/app/uploads
+    restart: unless-stopped
+
+  db:
+    restart: unless-stopped
+    # 운영 서버는 DB 포트를 호스트에 노출하지 않는다 (ops.md — 관리 접속은 SSH 터널).
+    # 개발 서버에서 DB 툴 접속이 필요하면 사내망 한정으로만 노출:
+    # ports:
+    #   - "127.0.0.1:${DB_PORT}:3306"
+
+  # 마이그레이션 — 앱 기동과 분리된 별도 단계 (docker.md 5절)
+  # 실행: docker compose run --rm migrate
+  migrate:
+    profiles: ["tools"]                 # 기본 up 대상에서 제외 — 명시적으로만 실행
+    image: flyway/flyway:10             # JVM/Flyway 프로젝트
+    command: >
+      -url=jdbc:mariadb://db:3306/${DB_NAME}
+      -user=${DB_USER} -password=${DB_PASSWORD}
+      -locations=filesystem:/flyway/sql
+      -baselineOnMigrate=true migrate
+    volumes:
+      - ./migrations:/flyway/sql:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [app]
+    # Node 프로젝트는 위 image/command 대신 서버 이미지의 러너를 쓴다:
+    #   image: ${IMAGE_PREFIX}-server:${DEPLOY_TAG}
+    #   command: ["npm", "run", "migrate"]
+
+  # 정기 배치 — 호스트 cron이 호출한다 (batch.md 1절 (b) 방식)
+  # 실행: docker compose run --rm batch <작업명> --date=YYYY-MM-DD
+  batch:
+    profiles: ["tools"]
+    image: ${IMAGE_PREFIX:?IMAGE_PREFIX 미설정}-server:${DEPLOY_TAG:?DEPLOY_TAG 미설정}
+    entrypoint: ["node", "dist/batch/index.js"]   # Spring: ["java","-jar","app.jar","--spring.batch.job.name="]
+    environment:
+      TZ: Asia/Seoul                    # 컨테이너 기본 UTC — 배치 시각이 밀린다 (batch.md 2절)
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [app]
+
+volumes:
+  caddy-data:
+  caddy-config:

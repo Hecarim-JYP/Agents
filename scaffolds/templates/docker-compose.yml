@@ -1,0 +1,51 @@
+# base — 어느 모드에서든 참인 것만 (docker.md 4-1절)
+# 모드 조합은 .env의 COMPOSE_FILE이 지정한다:
+#   로컬  COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml
+#   서버  COMPOSE_FILE=docker-compose.yml:docker-compose.deploy.yml
+# 기동 명령은 어디서나: docker compose up -d
+
+services:
+  # DB 위치가 (b) 호스트 로컬 / (c) 외부 매니지드면 이 서비스를 삭제한다 (docker.md 4-2절)
+  db:
+    image: mariadb:11.4
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    environment:
+      TZ: Asia/Seoul
+      MARIADB_DATABASE: ${DB_NAME:?DB_NAME 미설정}
+      MARIADB_USER: ${DB_USER:?DB_USER 미설정}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD 미설정}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD 미설정}
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [app]
+
+  server:
+    environment:
+      TZ: Asia/Seoul
+      DB_HOST: ${DB_HOST:?DB_HOST 미설정}
+      DB_PORT: 3306                      # 컨테이너 내부 포트 — 호스트 노출 포트와 무관 (docker.md 4-3절)
+      DB_NAME: ${DB_NAME:?DB_NAME 미설정}
+      DB_USER: ${DB_USER:?DB_USER 미설정}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD 미설정}
+      # 사내 API 연동 프로젝트만 (integration.md 3절)
+      INTERNAL_API_URL: ${INTERNAL_API_URL:-}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [app]
+
+  client:
+    networks: [app]
+
+volumes:
+  db-data:
+  uploads:                                # 업로드 파일 (앱 산출물 — 백업 대상, ops.md 6절)
+
+networks:
+  app:

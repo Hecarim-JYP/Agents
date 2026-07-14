@@ -17,8 +17,16 @@
 | (c) | **DB 락 기반 분산 스케줄러** (ShedLock 등) | 앱 다중화가 이미 확정된 경우 | 락 테이블 필요. 서버 1대 = 프로젝트 1개(docker.md 7절) 전제에서는 대개 과하다 |
 
 - **컨테이너 안 crontab(cron 데몬을 이미지에 넣기) 금지** — 컨테이너를 지웠다 만들면 사라지고, 실행 로그가 `docker logs`에 잡히지 않아 조용히 죽는다 (무상태 원칙 위반).
-- (b)는 배치 컨테이너가 **앱과 같은 이미지**를 쓰고 진입점만 다르게 한다 (`CMD` 대신 배치 엔트리) — 코드·설정 중복 방지, 같은 이미지 태그로 배포된다.
-- 배치도 stdout/stderr로 로깅하고(docker.md 6절), 호스트 cron 출력은 로그 파일 또는 컨테이너 로그로 수집되게 한다.
+- (b)는 배치 컨테이너가 **앱과 같은 이미지**를 쓰고 진입점만 다르게 한다 (`CMD` 대신 배치 엔트리) — 코드·설정 중복 방지, 같은 이미지 태그로 배포된다. compose의 `batch` 서비스는 `profiles: ["tools"]`로 두어 `up`에 딸려 올라가지 않게 한다 (스캐폴드 템플릿의 deploy override 참조).
+- **호스트 cron 등록** (배포 서버에서 1회, 절차는 handover 문서에 기록):
+
+```cron
+# /etc/cron.d/<프로젝트명>  — 새벽 2시 일별 집계
+CRON_TZ=Asia/Seoul
+0 2 * * * <배포계정> cd /srv/<프로젝트명> && docker compose run --rm batch daily-aggregate >> /var/log/<프로젝트명>-batch.log 2>&1
+```
+
+- `CRON_TZ` 명시(서버 로케일에 기대지 않는다), 출력은 로그 파일로 리다이렉트(배치도 stdout/stderr로 로깅 — docker.md 6절), 실패는 3절의 이력·알림으로 잡는다. 로그 파일은 logrotate 대상에 넣는다.
 
 ## 2. 배치 작성 규칙 (STRICT)
 

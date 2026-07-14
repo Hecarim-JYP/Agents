@@ -8,6 +8,7 @@
 - **Gradle wrapper(`gradlew` + `gradle/wrapper/*.jar`)를 저장소에 포함**한다 — CI·다른 기기에서 로컬 Gradle 설치 없이 빌드하기 위함. wrapper jar는 오프라인 생성이 안 되므로 프로젝트 생성 시(Spring Initializr 산출물 또는 공식 배포본에서) 확보한다.
 - ⚠ **Windows에서 생성한 `gradlew`는 실행 비트가 유실된다** — Linux CI/컨테이너에서 `Permission denied`로 깨진다. 조치: `git update-index --chmod=+x gradlew` 커밋 또는 Dockerfile/CI에서 `chmod +x gradlew`.
 - 데이터 접근 기본: **MyBatis**(순수 SQL 유지 — sql.md 스타일을 그대로 적용). JPA는 사용자가 명시적으로 선택할 때만 (선택 시 CLAUDE.md에 기록하고 N+1·즉시로딩 정책을 함께 정한다).
+- 마이그레이션은 **Flyway**를 쓰되 **`spring.flyway.enabled=false`로 앱 기동 시 자동 실행을 끈다 (STRICT)** — 배포 절차의 별도 단계(`docker compose run --rm migrate`)로만 적용한다 (근거: 기동 시 자동 실행은 docker.md 5절의 "앱 기동과 분리" 원칙을 깨고, 앱이 여러 개면 동시에 마이그레이션을 돌리는 경쟁이 생긴다). 마이그레이션 파일은 저장소 루트 `migrations/`에 두고(모노레포 공유), migrate 서비스가 `filesystem:` 위치로 읽는다 — `src/main/resources/db/migration`에 두지 않는다.
 
 ## 1. 계층 구조
 

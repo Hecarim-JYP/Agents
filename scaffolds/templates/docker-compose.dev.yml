@@ -1,0 +1,53 @@
+# 개발 모드 — 로컬 전용 (docker.md 4-1절)
+# 소스 bind mount + 핫리로드. 프록시 컨테이너 없이 Vite dev server가 /api/*를 서버로 넘긴다.
+
+services:
+  db:
+    ports:
+      - "${DB_PORT:?DB_PORT 미설정}:3306"     # 좌변 = 호스트 노출 포트 (DB 툴 접속용)
+
+  # 테스트 DB (체크리스트 21 — 사용 시에만 포함, testing.md 0절)
+  db-test:
+    image: mariadb:11.4
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    environment:
+      TZ: Asia/Seoul
+      MARIADB_DATABASE: ${TEST_DB_NAME:?TEST_DB_NAME 미설정}
+      MARIADB_USER: ${TEST_DB_USER:?TEST_DB_USER 미설정}
+      MARIADB_PASSWORD: ${TEST_DB_PASSWORD:?TEST_DB_PASSWORD 미설정}
+      MARIADB_ROOT_PASSWORD: ${TEST_DB_PASSWORD:?TEST_DB_PASSWORD 미설정}
+    ports:
+      - "${TEST_DB_PORT:?TEST_DB_PORT 미설정}:3306"
+    tmpfs:
+      - /var/lib/mysql                        # 테스트 데이터는 영속화하지 않는다 (매 기동 초기화)
+    networks: [app]
+
+  server:
+    build:
+      context: ./server
+      target: builder
+    # Node/Express: 핫리로드
+    command: ["npm", "run", "dev"]
+    volumes:
+      - ./server/src:/app/src
+      - uploads:/app/uploads
+    # Spring Boot일 때는 위 두 줄 대신:
+    #   command: ["./gradlew", "bootRun", "--no-daemon"]
+    #   volumes:
+    #     - ./server/src:/app/src
+    #     - uploads:/app/uploads
+    ports:
+      - "${API_PORT:?API_PORT 미설정}:3000"   # 우변 = 컨테이너 내부 포트 (Spring이면 8080)
+    # DB 위치가 (b) 호스트 로컬일 때만 (docker.md 4-2절):
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway"
+
+  client:
+    build:
+      context: ./client
+      target: builder
+    command: ["npm", "run", "dev", "--", "--host"]
+    volumes:
+      - ./client/src:/app/src
+    ports:
+      - "${WEB_PORT:?WEB_PORT 미설정}:5173"

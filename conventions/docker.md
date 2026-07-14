@@ -67,7 +67,9 @@ CMD ["java", "-jar", "app.jar"]
 - `chmod +x gradlew`는 Windows에서 커밋된 실행 비트 유실 대비다 (spring.md 0절).
 - JRE 베이스에 wget/curl이 없으면 설치하거나 `java`로 HTTP 체크하는 한 줄 클래스 사용 — 어느 쪽이든 HEALTHCHECK는 생략하지 않는다.
 
-### 2-3. 정적 프론트 (React 빌드 + nginx)
+### 2-3. 정적 프론트 (React 빌드 + nginx) — 표준
+
+**정적 서빙은 client(nginx) 컨테이너가 담당한다 (2026-07-14 확정)** — 프록시(7절)는 HTTPS 종단과 라우팅만 한다. 빌드 산출물이 이미지에 봉인되므로 롤백이 태그 교체만으로 끝난다.
 
 ```dockerfile
 FROM node:22-slim AS builder
@@ -84,8 +86,7 @@ EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://localhost/ >/dev/null || exit 1
 ```
 
-- nginx.conf에는 SPA fallback(`try_files ... /index.html`)을 반드시 포함한다.
-- 단, **프록시(7절)가 정적 서빙까지 겸하는 구성이면 이 컨테이너는 생략**하고 빌드 산출물을 프록시가 서빙한다 — 컨테이너 하나가 준다.
+- nginx.conf에는 **SPA fallback(`try_files ... /index.html`)을 반드시 포함**한다 — 없으면 새로고침·딥링크가 404가 된다. 템플릿: `~/.claude/jyp/scaffolds/templates/nginx.conf`.
 
 ## 3. 설정 주입 (STRICT)
 
@@ -165,7 +166,7 @@ services:
   4. 헬스체크·기동 로그 확인 (ops.md 2절) → 이전 이미지는 즉시 삭제하지 않고 1~2개 보관
 - 서버의 ghcr 로그인(`docker login ghcr.io` — `read:packages` 토큰)은 서버 셋업 시 1회, 토큰 보관 위치는 handover 문서에 기록 (ops.md 1절 시크릿 규칙).
 - **롤백 = 직전 태그 이미지로 재기동** — 이것이 ops.md 2절 "롤백 계획"의 구체 수단이다. (DB 마이그레이션이 함께 나갔다면 migration.md 4절의 2단계 배포 여부를 먼저 확인.)
-- DB 마이그레이션은 앱 컨테이너 기동에 섞지 않고 **별도 단계로 실행**한다 — 여러 컨테이너가 동시에 마이그레이션을 돌리는 경쟁을 방지.
+- DB 마이그레이션은 앱 컨테이너 기동에 섞지 않고 **별도 단계로 실행**한다 — 여러 컨테이너가 동시에 마이그레이션을 돌리는 경쟁을 방지. 구현: compose의 `migrate` 서비스(`profiles: ["tools"]`로 자동 기동 제외) → **`docker compose run --rm migrate`**. ⚠ Spring Boot는 Flyway가 **기동 시 자동 실행되는 것이 기본**이므로 `spring.flyway.enabled=false`로 끄고 이 단계로 통일한다 (spring.md 0절).
 
 ## 6. 로그
 
@@ -188,27 +189,15 @@ services:
 - 도메인이 없어도 구성은 동일하다(프록시가 정적 서빙 + `/api` 프록시) — 도메인 확보 시 **`SITE_ADDRESS` 값 교체만으로 HTTPS 전환**되도록 다른 곳에 주소를 하드코딩하지 않는다. 서버 1대 = 프로젝트 1개 전제 덕에 도메인이 없어도 포트 구분(8100번대 블록 등)은 필요 없다 — 80 하나면 된다.
 - **DB 포트 노출 정책**: 운영서버는 DB 포트를 호스트에 노출하지 않는다(관리 접속은 SSH 터널). 개발서버는 노출하되 사내망/VPN 범위로 제한. 로컬은 자유(4-3절).
 - HTTPS 종단은 프록시에서 처리하고 앱은 내부 HTTP로 받는다 — Express는 `app.set('trust proxy', 1)`로 `X-Forwarded-*`를 신뢰 설정해야 클라이언트 IP·프로토콜 판별이 정상 동작한다.
-- React 정적 빌드는 프록시(또는 전용 정적 서빙 컨테이너)에서 서빙하고, `/api/*`만 서버 컨테이너로 프록시한다 — CORS 문제를 동일 출처로 원천 해소.
-- **이 절은 규정이 아니라 스캐폴드 기본 구성이다 (STRICT)**: 프록시 서비스와 Caddyfile은 새 프로젝트 생성 시 함께 만들어진다 — 없으면 배포 모드 기동 시 외부 접근 경로가 아예 없다 (근거: 규칙만 있고 스캐폴드에 프록시가 빠져 배포 기동에서 접근 불가·CORS 차단이 발생한 사례).
+- **역할 분담 (2026-07-14 확정)**: **프록시 = HTTPS 종단 + 라우팅만**, **정적 서빙 = client(nginx) 컨테이너**(2-3절). 프록시가 같은 출처에서 `/api/*`는 server로, 그 외는 client로 넘기므로 CORS가 원천 해소된다.
+- **프록시 서비스와 Caddyfile은 스캐폴드 기본 구성이다 (STRICT)** — 없으면 배포 모드 기동 시 외부 접근 경로가 아예 없다 (근거: 규칙만 있고 스캐폴드에 프록시가 빠져 배포 기동에서 접근 불가·CORS 차단이 발생한 사례).
+- 템플릿: **`~/.claude/jyp/scaffolds/templates/Caddyfile`** (compose 3종도 같은 폴더). 라우팅 규약:
 
-```caddyfile
-# Caddyfile
-{$SITE_ADDRESS}
-
-handle /api/* {
-    reverse_proxy server:3000
-}
-handle /health {
-    reverse_proxy server:3000
-}
-handle {
-    root * /srv/client
-    try_files {path} /index.html
-    file_server
-}
-```
-
-- `reverse_proxy` 대상은 compose 서비스명 — Spring이면 `server:8080`, `/health` 라우트는 `/actuator/health`로 rewrite. `/health`는 외부 가동 감시용(ops.md 7절), `try_files`의 `/index.html`은 SPA fallback이다.
+| 경로 | 대상 | 비고 |
+|---|---|---|
+| `/api/*` | `server:3000` | Spring이면 `server:8080` |
+| `/health` | `server:3000` | 외부 가동 감시용(ops.md 7절). Spring이면 `/actuator/health`로 rewrite |
+| 그 외 | `client:80` | nginx가 SPA fallback 처리 |
 
 - **개발(로컬)도 동일 출처를 유지한다**: 로컬은 프록시 컨테이너 대신 Vite `server.proxy`로 `/api/*`를 서버(컨테이너 노출 포트)로 넘긴다 — 클라이언트 코드는 dev/prod 어디서든 같은 상대 경로(`/api/...`)만 호출하고, CORS 설정 자체가 필요 없어진다. 프록시 대상 포트는 vite.config가 `loadEnv`로 `.env`의 `API_PORT`를 읽는다 — `localhost:3000` 하드코딩 금지 (포트 변수화 원칙 4-1절이 여기서만 깨지는 것 방지).
 - 사내망 등 HTTPS 불가 환경이면 그 제약을 프로젝트 CLAUDE.md에 기록한다 (브라우저의 HTTP 제약 — blob 다운로드 차단, secure cookie 불가 등을 설계 시 인지).
