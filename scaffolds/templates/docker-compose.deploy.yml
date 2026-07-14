@@ -2,6 +2,10 @@
 # 두 서버의 차이는 이 파일이 아니라 각 서버 .env의 값뿐 (SITE_ADDRESS, DB 자격, DEPLOY_TAG).
 # 로컬에서 배포 전 검증할 때도 같은 파일을 쓴다.
 # 이미지는 CI가 빌드해 ghcr.io에 push한 것을 pull만 한다 (docker.md 5절) — build: 금지.
+#
+# ⚠ 한 호스트에 운영·개발 스택을 함께 올린다면 (docker.md 7-2절):
+#    .env의 COMPOSE_PROJECT_NAME을 스택마다 다르게 설정한다 — 안 하면 컨테이너·네트워크·
+#    볼륨 이름이 겹쳐 개발 스택이 운영 DB 볼륨을 붙잡는다. HTTP_PORT/HTTPS_PORT도 분리한다.
 
 services:
   proxy:
@@ -9,8 +13,8 @@ services:
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS:?SITE_ADDRESS 미설정}
     ports:
-      - "80:80"
-      - "443:443"                       # 외부에 열리는 포트는 프록시뿐 (docker.md 7절)
+      - "${HTTP_PORT:?HTTP_PORT 미설정}:80"      # 외부에 열리는 포트는 프록시뿐 (docker.md 7절)
+      - "${HTTPS_PORT:?HTTPS_PORT 미설정}:443"   # 운영 80/443, 같은 호스트의 개발 스택은 8080/8443 등
     volumes:
       - ./proxy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data                # 발급받은 인증서 — 지우면 재발급 (rate limit 주의)
