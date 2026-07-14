@@ -36,6 +36,13 @@ HOOKS_DIR="$CLAUDE_DIR/hooks"
 mkdir -p "$HOOKS_DIR"
 cp "$REPO_DIR/hooks/"*.mjs "$HOOKS_DIR/"
 
+# 훅 등록 — settings.json에 우리 훅 항목만 병합 (다른 설정·다른 훅은 보존)
+if command -v node >/dev/null 2>&1; then
+  node "$REPO_DIR/scripts/register-hooks.mjs"
+else
+  echo "  node가 없어 훅 등록을 건너뜁니다 — 훅은 Node로 실행되므로 Node 설치 후 install을 다시 실행하세요."
+fi
+
 echo ""
 echo "설치 완료:"
 echo "  에이전트                    -> $AGENTS_DIR  (dev-claude, doc-claude)"

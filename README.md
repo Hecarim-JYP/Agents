@@ -30,6 +30,8 @@ cd jyp-agents
 에이전트는 `~/.claude/agents/`에, 템플릿·컨벤션·스캐폴드·규칙은 `~/.claude/jyp/`에 복사된다.
 전역 설치이므로 어느 폴더에서 Claude Code를 열어도 사용할 수 있다.
 
+**자동 검증 훅도 install이 등록까지 해준다** — `~/.claude/settings.json`에 훅 항목만 병합하며(다른 설정·개인 훅 보존), 재실행해도 중복되지 않는다. 새 기기에서는 clone → `install.ps1`이면 끝이다.
+
 ## 사용법
 
 ### 방법 1: 서브에이전트로 호출

@@ -34,6 +34,13 @@ $hooksDir = Join-Path $claudeDir "hooks"
 New-Item -ItemType Directory -Force $hooksDir | Out-Null
 Copy-Item (Join-Path $PSScriptRoot "hooks\*.mjs") $hooksDir -Force
 
+# 훅 등록 — settings.json에 우리 훅 항목만 병합 (다른 설정·다른 훅은 보존)
+if (Get-Command node -ErrorAction SilentlyContinue) {
+    node (Join-Path $PSScriptRoot "scripts\register-hooks.mjs")
+} else {
+    Write-Host "  node가 없어 훅 등록을 건너뜁니다 — 훅은 Node로 실행되므로 Node 설치 후 install을 다시 실행하세요." -ForegroundColor Yellow
+}
+
 # 구버전 설치 경로 정리
 $oldTemplatesDir = Join-Path $claudeDir "jyp-templates"
 if (Test-Path $oldTemplatesDir) {
@@ -46,7 +53,7 @@ Write-Host "설치 완료:"
 Write-Host "  에이전트              -> $agentsDir  (dev-claude, doc-claude)"
 Write-Host "  템플릿/컨벤션/스캐폴드/규칙 -> $jypDir"
 Write-Host "  스킬                  -> $skillsDir  (/work-log, /deploy-check, /paper-test, /new-project)"
-Write-Host "  훅                    -> $hooksDir  (post-edit-check, stop-test)"
+Write-Host "  훅                    -> $hooksDir  (post-edit-check, stop-test — settings.json 등록까지 자동)"
 Write-Host ""
 Write-Host "이제 어느 폴더에서든 Claude Code에서 다음처럼 사용할 수 있습니다:"
 Write-Host '  "dev-claude로 새 프로젝트 세팅해줘"'
