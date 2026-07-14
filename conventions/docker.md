@@ -108,6 +108,7 @@ HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://localhost/ >/dev/nu
 - **기동 명령도 하나로 통일**: 각 환경의 `.env`에 `COMPOSE_FILE`을 지정하면 (compose가 `.env`의 `COMPOSE_FILE`을 읽는다) 명령은 어디서나 `docker compose up -d` 하나다 — `-f` 나열을 환경마다 외우지 않는다:
   - 로컬 `.env`: `COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml`
   - 서버(개발·운영) `.env`: `COMPOSE_FILE=docker-compose.yml:docker-compose.deploy.yml`
+  - ⚠ **`COMPOSE_PATH_SEPARATOR=:`를 함께 지정한다 (2026-07-14 실측)** — 구분자 기본값이 OS를 따라가서 **Windows에서는 `;`**다. 지정하지 않으면 위 `:` 표기가 Windows 로컬에서 "파일을 찾을 수 없음"으로 깨진다. `.env`를 쓸 때 **BOM이 붙지 않게** 한다(PowerShell `Set-Content -Encoding utf8`는 BOM을 붙이며, BOM이 있으면 compose가 첫 줄 키를 인식하지 못한다).
 - 서버의 `.env`는 저장소에 커밋하지 않고 서버에만 둔다(시크릿 포함 — ops.md 1절 관리 규칙). `.env.example`이 전체 키의 원본.
 
 파일별 경계 — **base에는 어느 모드에서든 참인 것만 넣는다** (근거: dev 전용 설정이 base에 있으면 배포 모드에 조용히 딸려간다 — base의 `env_file`·`extra_hosts`가 운영까지 따라가 3절 위반 사례):

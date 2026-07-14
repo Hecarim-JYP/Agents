@@ -11,6 +11,7 @@
    4. 확정값은 전부 CLAUDE.md "프로젝트 참고사항"에 기록한다 — 프로필을 안 읽은 사람도 이 프로젝트의 결정을 알 수 있어야 한다.
 2. **생성**: 아래 기본 구조를 만들고, 스택별 조정표에 따라 변형한다. **compose·프록시·nginx 설정은 `~/.claude/jyp/scaffolds/templates/`의 파일을 복사해 프로젝트에 맞게 조정한다** — 즉흥 작성 금지 (docker.md 규칙이 이미 반영된 파일이다).
 3. **first-run 준비**: `.env.example`에서 **`.env`를 자동 생성**하고 결정된 값(DB 포트, 노출 포트 등)을 채운다 — compose 변수 치환(`${DB_NAME}`)은 `.env`가 없으면 빈 값으로 기동돼 첫 실행이 깨진다. `.env`는 `.gitignore` 대상임을 재확인.
+   - ⚠ **`.env`는 BOM 없이 쓴다 (Windows 함정, 2026-07-14 실측)**: PowerShell의 `Set-Content -Encoding utf8`(5.1)은 BOM을 붙이는데, BOM이 있으면 **compose가 첫 줄의 키를 인식하지 못한다**. `[System.IO.File]::WriteAllText(..., [System.Text.UTF8Encoding]::new($false))` 또는 `Out-File -Encoding ascii`를 쓴다.
 4. **초기화**: `git init` 후 첫 커밋 (`chore: 프로젝트 초기 구조 생성`)
 5. **보고**: 생성된 구조를 트리로 보여주고, 다음 단계(의존성 설치, `docker compose up` 등)를 안내한다. **노출 포트가 다른 로컬 프로젝트와 충돌할 수 있음을 함께 고지** (충돌 시 `.env`의 포트 변수만 변경).
 
@@ -179,6 +180,8 @@
 ```
 # 모드 선택 (로컬=dev, 서버=deploy)
 COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml
+# ⚠ COMPOSE_FILE 구분자 — Windows 기본값은 ';'라 위 표기가 깨진다. ':'로 고정 (2026-07-14 실측)
+COMPOSE_PATH_SEPARATOR=:
 # 스택 이름 — 컨테이너·네트워크·볼륨 이름의 접두사.
 # 한 호스트에 운영·개발을 함께 띄우면 반드시 다르게 (docker.md 7-2절: 안 하면 볼륨이 겹친다)
 COMPOSE_PROJECT_NAME=<프로젝트명>-dev
