@@ -2,8 +2,13 @@
  * 파일명 : 01_auth.sql
  * 용도 : 인증·권한 기초 테이블 (auth.md 4절 RBAC 모델의 표준 구현)
  * 최초등록 : 2026-07-12 [박진영]
- * 참고 : 멀티테넌트 프로젝트는 각 테이블에 스코프 컬럼(company_id 등)을 추가하고
- *        조회 인덱스 선두에 배치한다 (database.md 3절)
+ * 참고 : 이 DDL은 자체 로그인(auth.md 0절 a) 기준이다.
+ *        사내 인증 위임·SSO(0절 b·c)를 채택하면 user 테이블을 조정한다 —
+ *        password_hash / failed_login_count / locked_at 제거(신원 검증·잠금은 사내 책임),
+ *        external_user_key VARCHAR(100) 추가 + UNIQUE (사내 계정 식별자).
+ *        권한(role_id)·감사는 어느 방식에서든 우리 DB가 소유한다 (auth.md 0절)
+ *        멀티테넌트 프로젝트는 05_company.sql을 함께 복사하고, 각 테이블에 스코프 컬럼
+ *        (company_id)을 추가해 조회 인덱스 선두에 배치한다 (database.md 3절)
  *        FK는 논리적 참조만 — FOREIGN KEY 제약 미선언, FK 컬럼 인덱스 필수 (database.md 5절)
  */
 

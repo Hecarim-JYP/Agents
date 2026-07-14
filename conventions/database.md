@@ -5,7 +5,7 @@
 ## 1. 기본
 
 - 표준 DB: **MariaDB/MySQL**. 다른 DB를 채택할 경우 프로젝트 시작 시 결정하고 CLAUDE.md에 기록한다 (이 문서의 원칙은 동일 적용).
-- **기초 테이블은 표준 스키마(`~/.claude/jyp/schemas/`)로 시작한다**: schema_migrations, 인증·권한(user/role/permission/login_history), 공통코드, 파일 메타, 감사 로그 — 새로 설계하지 말고 이 DDL을 프로젝트 첫 마이그레이션으로 복사·조정한다.
+- **기초 테이블은 표준 스키마(`~/.claude/jyp/schemas/`)로 시작한다**: schema_migrations, 인증·권한(user/role/permission/login_history), 공통코드, 파일 메타, 감사 로그, (멀티테넌트 시) company — 새로 설계하지 말고 이 DDL을 프로젝트 첫 마이그레이션으로 복사·조정한다.
 - 운영은 Docker 컨테이너 + named volume (docker.md 4절), 백업·복구 절차는 ops.md 6절.
 - **지원 최소 버전: MariaDB 10.4+ / MySQL 8.0+** (근거: 구버전은 인덱스 키 한계가 767바이트라 utf8mb4 `VARCHAR(255)` UNIQUE 생성이 실패한다 — 최신 버전은 DYNAMIC 행 포맷 기본으로 3,072바이트). Docker로 DB를 직접 기동하므로(docker.md) 버전은 compose에서 고정한다.
 - 문자셋·정렬: **`utf8mb4` / `utf8mb4_unicode_ci` 고정** (근거: utf8=utf8mb3은 3바이트까지만 저장하는 불완전 UTF-8이라 이모지·일부 한자에서 깨진다. `utf8mb4_0900_ai_ci`는 MariaDB에 없어 MySQL↔MariaDB 이관이 깨지므로 양쪽 지원되는 unicode_ci 채택).
@@ -33,7 +33,16 @@ updated_by   BIGINT,
 ```
 
 - 소프트삭제 대상 테이블은 추가로: `is_active TINYINT(1) NOT NULL DEFAULT 1`, `deleted_at`, `deleted_by` (규칙: sql.md 5절).
-- 멀티테넌트 프로젝트는 스코프 컬럼(`company_id` 등)을 모든 업무 테이블에 두고, 조회 인덱스의 선두 컬럼으로 삼는다.
+- **여러 사용자가 수정할 수 있는 업무 테이블은 `version INT NOT NULL DEFAULT 0` 추가 (STRICT)** — 낙관적 락으로 잃어버린 갱신을 막는다 (sql.md 8절). 단일 작성자만 다루는 로그성·이력성 테이블은 제외.
+
+### 멀티테넌트 (다중 법인 — 시작 결정 체크리스트 항목)
+
+멀티테넌트 여부는 프로젝트 시작 시 결정한다 — 나중에 스코프 컬럼을 전 테이블에 소급하는 비용이 크다.
+
+- 테넌트 기준 테이블은 표준 스키마 `05_company.sql`로 시작한다 (멀티테넌트 프로젝트만 복사).
+- **스코프 컬럼(`company_id`)을 모든 업무 테이블에 두고**, 조회 인덱스의 선두 컬럼으로 삼는다 (5절). `user`에도 필수 — 토큰 페이로드의 회사 ID(auth.md 2절)가 여기서 나온다.
+- 스코프 값은 쿼리마다 **서버 신뢰값으로 강제 주입** (express.md/spring.md 5·6절, sql.md) — 클라이언트 전송값 사용 금지.
+- 시작 시 함께 결정해 CLAUDE.md에 기록: ① 법인 간 로그인 ID 중복 허용 여부(user UNIQUE 범위), ② role·common_code를 전사 공통/법인별 중 어느 쪽에 둘지, ③ 전사 횡단 조회(그룹 관리자)가 필요한 역할과 그 권한 게이트.
 
 ## 4. 타입 규칙
 
@@ -74,6 +83,7 @@ CREATE TABLE IF NOT EXISTS example_item (
     status           VARCHAR(20)  NOT NULL DEFAULT 'PENDING',  -- common_code: ITEM_STATUS
     sort_order       INT NOT NULL DEFAULT 0,
     is_active        TINYINT(1) NOT NULL DEFAULT 1,
+    version          INT NOT NULL DEFAULT 0,          -- 낙관적 락 (sql.md 8절)
     created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by       BIGINT,
     updated_at       DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,

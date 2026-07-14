@@ -3,10 +3,32 @@
 로그인이 있는 모든 시스템에 적용한다. 점검용 체크리스트는 ops.md 5절, 신뢰값 주입은 express.md 5절.
 이 문서의 원칙은 **백엔드 스택 무관**이다 — 스택별 구현 도구는 6절 매핑 표 참조.
 
-## 1. 비밀번호 (STRICT)
+## 0. 인증 소스 — 프로젝트 시작 시 결정 (STRICT)
+
+**"누가 신원을 검증하는가"를 시작 시 확정한다** (스캐폴드 체크리스트 — 반드시 묻는다). 나중에 바꾸면 user 테이블·로그인 화면·토큰 발급 경로를 전부 재작업해야 한다.
+
+| | (a) 자체 로그인 | (b) 사내 인증 위임 | (c) SSO (OIDC/SAML) |
+|---|---|---|---|
+| 신원 검증 | 우리 DB의 비밀번호 해시 | **사내 API서버**에 자격 검증 요청 (integration.md) | 사내 IdP로 리다이렉트 |
+| 로그인 화면 | 우리 것 | 우리 것 (ID/PW를 받아 사내 API로 전달) | IdP 화면 (우리는 콜백만) |
+| 비밀번호 취급 | bcrypt 해시 저장 (1절) | **저장 금지** — 사내 API 전달 후 즉시 폐기, 로그·에러에 절대 남기지 않음 | 우리가 아예 보지 않음 (가장 안전) |
+| 표준 스키마 조정 | `01_auth.sql` 그대로 | `password_hash`·`failed_login_count`·`locked_at` 제거(잠금은 사내 책임), `external_user_key` 추가 | (b)와 동일 |
+
+**어느 방식이든 공통 (STRICT)**:
+
+- **인증(누구인가)과 인가(무엇을 할 수 있나)는 별개 층이다** — 위임·SSO를 써도 **권한(RBAC·스코프)은 우리 DB가 소유**한다(4절). 사내 인증이 알려주는 것은 신원뿐이며, 역할을 사내 값으로 그대로 신뢰하지 않는다.
+- **우리 서비스의 세션·토큰 체계는 동일**하다(2·3절) — 검증에 성공하면 **우리가 우리 토큰을 발급**한다. 사내/IdP 토큰을 클라이언트에 그대로 흘리지 않는다 (근거: 우리 토큰이어야 서버 측 무효화·권한 변경 반영이 우리 손에 남는다).
+- `user` 테이블은 위임·SSO에서도 필요하다 — 권한 매핑·감사 로그·`created_by` 참조의 대상이다.
+- **계정 프로비저닝 방식을 정한다**: 최초 로그인 시 자동 생성(JIT — 기본 역할 부여, 관리자가 승격) 또는 사전 등록된 사용자만 허용. 어느 쪽이든 **사내에서 퇴사·비활성 처리된 계정이 우리 시스템에 남는 문제**의 처리 방법(로그인 시 상태 확인 또는 정기 동기화)을 CLAUDE.md에 기록한다.
+- **인증 소스 장애 격리**: 사내 API·IdP 장애 시 **신규 로그인만 불가**하고 이미 발급된 우리 토큰의 세션은 계속 동작해야 한다 (integration.md 6절 — `/health`에 인증 소스 확인을 넣지 않는다).
+- (b)(c)의 신원 검증 호출은 연동 계층(`external/`)을 통한다 — 타임아웃·에러 매핑은 integration.md 4·5절.
+
+## 1. 비밀번호 (STRICT — 자체 로그인 전용)
+
+위임·SSO(0절 b·c)를 채택하면 이 절은 사내 인증 시스템의 책임이다 — 우리는 구현하지 않는다.
 
 - 저장은 **bcrypt 또는 argon2 해시**로만. 평문·복호화 가능 암호화·MD5/SHA 단독 해시 금지.
-- 로그인 실패 메시지는 모호하게: "아이디 또는 비밀번호가 올바르지 않습니다" (계정 존재 여부를 노출하지 않는다).
+- 로그인 실패 메시지는 모호하게: "아이디 또는 비밀번호가 올바르지 않습니다" (계정 존재 여부를 노출하지 않는다). 위임 방식도 동일 — 사내 API의 에러 문구를 그대로 노출하지 않는다.
 - 실패 횟수 제한 + 계정 잠금(예: 5회 실패 시 잠금, 관리자 해제)을 구현한다.
 
 ## 2. 토큰 (JWT 기준)
@@ -60,8 +82,10 @@
 | 인증 필터 | 커스텀 미들웨어 (`authenticateToken`) | Spring Security `SecurityFilterChain` |
 | 권한 게이트 | `requireActionPermission('module.action')` | `@PreAuthorize("hasAuthority('module.action')")` |
 | JWT 발급/검증 | jsonwebtoken 또는 jose | jjwt / spring-security-oauth2-resource-server |
-| 비밀번호 해싱 | bcrypt | `BCryptPasswordEncoder` |
+| 비밀번호 해싱 (0절 a) | bcrypt | `BCryptPasswordEncoder` |
+| 사내 인증 위임 (0절 b) | `external/` 연동 클라이언트 호출 후 자체 토큰 발급 | 동일 — `external/` 빈 호출 후 자체 토큰 발급 |
+| SSO (0절 c) | openid-client 등 OIDC 라이브러리 | `spring-boot-starter-oauth2-client` |
 | refresh 쿠키 | `res.cookie(..., { httpOnly, secure, sameSite })` | `ResponseCookie` + `HttpOnly/Secure/SameSite` |
 | CSRF | SameSite + Bearer 헤더 요구 (3절) | Spring Security CSRF 설정 (토큰 방식이면 비활성 + 3절 방식) |
 
-- Spring을 실제 채택하는 시점에 `spring.md`(계층·구현 패턴)를 express.md에 준해 작성한다.
+- Spring 채택 시 계층·구현 패턴은 `spring.md`를 따른다 (express.md에 준하는 구현 층 — 2026-07-13 작성).
