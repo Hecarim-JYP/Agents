@@ -243,6 +243,53 @@
 - `rules/dev-rules.md`·`scaffolds/default.md`·`README.md` — 프로필·린트 연결
 - 컨벤션 17종·규칙 2종·스캐폴드 — 제목 정리
 
+---
+
+## 10. 실검증 — Docker 설치 후 실제로 돌려본 결과 (커밋 501ca4f, 494da29, 42fb3a5)
+
+지금까지의 검증은 전부 문서 위 종이 실행이었다. Docker Desktop(4.82 / 엔진 29.6.1)을 설치해
+**compose 병합 검증(1단계) → 실제 기동(2단계) → Spring 경로**까지 돌렸고, **문서만으로는 보이지 않던 버그 6건**이 나왔다.
+
+### 10-1. compose 템플릿 실검증 (1단계)
+
+기존: YAML 파싱까지만 확인했고 compose의 변수 치환·오버라이드 병합은 미검증이었다.
+변경: `scripts/verify-templates.ps1`을 추가해 임시 폴더에 템플릿을 조립하고 두 모드의 `docker compose config`를 실행한다. Docker가 없으면 조립된 폴더와 실행 명령을 안내하고 종료한다.
+
+발견·수정한 버그 2건:
+- **`COMPOSE_FILE` 구분자**: 기본값이 OS를 따라가 **Windows에서는 `;`**다. `.env`의 `a.yml:b.yml` 표기가 Windows 로컬에서 "파일을 찾을 수 없음"으로 깨졌다 — 서버(Linux)에서는 멀쩡하고 개발자 PC에서만 터지는 유형. → `.env.example`·docker.md에 **`COMPOSE_PATH_SEPARATOR=:` 고정** 명시.
+- **`.env`의 BOM**: PowerShell `Set-Content -Encoding utf8`이 BOM을 붙이는데, BOM이 있으면 **compose가 첫 줄의 키를 인식하지 못한다**. 스캐폴드가 `.env`를 자동 생성하는 단계에서 그대로 터질 문제였다. → first-run 절차에 BOM 없이 쓰는 방법 명시.
+
+### 10-2. 실제 기동 (2단계) — Node/React 경로
+
+템플릿으로 미니 프로젝트를 조립해 배포 모드를 실제로 띄우고 종단 검증했다.
+
+- 통과: 이미지 빌드(멀티스테이지·non-root) / `up -d`로 proxy·client·server·db 기동 + `depends_on: service_healthy` / `run --rm migrate`(앱 기동과 분리) → Flyway 적용 후 **재실행 시 "up to date"(멱등)** / 동일 출처 라우팅(정적 200 · **SPA fallback** · `/health` · `/api/items`가 **DB에서 utf8mb4 한글 반환**) / `DEPLOY_TAG`만 바꿔 **롤백** 확인.
+- 발견·수정: **nginx HEALTHCHECK가 항상 unhealthy**였다. 컨테이너 안에서 `localhost`는 **IPv6(`::1`)로 먼저 풀리는데 nginx의 `listen 80`은 IPv4만 듣기** 때문 — 서비스는 정상인데 컨테이너만 계속 unhealthy로 표시된다. → HEALTHCHECK를 `127.0.0.1`로 교체 + nginx.conf에 `listen [::]:80` 추가. **Node는 기본이 듀얼스택이라 같은 코드가 통과한다** — 그래서 종이 검증으로는 보이지 않았다.
+
+### 10-3. Spring 경로 실기동
+
+Java 21 / Boot 4.0.7 / Gradle 9 / MariaDB / Caddy+nginx로 빌드·기동·종단 요청까지 검증했다.
+
+- 통과: `./gradlew check`(Spotless + Checkstyle + JUnit 5 테스트 2건) / 이미지 빌드(508MB, non-root) / 컨테이너 4종 전부 healthy(**actuator 헬스체크**) / Flyway 별도 단계(`spring.flyway.enabled=false`) + 멱등 / 종단: 정적·SPA fallback·**`/health`(actuator rewrite)**·`GET /api/items` 봉투 `{data,total}`·**POST 201 + snake_case**·**검증 실패 400 + `{message,error,field}`**·DB utf8mb4 한글 저장.
+- **훅 버그(치명)**: Windows에서 `gradlew.bat`을 상대명으로 호출하면 cmd가 PATH에서만 찾아 실패하는데, **훅이 이를 조용히 통과 처리**했다 — Java 프로젝트에서 컴파일 에러가 있어도 아무 검사 없이 넘어가고 있었다("훅을 Spring까지 확장했다"는 이전 보고가 실제로는 작동하지 않는 상태였다). → 절대 경로 호출로 수정. `--offline`도 제거(캐시가 비면 정상 코드도 실패시킨다), 타임아웃 180초.
+- **Spotless + Windows**: 기본 정책이 `GIT_ATTRIBUTES`라 **`.gitattributes`가 없으면 CRLF를 기대**해 LF로 쓴 정상 코드가 `spotlessCheck`에서 실패한다. → `lineEndings = 'UNIX'` + `.gitattributes`(`* text=auto eol=lf`) 둘 다 두도록 규칙화.
+- **예외 핸들러가 로깅을 하지 않았다** — 500만 반환하고 예외가 통째로 사라져 원인 추적이 불가능했다(실제로 POST 500의 원인을 못 찾다가, 로깅을 넣은 뒤에야 요청 본문의 잘못된 UTF-8이 드러났다). → spring.md 예시에 `log.error` 추가 + **STRICT 규칙화**.
+- **버전 현실 반영**: Initializr가 **Boot 3.x를 더 이상 제공하지 않고**(최소 4.0), Boot 4 플러그인은 **Gradle 8.14+/9.x**를 요구하며, **MyBatis 스타터는 Boot 4.0.x까지만 호환**된다. → spring.md 0절을 **Boot 4.x + Gradle 9.x + `JdbcClient` 기본**(순수 SQL 유지·1st-party라 호환 리스크 없음)으로 갱신, MyBatis는 Boot 4.0.x 고정 조건부 허용. wrapper 확보 대안(`docker run gradle:9-jdk21 gradle wrapper`)도 추가 — 실제로 Initializr 생성 API가 500이라 이 경로로 우회했다.
+- **테스트 네이밍 규칙 충돌**: Checkstyle `MethodName`(camelCase)과 testing.md의 스네이크 서술형 이름이 부딪혀 `./gradlew check`가 실패한다. → Java는 **camelCase 메서드 + `@DisplayName`으로 서술**하도록 정정(도구 쪽을 따른다).
+
+### 10-4. 결론
+
+실검증으로 잡은 버그는 이번 세션 누계 **12건**(ESLint 정규식·설치 충돌 3 / compose 구분자·BOM 2 / nginx IPv6 1 / Spring 버전·훅·Spotless 6). 전부 문서를 아무리 정교하게 써도 보이지 않던 것들이고, 특히 **훅이 Java에서 아무 검사도 하지 않던 버그**는 실기동 없이는 계속 몰랐을 것이다. **"문서로 결정하지 말고 돌려보고 결정한다"**가 이번 작업의 가장 큰 교훈이다.
+
+**변경 파일**
+- `scripts/verify-templates.ps1` — (신규) compose 템플릿 검증 스크립트
+- `conventions/docker.md` — `COMPOSE_PATH_SEPARATOR`·BOM 주의, nginx HEALTHCHECK `127.0.0.1`
+- `conventions/spring.md` — Boot 4.x·Gradle 9·JdbcClient 기본, wrapper 컨테이너 생성, 예외 로깅 STRICT, Spotless 줄바꿈
+- `conventions/testing.md` — Java 테스트 네이밍 예외(`@DisplayName`)
+- `scaffolds/templates/nginx.conf`·`Caddyfile` — IPv6 리스닝, Spring 변형 안내
+- `scaffolds/default.md` — `.env` BOM·`COMPOSE_PATH_SEPARATOR`·`.gitattributes` 필수
+- `hooks/post-edit-check.mjs`·`stop-test.mjs` — Windows gradlew 절대 경로, `--offline` 제거
+
 ## 커밋 코멘트
 
 ```
@@ -292,4 +339,12 @@
 - ESLint 템플릿 2종 + Spotless/Checkstyle + 훅 JVM 확장 — 규칙을 도구가 강제
 - OVERVIEW 인덱스화 (435줄 → 279줄), 문서 제목의 (JYP) 제거
 - 실전 검증: 위반 11건 전부 검출·오탐 0, 템플릿 버그 3건 발견·수정
+
+■ 실검증 (501ca4f, 494da29, 42fb3a5)
+- Docker 설치 후 compose config → 실제 기동 → Spring 경로까지 실행 검증
+- 실검증으로만 드러난 버그 6건 수정: COMPOSE_FILE 구분자(Windows ';'), .env BOM,
+  nginx 헬스체크 IPv6, 훅의 gradlew.bat 미실행(Java 검사가 통째로 무력), Spotless CRLF,
+  예외 핸들러 무로깅
+- Spring 스택 현실 반영: Boot 4.x + Gradle 9 + JdbcClient 기본 (MyBatis는 Boot 4.0.x 고정)
+- scripts/verify-templates.ps1 추가
 ```
