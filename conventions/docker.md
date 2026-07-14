@@ -83,10 +83,11 @@ FROM nginx:1.27-alpine AS runtime
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
-HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://localhost/ >/dev/null || exit 1
+HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1/ >/dev/null || exit 1
 ```
 
 - nginx.conf에는 **SPA fallback(`try_files ... /index.html`)을 반드시 포함**한다 — 없으면 새로고침·딥링크가 404가 된다. 템플릿: `~/.claude/jyp/scaffolds/templates/nginx.conf`.
+- ⚠ **HEALTHCHECK 주소는 `localhost`가 아니라 `127.0.0.1`** (2026-07-14 실측): 컨테이너 안에서 `localhost`는 IPv6(`::1`)로 먼저 풀리는데 nginx의 `listen 80`은 IPv4만 듣는다 — 서비스는 멀쩡한데 컨테이너가 계속 `unhealthy`로 표시된다. (Node는 기본이 듀얼스택이라 이 문제가 없다.)
 
 ## 3. 설정 주입 (STRICT)
 
