@@ -125,7 +125,7 @@
     # server
     npm i -D eslint@9 @eslint/js@9 typescript-eslint eslint-plugin-import globals
     ```
-- **Java/Spring**: Spotless(google-java-format) + Checkstyle을 `check`에 연결 (spring.md 7절).
+- **Java/Spring**: Spotless(google-java-format) + Checkstyle을 `check`에 연결 (spring.md 7절). ⚠ **`.gitattributes`(`* text=auto eol=lf`)를 반드시 함께 생성**한다 — 없으면 Windows에서 CRLF를 기대해 정상 코드가 `spotlessCheck`에서 실패한다 (2026-07-14 실측).
 - **CI와 훅이 이 스크립트를 실행한다** — 린트가 없으면 훅이 조용히 통과해 자동 검증 층이 사라진다.
 
 ## 초기 파일 내용

@@ -27,7 +27,9 @@ const isGradle = existsSync(path.join(root, 'gradlew'));
 let cmd = null;
 
 if (isGradle) {
-  cmd = `${process.platform === 'win32' ? 'gradlew.bat' : './gradlew'} test --quiet --offline`;
+  // Windows는 절대 경로로 — 'gradlew.bat'만 쓰면 cmd가 PATH에서만 찾아 실패한다
+  const gw = process.platform === 'win32' ? `"${path.join(root, 'gradlew.bat')}"` : './gradlew';
+  cmd = `${gw} test --quiet`;   // --offline 금지: 캐시가 비면 정상 코드도 실패한다
 } else if (existsSync(path.join(root, 'package.json'))) {
   let pkg = {};
   try { pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')); } catch { process.exit(0); }

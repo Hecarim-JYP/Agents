@@ -1,6 +1,10 @@
 # 리버스 프록시 — HTTPS 종단 + 라우팅만 담당한다 (docker.md 7절).
 # 정적 파일은 client(nginx) 컨테이너가 서빙한다 — 2026-07-14 확정.
 # SITE_ADDRESS: 도메인이면 자동 HTTPS, 사내 도메인 미확보면 ":80" (체크리스트 15)
+#
+# 아래는 Node/Express(내부 포트 3000) 기준. Spring Boot면 두 곳을 바꾼다 (2026-07-14 검증):
+#   - reverse_proxy server:8080
+#   - /health 블록에 `rewrite * /actuator/health` 한 줄 추가 (actuator 표준 경로)
 
 {$SITE_ADDRESS}
 

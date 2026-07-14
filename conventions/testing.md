@@ -40,6 +40,7 @@
 
 - 위치는 프로젝트 초기에 결정해 CLAUDE.md에 기록: `tests/` 미러링 또는 소스 인접 `*.test.ts` 중 하나로 통일.
 - 테스트 이름은 검증하는 행동을 서술한다: `만료된_세션은_거부된다`, `생성_성공시_201과_data_키를_반환한다`.
+  - ⚠ **Java는 예외 (2026-07-14 실측)**: Checkstyle의 `MethodName` 규칙이 camelCase를 강제하므로 **메서드명은 camelCase로 두고 서술은 `@DisplayName`에 적는다** (`@DisplayName("생성_성공시_201과_data_키를_반환한다") void createReturns201WithData()`). 스네이크 메서드명을 쓰면 `./gradlew check`가 실패한다 — 규칙끼리 부딪히므로 도구 쪽을 따른다.
 - 실행 명령은 항상 `npm test`(또는 `pytest`)로 통일 — 스크립트 별칭을 두어 CI와 로컬이 같은 명령을 쓴다.
 
 ## 5. 게이트 규칙 (STRICT — 게이트+기록 방식)

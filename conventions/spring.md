@@ -4,10 +4,13 @@
 
 ## 0. 언어·빌드 (신규 프로젝트)
 
-- **Java 21(LTS) + Spring Boot 3.x + Gradle** 기본. Kotlin은 사용자가 명시적으로 요청할 때만.
-- **Gradle wrapper(`gradlew` + `gradle/wrapper/*.jar`)를 저장소에 포함**한다 — CI·다른 기기에서 로컬 Gradle 설치 없이 빌드하기 위함. wrapper jar는 오프라인 생성이 안 되므로 프로젝트 생성 시(Spring Initializr 산출물 또는 공식 배포본에서) 확보한다.
+- **Java 21(LTS) + Spring Boot 4.x + Gradle 9.x** 기본 (2026-07-14 실측 갱신). Kotlin은 사용자가 명시적으로 요청할 때만.
+  - ⚠ **Spring Initializr는 더 이상 Boot 3.x를 제공하지 않는다**(최소 4.0). Boot 4 플러그인은 **Gradle 8.14+ 또는 9.x**를 요구하므로 wrapper 버전을 맞춘다 — 낮으면 `Spring Boot plugin requires Gradle 8.x (8.14 or later) or 9.x`로 빌드가 즉시 실패한다.
+- **Gradle wrapper(`gradlew` + `gradle/wrapper/*.jar`)를 저장소에 포함**한다 — CI·다른 기기에서 로컬 Gradle 설치 없이 빌드하기 위함. 확보 방법 두 가지:
+  1. Spring Initializr 산출물 사용 (기본)
+  2. 로컬에 Gradle이 없고 Initializr도 못 쓸 때: **컨테이너로 생성** — `docker run --rm -v "$PWD:/app" -w /app gradle:9-jdk21 gradle wrapper --gradle-version 9.0` (2026-07-14 검증)
 - ⚠ **Windows에서 생성한 `gradlew`는 실행 비트가 유실된다** — Linux CI/컨테이너에서 `Permission denied`로 깨진다. 조치: `git update-index --chmod=+x gradlew` 커밋 또는 Dockerfile/CI에서 `chmod +x gradlew`.
-- 데이터 접근 기본: **MyBatis**(순수 SQL 유지 — sql.md 스타일을 그대로 적용). JPA는 사용자가 명시적으로 선택할 때만 (선택 시 CLAUDE.md에 기록하고 N+1·즉시로딩 정책을 함께 정한다).
+- 데이터 접근 기본: **Spring JDBC의 `JdbcClient`**(순수 SQL 유지 — sql.md 스타일을 그대로 적용, 1st-party라 Boot 버전 호환 문제가 없다). **MyBatis도 표준으로 허용**하되 ⚠ **MyBatis 스타터는 Boot 4.0.x까지만 호환**된다(4.1 미지원, 2026-07-14 기준) — 채택 시 Boot 버전을 4.0.x로 고정하고 CLAUDE.md에 기록한다. JPA는 사용자가 명시적으로 선택할 때만 (선택 시 N+1·즉시로딩 정책을 함께 정한다).
 - 마이그레이션은 **Flyway**를 쓰되 **`spring.flyway.enabled=false`로 앱 기동 시 자동 실행을 끈다 (STRICT)** — 배포 절차의 별도 단계(`docker compose run --rm migrate`)로만 적용한다 (근거: 기동 시 자동 실행은 docker.md 5절의 "앱 기동과 분리" 원칙을 깨고, 앱이 여러 개면 동시에 마이그레이션을 돌리는 경쟁이 생긴다). 마이그레이션 파일은 저장소 루트 `migrations/`에 두고(모노레포 공유), migrate 서비스가 `filesystem:` 위치로 읽는다 — `src/main/resources/db/migration`에 두지 않는다.
 
 ## 1. 계층 구조
@@ -74,16 +77,26 @@ public record ItemCreateRequest(
 ```java
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(NotFoundException e) {
         return ResponseEntity.status(404).body(new ErrorResponse(e.getMessage(), "NOT_FOUND", null));
     }
-    // ValidationException → 400, ForbiddenException → 403, 최후 Exception → 500
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponse> handleUnexpected(Exception e) {
+        log.error("처리되지 않은 예외", e);   // ← 필수 (아래 STRICT)
+        return ResponseEntity.status(500).body(new ErrorResponse("서버 오류", "INTERNAL_ERROR", null));
+    }
+    // ValidationException → 400, ForbiddenException → 403
 }
 ```
 
 - 타입 있는 예외 계층(`ValidationError`/`NotFoundError`/`ForbiddenError` 대응)을 `common/`에 정의하고, 상태코드 매핑은 이 한 곳에서만 한다 (patterns.md 3절).
 - 최후 방어 핸들러(500)는 스택트레이스·SQL을 응답에 싣지 않는다 — 로그로만 (ops.md 3절).
+- **최후 방어 핸들러는 반드시 예외를 로깅한다 (STRICT — 2026-07-14 실측)**: 로깅 없이 500만 반환하면 **예외가 통째로 사라져** 원인 추적이 불가능하다. 실제로 검증 중 POST가 500을 반환하는데 서버 로그에 아무것도 남지 않아 원인(요청 본문의 잘못된 UTF-8)을 찾지 못했고, 로깅을 넣은 뒤에야 드러났다. Spring은 핸들러가 처리한 예외를 스스로 로깅하지 않는다.
 
 ## 5. 트랜잭션
 
@@ -112,6 +125,7 @@ plugins {
     id 'checkstyle'
 }
 spotless {
+    lineEndings = 'UNIX'
     java {
         googleJavaFormat()
         removeUnusedImports()
@@ -124,4 +138,7 @@ checkstyle {
     maxWarnings = 0
 }
 ```
+
+- ⚠ **줄바꿈 (Windows 함정, 2026-07-14 실측)**: Spotless의 기본 정책은 `GIT_ATTRIBUTES`라 **`.gitattributes`가 없으면 OS 기본(Windows=CRLF)을 기대**해, LF로 작성한 정상 코드가 `spotlessCheck`에서 실패한다. 저장소에 **`.gitattributes`(`* text=auto eol=lf`)를 두거나** 위처럼 `lineEndings = 'UNIX'`를 명시한다 (둘 다 두는 것을 권장).
+- 포맷 위반은 `./gradlew spotlessApply`로 자동 수정한다 — 검사(`spotlessCheck`)는 CI·훅이 돌린다.
 - 리버스 프록시 뒤에서는 `server.forward-headers-strategy: framework` 설정 — Express `trust proxy`의 대응 (docker.md 7절).

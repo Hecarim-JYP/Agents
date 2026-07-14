@@ -34,7 +34,7 @@ if (data.session_id) {
 const failures = [];
 const run = (label, cmd) => {
   try {
-    execSync(cmd, { cwd: root, stdio: 'pipe', encoding: 'utf8', timeout: 120_000 });
+    execSync(cmd, { cwd: root, stdio: 'pipe', encoding: 'utf8', timeout: 180_000 });
   } catch (e) {
     const out = `${e.stdout || ''}${e.stderr || ''}`.trim() || String(e.message);
     failures.push(`[${label}] 실패:\n${out.split('\n').slice(-40).join('\n')}`);
@@ -43,11 +43,14 @@ const run = (label, cmd) => {
 
 if (isJavaFile) {
   // Gradle: 포맷(Spotless)과 컴파일까지만 — 테스트는 Stop 훅이 실행한다
-  const gw = process.platform === 'win32' ? 'gradlew.bat' : './gradlew';
+  // Windows는 절대 경로로 호출한다 — 'gradlew.bat'만 쓰면 cmd가 PATH에서만 찾아 실패한다
+  const gw = process.platform === 'win32' ? `"${path.join(root, 'gradlew.bat')}"` : './gradlew';
+  // --offline은 쓰지 않는다: 캐시가 비어 있으면 정상 코드도 "플러그인을 찾을 수 없음"으로 실패한다.
+  // 첫 실행은 의존성 내려받느라 느리다 — 프로젝트 세팅 직후 `./gradlew build`로 캐시를 채워두면 이후는 빠르다.
   const build = ['build.gradle', 'build.gradle.kts'].map((f) => path.join(root, f)).find(existsSync);
   const hasSpotless = build ? /spotless/.test(readFileSync(build, 'utf8')) : false;
-  if (hasSpotless) run('spotlessCheck', `${gw} spotlessCheck --quiet --offline`);
-  run('compileJava', `${gw} compileJava --quiet --offline`);
+  if (hasSpotless) run('spotlessCheck', `${gw} spotlessCheck --quiet`);
+  run('compileJava', `${gw} compileJava --quiet`);
 } else {
   let pkg = {};
   try { pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')); } catch { process.exit(0); }
