@@ -1,4 +1,4 @@
-# 문서 작업 규칙 (JYP)
+# 문서 작업 규칙
 
 <!-- 프로젝트 CLAUDE.md에서 @로 import해서 사용:
      @~/.claude/jyp/rules/doc-rules.md -->

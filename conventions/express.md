@@ -1,4 +1,4 @@
-# 구현 패턴 — Express/Node 서버 (JYP)
+# 구현 패턴 — Express/Node 서버
 
 실무에서 검증된 Express 서버 구현 패턴. `patterns.md`(언어 무관)를 전제로 한다.
 

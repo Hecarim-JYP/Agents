@@ -1,4 +1,4 @@
-# 구현 패턴 — Spring Boot 서버 (JYP)
+# 구현 패턴 — Spring Boot 서버
 
 실무 표준 Spring Boot 서버 구현 패턴. `patterns.md`(언어 무관)를 전제로 하며, express.md와 같은 원칙(계층·계약·신뢰 경계)의 Spring 구현 층이다. 인증 도구 매핑은 auth.md 6절.
 
