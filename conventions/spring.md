@@ -104,4 +104,24 @@ public class GlobalExceptionHandler {
 - 헬스체크: **spring-boot-starter-actuator의 `/actuator/health`** 사용 — 직접 만들지 않는다. docker.md HEALTHCHECK가 이 경로를 본다. 노출 엔드포인트는 health만(`management.endpoints.web.exposure.include: health`).
 - 날짜 직렬화는 ISO 8601 고정(`LocalDate`/`LocalDateTime` + jackson-datatype-jsr310 기본), 시간대는 앱·DB 통일(database.md 1절).
 - 테스트: **JUnit 5 + `@WebMvcTest`/`MockMvc`**(API 계약) + 순수 단위 테스트(서비스 도메인 로직 — 컨텍스트 없이). 실행은 `./gradlew test` (testing.md의 `npm test` 대응).
+- **포맷·정적 검사 자동화 (스캐폴드가 설정)**: **Spotless**(google-java-format — 포맷 논쟁 제거)와 **Checkstyle**(순환 의존·미사용 import·네이밍)을 build.gradle에 넣고 `check`에 묶는다 — 규칙을 문서가 아니라 빌드가 강제한다 (TS/React의 ESLint 대응). CI와 훅이 `./gradlew spotlessCheck` / `./gradlew check`를 실행한다.
+
+```gradle
+plugins {
+    id 'com.diffplug.spotless' version '6.25.0'
+    id 'checkstyle'
+}
+spotless {
+    java {
+        googleJavaFormat()
+        removeUnusedImports()
+        licenseHeaderFile 'config/header.txt'   // 파일 헤더 주석 강제 (general.md 5절)
+    }
+}
+checkstyle {
+    toolVersion = '10.17.0'
+    configFile = file('config/checkstyle/checkstyle.xml')
+    maxWarnings = 0
+}
+```
 - 리버스 프록시 뒤에서는 `server.forward-headers-strategy: framework` 설정 — Express `trust proxy`의 대응 (docker.md 7절).

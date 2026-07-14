@@ -14,7 +14,7 @@ New-Item -ItemType Directory -Force $agentsDir | Out-Null
 if (Test-Path $jypDir) { Remove-Item -Recurse -Force $jypDir }
 
 # -Recurse 필수: scaffolds/templates/ 같은 하위 폴더까지 복사한다
-foreach ($sub in "templates", "conventions", "scaffolds", "rules", "schemas") {
+foreach ($sub in "templates", "conventions", "scaffolds", "rules", "schemas", "profiles") {
     New-Item -ItemType Directory -Force (Join-Path $jypDir $sub) | Out-Null
     Copy-Item (Join-Path $PSScriptRoot "$sub\*") (Join-Path $jypDir $sub) -Recurse -Force
 }

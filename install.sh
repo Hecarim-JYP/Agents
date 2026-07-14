@@ -16,7 +16,7 @@ mkdir -p "$AGENTS_DIR"
 rm -rf "$JYP_DIR"
 
 # -r 필수: scaffolds/templates/ 같은 하위 폴더까지 복사한다
-for sub in templates conventions scaffolds rules schemas; do
+for sub in templates conventions scaffolds rules schemas profiles; do
   mkdir -p "$JYP_DIR/$sub"
   cp -r "$REPO_DIR/$sub/"* "$JYP_DIR/$sub/"
 done

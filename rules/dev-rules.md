@@ -39,7 +39,7 @@
 - 정기 배치·스케줄 작업은 `batch.md`를 따른다 — **첫 배치 구현 전에 실행 방식(앱 내/별도 컨테이너+호스트 cron/분산 락)을 사용자에게 제안·확정**(MANDATORY), 멱등 작성, 실행 이력 기록 + 실패 알림 필수, 컨테이너 타임존 명시
 - 화면 디자인·테마·UX는 `~/.claude/jyp/conventions/design.md`를 따른다 — Tailwind + shadcn/ui 표준, 색상은 시맨틱 토큰만(hex 직접 지정 금지), 업무/서비스 UI 모드, 로딩·빈 상태·에러 3종 필수
 - 다국어 지원 프로젝트는 `i18n.md`를 따른다 — 모든 문구는 키로(기본 언어 하드코딩 금지), react-i18next, 에러 분기는 `error` 코드, 코드성 데이터는 번역 테이블
-- 새 프로젝트 세팅 요청 시 `~/.claude/jyp/scaffolds/default.md`의 절차를 따른다
+- 새 프로젝트 세팅 요청 시 `~/.claude/jyp/scaffolds/default.md`의 절차를 따른다 — **사내 표준 프로필(`~/.claude/jyp/profiles/jyp-default.md`)이 결정 항목의 기본 답안**이므로 먼저 읽고, 프로필의 [확인] 항목만 묻는다
 
 ## 코드
 - 새 의존성 추가는 사전 보고

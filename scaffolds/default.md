@@ -4,10 +4,11 @@
 
 ## 생성 절차
 
-1. **확인**: 프로젝트명(폴더명)과 목적 한 줄을 듣고, 아래 **시작 결정 체크리스트**를 확정한다. 22개를 순서대로 다 묻지 않는다 — 다음 순서로 진행한다:
-   1. **반드시 묻는다 (5개)**: ①프론트 TS/JS ②인증 소스 ③사내 API 연동 여부 ④사내 도메인 유무 ⑤가동 모니터링 주체. 되돌리기 비용이 크거나 환경마다 답이 달라 추측이 위험한 항목이다 (patterns.md 0-1절).
-   2. **목적에서 갈리는 것만 묻는다**: 백엔드 스택, 멀티테넌트, 다국어, 정기 배치, 예상 규모.
-   3. **나머지는 기본값을 표로 제시하고 이견만 받는다** (UI 모드·다크모드·브랜드 색·DB·포트·봉투·테스트 위치·테스트 DB·CI).
+1. **확인**: **`~/.claude/jyp/profiles/jyp-default.md`(사내 표준 프로필)를 먼저 읽는다.** 프로필이 체크리스트의 기본 답안이므로, 23개를 순서대로 다 묻지 않는다:
+   1. **프로필의 [확인] 항목만 묻는다 (4개)**: 프로젝트명·목적 / 인증 소스 / 사내 API 연동 / 특수 요구(멀티테넌트·다국어·배치).
+   2. **[고정] 항목은 확정값을 표로 보여주고 이견만 받는다** — 묻지 않되 숨기지도 않는다.
+   3. 프로필 미적용 신호(대외 서비스·비표준 스택·규제 요건)에 해당하면 **프로필을 버리고 체크리스트 전체**를 확인한다.
+   4. 확정값은 전부 CLAUDE.md "프로젝트 참고사항"에 기록한다 — 프로필을 안 읽은 사람도 이 프로젝트의 결정을 알 수 있어야 한다.
 2. **생성**: 아래 기본 구조를 만들고, 스택별 조정표에 따라 변형한다. **compose·프록시·nginx 설정은 `~/.claude/jyp/scaffolds/templates/`의 파일을 복사해 프로젝트에 맞게 조정한다** — 즉흥 작성 금지 (docker.md 규칙이 이미 반영된 파일이다).
 3. **first-run 준비**: `.env.example`에서 **`.env`를 자동 생성**하고 결정된 값(DB 포트, 노출 포트 등)을 채운다 — compose 변수 치환(`${DB_NAME}`)은 `.env`가 없으면 빈 값으로 기동돼 첫 실행이 깨진다. `.env`는 `.gitignore` 대상임을 재확인.
 4. **초기화**: `git init` 후 첫 커밋 (`chore: 프로젝트 초기 구조 생성`)
@@ -15,7 +16,7 @@
 
 ## 시작 결정 체크리스트
 
-컨벤션 곳곳의 "프로젝트 시작 시 결정" 항목을 모은 목록. 확정값은 생성되는 CLAUDE.md의 "프로젝트 참고사항"에 기록한다.
+컨벤션 곳곳의 "프로젝트 시작 시 결정"(= patterns.md 0절의 "되돌리기 어려운 결정") 레지스트리. **평소에는 프로필(`profiles/jyp-default.md`)이 이 표의 답을 대신하고, 이 표는 프로필의 근거이자 미적용 시의 전체 목록이다.** 확정값은 생성되는 CLAUDE.md의 "프로젝트 참고사항"에 기록한다.
 
 | # | 결정 항목 | 기본값 | 근거 문서 |
 |---|---|---|---|
@@ -107,9 +108,24 @@
 |---|---|
 | Python | `pyproject.toml` 추가, `src/<패키지명>/` 레이아웃, `src/<패키지명>/__init__.py`. 테스트: **pytest** |
 | Node/Express 서버 | **TypeScript 기본** — `package.json`(`"type": "module"`), `tsconfig.json`(`strict: true`), 개발 `tsx watch` / 배포 `tsc` 빌드. 계층 구조는 `conventions/express.md` 1절, 경계 검증은 **zod**. 테스트: **Vitest + supertest** — 의존성 설치 + `"test"` 스크립트 등록까지 스캐폴드가 한다. DB 사용 시 **마이그레이션 러너**(`npm run migrate` — migration.md 5절) 포함 |
-| Spring Boot 서버 | **Java 21 + Gradle** — 구조·패턴은 `conventions/spring.md`. Spring Initializr 산출물로 시작(web, validation, actuator, mybatis, flyway + DB 드라이버). **Gradle wrapper jar 확보 필수**(오프라인 생성 불가 — Initializr 산출물 사용) + `git update-index --chmod=+x gradlew`(Windows 실행 비트 유실 — spring.md 0절). 마이그레이션: **Flyway**. 테스트: **JUnit 5**, `./gradlew test` |
+| Spring Boot 서버 | **Java 21 + Gradle** — 구조·패턴은 `conventions/spring.md`. Spring Initializr 산출물로 시작(web, validation, actuator, mybatis, flyway + DB 드라이버). **Gradle wrapper jar 확보 필수**(오프라인 생성 불가 — Initializr 산출물 사용) + `git update-index --chmod=+x gradlew`(Windows 실행 비트 유실 — spring.md 0절). 마이그레이션: **Flyway**(`spring.flyway.enabled=false` + 별도 단계). 테스트: **JUnit 5**, `./gradlew test`. **자동 강제: Spotless + Checkstyle을 `check`에 연결**(spring.md 7절) |
 | React/Next.js | **TypeScript 기본** — Vite는 `react-ts` 템플릿, Next.js는 `create-next-app --typescript`, `strict: true` 고정 (JS는 체크리스트 1에서 명시 확인된 경우만). **CLI 산출물 위에 얹은 뒤 데모 잔재를 정리한다**: 데모 App/CSS/로고 에셋 제거, `index.html`의 `<title>`·메타를 프로젝트명으로 치환, favicon 결정. 스타일링: **Tailwind + shadcn/ui — `design.md` 8절 셋업 레시피의 체크리스트 전 항목 수행**(JS 프로젝트면 `components.json`의 `tsx: false` 포함). 테스트: **Vitest + Testing Library** — ⚠ Vite 템플릿에는 test 스크립트가 없다: 의존성 설치 + `"test": "vitest run --passWithNoTests"` 등록까지 해야 CI `npm test`가 깨지지 않는다 |
 | 기타 | 해당 언어 커뮤니티의 표준 레이아웃을 조사해서 따르고, CLAUDE.md/docs/는 항상 추가. 테스트 도구는 해당 언어 표준 채택 |
+
+## 린트·포맷 (자동 강제 — MANDATORY)
+
+**컨벤션 중 도구로 강제할 수 있는 것은 도구가 강제한다.** 문서로만 두면 코드가 커질수록 지켜지지 않는다 — 린트 설정은 스캐폴드 단계에서 반드시 포함한다.
+
+- **TS/React**: `~/.claude/jyp/scaffolds/templates/eslint.config.client.mjs` / `eslint.config.server.mjs`를 각 디렉토리에 `eslint.config.mjs`로 복사하고 `"lint": "eslint ."` 스크립트를 등록한다. 강제되는 규칙: `any` 금지, 순환 의존, `=== 200` 비교, hex·팔레트 색상, 네이티브 alert/confirm, 토큰 스토리지 저장, axios 직접 import, `process.env || 폴백`, `console.error(err)` 한 줄, SQL 템플릿 리터럴 보간.
+  - 설치 (⚠ **eslint와 `@eslint/js`의 메이저를 맞춘다** — 최신 `@eslint/js`는 eslint 10을 요구해 `ERESOLVE`로 설치가 깨진다. 2026-07-14 실측):
+    ```bash
+    # client
+    npm i -D eslint@9 @eslint/js@9 typescript-eslint eslint-plugin-react-hooks eslint-plugin-import globals
+    # server
+    npm i -D eslint@9 @eslint/js@9 typescript-eslint eslint-plugin-import globals
+    ```
+- **Java/Spring**: Spotless(google-java-format) + Checkstyle을 `check`에 연결 (spring.md 7절).
+- **CI와 훅이 이 스크립트를 실행한다** — 린트가 없으면 훅이 조용히 통과해 자동 검증 층이 사라진다.
 
 ## 초기 파일 내용
 
@@ -211,6 +227,7 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
+      - run: npm run lint          # 컨벤션 자동 강제 (린트 절)
       - run: npm test
 
   # JVM job (Spring 서버) — 테스트 DB를 쓰면 서비스 컨테이너로 띄운다 (체크리스트 21)
@@ -242,7 +259,7 @@ jobs:
           distribution: temurin
           java-version: 21
       - run: chmod +x gradlew
-      - run: ./gradlew test --no-daemon
+      - run: ./gradlew check --no-daemon      # spotlessCheck + checkstyle + test
 
   docker:
     runs-on: ubuntu-latest
