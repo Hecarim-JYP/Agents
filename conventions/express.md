@@ -30,11 +30,13 @@ src/
 ├── controller/{module}/    # 라우팅 + 응답 반환 (asyncHandler + 응답 헬퍼)
 ├── service/{module}/       # 비즈니스 로직 + 파라미터 검증/정규화
 ├── repository/{module}/    # SQL 쿼리 함수 (sql.md 스타일)
+├── external/{system}/      # 사내·외부 API 연동 클라이언트 (연동 프로젝트만 — integration.md)
 ├── common/                 # 공용 유틸, 도메인 횡단 헬퍼
 └── middleware/             # 인증, 에러 핸들러, 응답 헬퍼
 ```
 
 - ES Modules(`"type": "module"`) — `require()` 금지, `import/export`만.
+- **업무 라우터는 `/api` 프리픽스 아래에 마운트** (`app.use('/api', routes)`) — 동일 출처 프록시 라우팅의 전제 (api.md 1절, docker.md 7절). `/health`는 프리픽스 밖에 둔다 (컨테이너 HEALTHCHECK·프록시 헬스 라우트용 — 인증 불요).
 - 미들웨어 순서: **라우터 → notFoundHandler → errorHandler** 순서 필수 (순서가 틀리면 404/에러 응답이 깨진다).
 - 네이밍: `{module}Controller.js` / `{module}Service.js` / `{module}Query.js`.
 
@@ -49,8 +51,7 @@ router.get('/endpoint', asyncHandler(async (req, res) => {
 ```
 
 - 모든 라우트는 `asyncHandler`로 감싼다. 직접 try-catch 금지 (예외: SSE처럼 스트림을 직접 관리하는 특수 라우트만 — 예외는 CLAUDE.md에 사유와 함께 기록).
-- 응답은 공용 응답 헬퍼로만. **응답 키 계약을 프로젝트 초기에 정하고 혼용 금지** — 신규 프로젝트는 단일 봉투(예: 모든 헬퍼가 `data` 키) 권장, 계약은 CLAUDE.md에 기록.
-- 에러 응답 본문 키도 계약으로 고정 (예: `message` + `error` + `field`).
+- 응답은 공용 응답 헬퍼로만. **봉투·에러 키 계약은 api.md 5절(스택 무관)이 정의한다** — 이 헬퍼와 중앙 errorHandler가 그 계약의 Express 구현이다. 혼용 금지, 확정 계약은 CLAUDE.md에 기록.
 
 ## 3. Service — 경계 검증 = zod (STRICT)
 
