@@ -54,3 +54,16 @@
 
 - 아이콘: **lucide-react** 표준 (shadcn 기본 짝). 프로젝트 내 아이콘 라이브러리 혼용 금지.
 - 폰트: 한글 UI는 **Pretendard**(또는 시스템 폰트 스택) 기본. 프로젝트 시작 시 확정해 CLAUDE.md에 기록.
+
+## 8. 셋업 레시피 (Vite React — 스캐폴드가 수행)
+
+"Tailwind + shadcn 셋업"은 아래 산출물이 전부 갖춰져야 완료다 — 조정표 한 줄로 얼버무리지 않는다 (근거: 레시피 없이는 매 프로젝트 수동 셋업에서 항목이 누락된다). 도구 버전별 세부 명령은 shadcn 공식 문서(`ui.shadcn.com/docs/installation/vite`)가 우선 — 아래는 완료 판정 체크리스트다.
+
+1. **Tailwind 설치·배선**: `tailwindcss` 설치 + Vite 플러그인 등록, `index.css`에 Tailwind 지시문.
+2. **`@` alias**: `tsconfig.json`(`baseUrl`/`paths`)과 `vite.config.ts`(`resolve.alias`) **양쪽** 설정 — 한쪽만 하면 에디터 또는 빌드가 깨진다.
+3. **shadcn init**: `npx shadcn@latest init` → `components.json` 생성. ⚠ JavaScript 프로젝트면 `components.json`의 `"tsx": false` 확인 — 기본값 true라 JS 프로젝트에 .tsx가 생성된다.
+4. **시맨틱 토큰**: init이 만든 `:root`/`.dark` CSS 변수 블록을 `index.css`에 유지하고, 브랜드 색(2절)을 여기서 조정.
+5. **`cn()` 유틸**: `src/lib/utils`(clsx + tailwind-merge) 생성 확인 — 커스텀 컴포넌트도 이것만 사용 (1절).
+6. **다크모드 배선** (지원 프로젝트만, 3절): `class` 전략 ThemeProvider + 토글 컴포넌트 + localStorage 저장 + 시스템 설정 초기값 — 토큰만 있고 토글 배선이 없으면 "지원"이 아니다.
+7. **아이콘·폰트**: lucide-react 설치, Pretendard(또는 확정 폰트) 로드 (7절).
+8. 검증: shadcn 컴포넌트 하나를 `npx shadcn@latest add button`으로 추가해 빌드가 통과하는지 확인 후, 데모 사용처는 남기지 않는다.
