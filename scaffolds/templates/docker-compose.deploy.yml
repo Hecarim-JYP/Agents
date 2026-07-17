@@ -30,7 +30,7 @@ services:
   server:
     image: ${IMAGE_PREFIX:?IMAGE_PREFIX 미설정}-server:${DEPLOY_TAG:?DEPLOY_TAG 미설정}
     volumes:
-      - uploads:/app/uploads
+      - uploads:/app/uploads            # 마운트 지점은 이미지에 실행 사용자 소유로 선생성 (docker.md 2절)
     restart: unless-stopped
 
   db:

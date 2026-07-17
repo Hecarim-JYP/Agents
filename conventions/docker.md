@@ -14,6 +14,7 @@
 
 - **멀티스테이지 빌드 필수** — 런타임 이미지에 빌드 도구·소스·devDependencies를 남기지 않는다 (이미지 크기·공격 표면 축소).
 - **non-root 사용자로 실행**. root 실행 금지.
+- **볼륨 마운트 지점은 이미지에서 미리 만들고 실행 사용자 소유로 둔다** — `USER` 전환 전에 `RUN mkdir -p /app/uploads && chown node:node /app/uploads` (2026-07-17 실측): 빈 named volume은 첫 마운트 때 이미지의 해당 경로 소유권을 물려받는데, 경로가 이미지에 없으면 root 소유로 생성된다 — non-root 앱이 처음 쓰기를 시도하는 순간 EACCES. 컨테이너는 정상 기동하고 헬스체크도 통과하므로 배포가 성공한 것처럼 보이고, 개발 모드는 builder 스테이지(root)로 돌아 로컬에서는 재현되지 않는다 — "로컬은 되는데 운영에서 업로드만 죽는" 형태로 나타난다.
 - `.dockerignore` 필수: `node_modules`/`build 산출물`, `.env*`, `.git`, `uploads`, `*.log` — 특히 `.env`가 이미지에 들어가는 사고 방지.
 - 베이스 이미지는 버전 고정, `latest` 금지.
 - 패키지/빌드 정의 파일(package.json, gradle 파일)은 소스보다 먼저 COPY한다 — 의존성 레이어 캐시 활용.
@@ -36,6 +37,7 @@ ENV NODE_ENV=production
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
+RUN mkdir -p /app/uploads && chown node:node /app/uploads   # 볼륨 마운트 지점 — 업로드 없는 프로젝트는 제거
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s CMD node -e "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
@@ -56,7 +58,7 @@ RUN ./gradlew bootJar --no-daemon
 FROM eclipse-temurin:21-jre AS runtime
 WORKDIR /app
 COPY --from=builder /app/build/libs/*.jar app.jar
-RUN useradd -r app
+RUN useradd -r app && mkdir -p /app/uploads && chown app:app /app/uploads
 USER app
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:8080/actuator/health | grep -q UP || exit 1
