@@ -6,7 +6,7 @@
 
 - **언어(TS/JS)는 프로젝트 시작 시 사용자에게 확인한다 (STRICT — 체크리스트 1)** — **기본값을 두지 않는다**. 중간 전환은 사실상 재생성이다. TypeScript를 택하면 `tsconfig.json`은 `strict: true` 고정 (판단 재료는 react.md 0절과 동일).
 - `any` 사용 금지 — 타입을 모르면 `unknown`으로 받아 좁혀서 사용.
-- 실행/빌드: 개발은 `tsx watch src/index.ts`, 배포는 `tsc`로 `dist/` 빌드 후 `node dist/index.js`.
+- 실행/빌드: **TS면** 개발 `tsx watch src/index.ts` / 배포는 `tsc`로 `dist/` 빌드 후 `node dist/index.js`. **JS면** 개발 `node --watch src/index.js` / 빌드 단계 없이 소스를 그대로 실행 (Dockerfile의 `RUN npm run build`도 함께 제거 — docker.md 2-1절).
 - `req.user` 같은 커스텀 필드는 타입 확장(declaration merging)으로 선언해 전 컨트롤러에서 타입 안전하게 사용 — 신뢰값 주입(5절)의 재료가 타입으로 보장된다:
 
 ```ts

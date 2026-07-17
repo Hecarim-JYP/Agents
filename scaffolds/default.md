@@ -118,7 +118,7 @@
 
 **컨벤션 중 도구로 강제할 수 있는 것은 도구가 강제한다.** 문서로만 두면 코드가 커질수록 지켜지지 않는다 — 린트 설정은 스캐폴드 단계에서 반드시 포함한다.
 
-- **TS/React**: `~/.claude/jyp/scaffolds/templates/eslint.config.client.mjs` / `eslint.config.server.mjs`를 각 디렉토리에 `eslint.config.mjs`로 복사하고 `"lint": "eslint ."` 스크립트를 등록한다. 강제되는 규칙: `any` 금지, 순환 의존, `=== 200` 비교, hex·팔레트 색상, 네이티브 alert/confirm, 토큰 스토리지 저장, axios 직접 import, `process.env || 폴백`, `console.error(err)` 한 줄, SQL 템플릿 리터럴 보간.
+- **React/Node**: 언어(체크리스트 1)에 맞는 템플릿을 각 디렉토리에 `eslint.config.mjs`로 복사하고 `"lint": "eslint ."` 스크립트를 등록한다 — **TS면** `~/.claude/jyp/scaffolds/templates/eslint.config.client.mjs` / `eslint.config.server.mjs`, **JS면** `eslint.config.client-js.mjs` / `eslint.config.server-js.mjs`(TS 전용 규칙인 `any` 금지만 빠지고 나머지 강제는 동일 — 2026-07-17 검증). 강제되는 규칙: `any` 금지, 순환 의존, `=== 200` 비교, hex·팔레트 색상, 네이티브 alert/confirm, 토큰 스토리지 저장, axios 직접 import, `process.env || 폴백`, `console.error(err)` 한 줄, SQL 템플릿 리터럴 보간.
   - 설치 (⚠ **eslint와 `@eslint/js`의 메이저를 맞춘다** — 최신 `@eslint/js`는 eslint 10을 요구해 `ERESOLVE`로 설치가 깨진다. 2026-07-14 실측):
     ```bash
     # client

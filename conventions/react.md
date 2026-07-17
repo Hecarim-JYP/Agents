@@ -28,11 +28,13 @@ src/
 
 **네이밍 (React 생태계 표준 — 2026-07-11 PascalCase로 확정)**:
 
+확장자는 0절 언어 선택에 따른다 (TS: `.tsx`/`.ts` — JS: `.jsx`/`.js`). 아래 예시는 TS 기준.
+
 | 대상 | 패턴 | 예시 |
 |---|---|---|
 | 컴포넌트/페이지 파일 | PascalCase, 언더스코어 없음 | `CtRequestRead.tsx`, `CtRequestSearchForm.tsx` |
 | 훅 파일 | camelCase, `use` 접두사 | `useCtRequestApi.ts`, `useCtCreateForm.ts` |
-| 상수 파일 | camelCase + `.constants.ts` | `ctRequestRead.constants.ts` |
+| 상수 파일 | camelCase + `.constants.*` | `ctRequestRead.constants.ts` |
 | 유틸/일반 모듈 | camelCase | `printDocument.ts`, `dateUtils.ts` |
 | 폴더 | 소문자 camelCase | `features/ct/request/` |
 
