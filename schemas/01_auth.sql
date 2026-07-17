@@ -3,9 +3,10 @@
  * 용도 : 인증·권한 기초 테이블 (auth.md 4절 RBAC 모델의 표준 구현)
  * 최초등록 : 2026-07-12 [박진영]
  * 참고 : 이 DDL은 자체 로그인(auth.md 0절 a) 기준이다.
- *        사내 인증 위임·SSO(0절 b·c)를 채택하면 user 테이블을 조정한다 —
- *        password_hash / failed_login_count / locked_at 제거(신원 검증·잠금은 사내 책임),
- *        external_user_key VARCHAR(100) 추가 + UNIQUE (사내 계정 식별자).
+ *        위임(0절 b): password_hash 제거(신원 검증은 사내 책임) + external_user_key
+ *        VARCHAR(100) 추가 + UNIQUE (사내 계정 식별자). failed_login_count / locked_at은
+ *        유지 — 우리 로그인 화면이 ID/PW를 받으므로 시도 제한은 우리 책임 (auth.md 1절)
+ *        SSO(0절 c): 위에 더해 failed_login_count / locked_at도 제거 (자격증명이 IdP로 직접 간다)
  *        권한(role_id)·감사는 어느 방식에서든 우리 DB가 소유한다 (auth.md 0절)
  *        멀티테넌트 프로젝트는 05_company.sql을 함께 복사하고, 각 테이블에 스코프 컬럼
  *        (company_id)을 추가해 조회 인덱스 선두에 배치한다 (database.md 3절)
@@ -54,7 +55,7 @@ CREATE TABLE IF NOT EXISTS `user` (
     email               VARCHAR(255),
     role_id             BIGINT UNSIGNED NOT NULL,
     is_active           TINYINT(1) NOT NULL DEFAULT 1, -- 계정 활성 토글 (삭제 플래그 겸용 금지 — sql.md 5절)
-    failed_login_count  INT NOT NULL DEFAULT 0,        -- 실패 제한·잠금 (auth.md 1절)
+    failed_login_count  INT NOT NULL DEFAULT 0,        -- 실패 제한·잠금 — 우리 로그인만 차단 (auth.md 1절)
     locked_at           DATETIME NULL,
     token_version       INT NOT NULL DEFAULT 0,        -- 서버 측 토큰 무효화 (auth.md 2절 — 증가시키면 기존 토큰 전부 무효)
     last_login_at       DATETIME NULL,
