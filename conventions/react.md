@@ -60,7 +60,7 @@ try {
   await showAlert({ message: '저장되었습니다.', icon: 'success' });
   refetch();
 } catch (err) {
-  await showAlert({ message: err.response?.data?.message || '저장 실패', icon: 'error' });
+  await showAlert({ message: getErrorMessage(err, '저장 실패'), icon: 'error' });  // 접근식은 단일 유틸로 (7절)
 }
 ```
 
