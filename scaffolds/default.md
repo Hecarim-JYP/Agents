@@ -21,8 +21,8 @@
 
 | # | 결정 항목 | 기본값 | 근거 문서 |
 |---|---|---|---|
-| 1 | 프론트 언어 — **TS/JS를 명시적으로 확인** | TypeScript (react-ts) | react.md 0절 — 기본은 TS 유지하되 반드시 처음에 묻는다 (중간 전환 = 재생성 비용) |
-| 2 | 백엔드 스택 | Express TS (대안: Spring Boot — Java 21 + Gradle) | express.md / spring.md 0절 |
+| 1 | **언어 — 반드시 묻는다**: 프론트(TS/JS) · 백엔드가 Node면 백엔드도 | **기본값 없음 — 확인 필수** (중간 전환 = 재생성 비용) | react.md / express.md 0절 |
+| 2 | 백엔드 스택 | Express (대안: Spring Boot — Java 21 + Gradle). 언어는 1번에서 확인 | express.md / spring.md 0절 |
 | 3 | 구조 | 풀스택이면 모노레포(client/+server/) | 아래 모노레포 절 |
 | 4 | UI 모드 | 업무 시스템 모드 | design.md 4절 |
 | 5 | 다크모드 지원 | 프로젝트별 결정 | design.md 3절 |
@@ -109,9 +109,9 @@
 | 스택 | 조정 내용 |
 |---|---|
 | Python | `pyproject.toml` 추가, `src/<패키지명>/` 레이아웃, `src/<패키지명>/__init__.py`. 테스트: **pytest** |
-| Node/Express 서버 | **TypeScript 기본** — `package.json`(`"type": "module"`), `tsconfig.json`(`strict: true`), 개발 `tsx watch` / 배포 `tsc` 빌드. 계층 구조는 `conventions/express.md` 1절, 경계 검증은 **zod**. 테스트: **Vitest + supertest** — 의존성 설치 + `"test"` 스크립트 등록까지 스캐폴드가 한다. DB 사용 시 **마이그레이션 러너**(`npm run migrate` — migration.md 5절) 포함 |
+| Node/Express 서버 | **언어는 체크리스트 1에서 확인** — `package.json`(`"type": "module"`). TS면 `tsconfig.json`(`strict: true`) + 개발 `tsx watch` / 배포 `tsc` 빌드, JS면 개발 `node --watch` / 빌드 없음. 계층 구조는 `conventions/express.md` 1절, 경계 검증은 **zod**. 테스트: **Vitest + supertest** — 의존성 설치 + `"test"` 스크립트 등록까지 스캐폴드가 한다. DB 사용 시 **마이그레이션 러너**(`npm run migrate` — migration.md 5절) 포함 |
 | Spring Boot 서버 | **Java 21 + Gradle** — 구조·패턴은 `conventions/spring.md`. Spring Initializr 산출물로 시작(web, validation, actuator, flyway + DB 드라이버). **데이터 접근 의존성은 체크리스트 24 선택에 따른다**: JdbcClient=`spring-boot-starter-jdbc`(별도 ORM 없음) / JPA=`spring-boot-starter-data-jpa`(+ QueryDSL) / MyBatis=`mybatis-spring-boot-starter`(⚠ Boot 4.0.x 고정). **Gradle wrapper jar 확보 필수**(오프라인 생성 불가 — Initializr 산출물 사용) + `git update-index --chmod=+x gradlew`(Windows 실행 비트 유실 — spring.md 0절). 마이그레이션: **Flyway**(`spring.flyway.enabled=false` + 별도 단계). 테스트: **JUnit 5**, `./gradlew test`. **자동 강제: Spotless + Checkstyle을 `check`에 연결**(spring.md 7절) |
-| React/Next.js | **TypeScript 기본** — Vite는 `react-ts` 템플릿, Next.js는 `create-next-app --typescript`, `strict: true` 고정 (JS는 체크리스트 1에서 명시 확인된 경우만). **CLI 산출물 위에 얹은 뒤 데모 잔재를 정리한다**: 데모 App/CSS/로고 에셋 제거, `index.html`의 `<title>`·메타를 프로젝트명으로 치환, favicon 결정. 스타일링: **Tailwind + shadcn/ui — `design.md` 8절 셋업 레시피의 체크리스트 전 항목 수행**(JS 프로젝트면 `components.json`의 `tsx: false` 포함). 테스트: **Vitest + Testing Library** — ⚠ Vite 템플릿에는 test 스크립트가 없다: 의존성 설치 + `"test": "vitest run --passWithNoTests"` 등록까지 해야 CI `npm test`가 깨지지 않는다 |
+| React/Next.js | **언어는 체크리스트 1에서 확인** — TS면 Vite `react-ts` 템플릿 / Next.js `create-next-app --typescript` + `strict: true` 고정, JS면 Vite `react` 템플릿 / `create-next-app`(TS 미지정). **CLI 산출물 위에 얹은 뒤 데모 잔재를 정리한다**: 데모 App/CSS/로고 에셋 제거, `index.html`의 `<title>`·메타를 프로젝트명으로 치환, favicon 결정. 스타일링: **Tailwind + shadcn/ui — `design.md` 8절 셋업 레시피의 체크리스트 전 항목 수행**(JS 프로젝트면 `components.json`의 `tsx: false` 포함). 테스트: **Vitest + Testing Library** — ⚠ Vite 템플릿에는 test 스크립트가 없다: 의존성 설치 + `"test": "vitest run --passWithNoTests"` 등록까지 해야 CI `npm test`가 깨지지 않는다 |
 | 기타 | 해당 언어 커뮤니티의 표준 레이아웃을 조사해서 따르고, CLAUDE.md/docs/는 항상 추가. 테스트 도구는 해당 언어 표준 채택 |
 
 ## 린트·포맷 (자동 강제 — MANDATORY)

@@ -4,7 +4,7 @@
 
 ## 0. 언어 (신규 프로젝트)
 
-- **신규 Express/Node 서버는 TypeScript(`.ts`) 기본**, `tsconfig.json`은 `strict: true` 고정. JavaScript는 사용자가 명시적으로 요청할 때만 (react.md 0절과 동일 근거 — 2026-07-11 확정).
+- **언어(TS/JS)는 프로젝트 시작 시 사용자에게 확인한다 (STRICT — 체크리스트 1)** — **기본값을 두지 않는다**. 중간 전환은 사실상 재생성이다. TypeScript를 택하면 `tsconfig.json`은 `strict: true` 고정 (판단 재료는 react.md 0절과 동일).
 - `any` 사용 금지 — 타입을 모르면 `unknown`으로 받아 좁혀서 사용.
 - 실행/빌드: 개발은 `tsx watch src/index.ts`, 배포는 `tsc`로 `dist/` 빌드 후 `node dist/index.js`.
 - `req.user` 같은 커스텀 필드는 타입 확장(declaration merging)으로 선언해 전 컨트롤러에서 타입 안전하게 사용 — 신뢰값 주입(5절)의 재료가 타입으로 보장된다:
@@ -38,7 +38,7 @@ src/
 - ES Modules(`"type": "module"`) — `require()` 금지, `import/export`만.
 - **업무 라우터는 `/api` 프리픽스 아래에 마운트** (`app.use('/api', routes)`) — 동일 출처 프록시 라우팅의 전제 (api.md 1절, docker.md 7절). `/health`는 프리픽스 밖에 둔다 (컨테이너 HEALTHCHECK·프록시 헬스 라우트용 — 인증 불요).
 - 미들웨어 순서: **라우터 → notFoundHandler → errorHandler** 순서 필수 (순서가 틀리면 404/에러 응답이 깨진다).
-- 네이밍: `{module}Controller.js` / `{module}Service.js` / `{module}Query.js`.
+- 네이밍: `{module}Controller` / `{module}Service` / `{module}Query` (확장자는 0절 언어 선택에 따른다).
 
 ## 2. Controller (MANDATORY)
 
