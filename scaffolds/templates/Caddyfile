@@ -17,5 +17,5 @@ handle /health {
 }
 
 handle {
-	reverse_proxy client:80
+	reverse_proxy client:8080
 }

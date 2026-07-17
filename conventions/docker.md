@@ -18,7 +18,7 @@
 - 베이스 이미지는 버전 고정, `latest` 금지.
 - 패키지/빌드 정의 파일(package.json, gradle 파일)은 소스보다 먼저 COPY한다 — 의존성 레이어 캐시 활용.
 - 서버 앱에는 헬스 엔드포인트를 만들고 HEALTHCHECK를 연결한다 — 경로·명령은 아래 스택별 예시.
-- **컨테이너 내부 포트는 프로젝트 상수로 고정한다** (Node 3000 / Spring 8080 / 정적 80) — 앱이 `PORT` 환경변수 등으로 내부 포트를 바꾸는 것 금지 (근거: `EXPOSE`·HEALTHCHECK·프록시의 `server:3000` 참조가 따라가지 못해 헬스체크·라우팅이 조용히 깨진다). 포트 변경이 필요한 곳은 **호스트 매핑의 좌변뿐**이다 (4-1절).
+- **컨테이너 내부 포트는 프로젝트 상수로 고정한다** (Node 3000 / Spring 8080 / 정적 8080) — 앱이 `PORT` 환경변수 등으로 내부 포트를 바꾸는 것 금지 (근거: `EXPOSE`·HEALTHCHECK·프록시의 `server:3000` 참조가 따라가지 못해 헬스체크·라우팅이 조용히 깨진다). 포트 변경이 필요한 곳은 **호스트 매핑의 좌변뿐**이다 (4-1절).
 
 ### 2-1. Node/Express
 
@@ -79,15 +79,17 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM nginx:1.27-alpine AS runtime
+FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-EXPOSE 80
-HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1/ >/dev/null || exit 1
+USER 101
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:8080/ >/dev/null || exit 1
 ```
 
+- ⚠ **베이스가 `nginx-unprivileged`인 이유는 2절 non-root STRICT다** — 공식 `nginx` 이미지는 80을 열기 위해 마스터를 root로 띄우고, 리눅스는 1024 미만 포트를 root에게만 허용하므로 **non-root와 80은 양립할 수 없다**. 그래서 정적 컨테이너의 내부 포트는 8080이다(2절 포트 상수). `USER 101`은 베이스에 이미 설정돼 있지만 명시한다 — 이름(`nginx`)이 아니라 숫자 UID로 쓰는 이유는 K8s의 `runAsNonRoot` 같은 검사가 이름을 해석하지 못해 root로 간주하기 때문이다.
 - nginx.conf에는 **SPA fallback(`try_files ... /index.html`)을 반드시 포함**한다 — 없으면 새로고침·딥링크가 404가 된다. 템플릿: `~/.claude/jyp/scaffolds/templates/nginx.conf`.
-- ⚠ **HEALTHCHECK 주소는 `localhost`가 아니라 `127.0.0.1`** (2026-07-14 실측): 컨테이너 안에서 `localhost`는 IPv6(`::1`)로 먼저 풀리는데 nginx의 `listen 80`은 IPv4만 듣는다 — 서비스는 멀쩡한데 컨테이너가 계속 `unhealthy`로 표시된다. (Node는 기본이 듀얼스택이라 이 문제가 없다.)
+- ⚠ **HEALTHCHECK 주소는 `localhost`가 아니라 `127.0.0.1`** (2026-07-14 실측): 컨테이너 안에서 `localhost`는 IPv6(`::1`)로 먼저 풀리는데 nginx의 `listen 8080`은 IPv4만 듣는다 — 서비스는 멀쩡한데 컨테이너가 계속 `unhealthy`로 표시된다. (Node는 기본이 듀얼스택이라 이 문제가 없다.)
 
 ## 3. 설정 주입 (STRICT)
 
@@ -200,7 +202,7 @@ services:
 |---|---|---|
 | `/api/*` | `server:3000` | Spring이면 `server:8080` |
 | `/health` | `server:3000` | 외부 가동 감시용(ops.md 7절). Spring이면 `/actuator/health`로 rewrite |
-| 그 외 | `client:80` | nginx가 SPA fallback 처리 |
+| 그 외 | `client:8080` | nginx가 SPA fallback 처리 |
 
 - **개발(로컬)도 동일 출처를 유지한다**: 로컬은 프록시 컨테이너 대신 Vite `server.proxy`로 `/api/*`를 서버(컨테이너 노출 포트)로 넘긴다 — 클라이언트 코드는 dev/prod 어디서든 같은 상대 경로(`/api/...`)만 호출하고, CORS 설정 자체가 필요 없어진다. 프록시 대상 포트는 vite.config가 `loadEnv`로 `.env`의 `API_PORT`를 읽는다 — `localhost:3000` 하드코딩 금지 (포트 변수화 원칙 4-1절이 여기서만 깨지는 것 방지).
 - 사내망 등 HTTPS 불가 환경이면 그 제약을 프로젝트 CLAUDE.md에 기록한다 (브라우저의 HTTP 제약 — blob 다운로드 차단, secure cookie 불가 등을 설계 시 인지).
