@@ -13,7 +13,7 @@ New-Item -ItemType Directory -Force (Join-Path $work "proxy") | Out-Null
 New-Item -ItemType Directory -Force (Join-Path $work "migrations") | Out-Null
 
 Copy-Item (Join-Path $repo "scaffolds\templates\docker-compose*.yml") $work
-Copy-Item (Join-Path $repo "scaffolds\templates\Caddyfile") (Join-Path $work "proxy")
+Copy-Item (Join-Path $repo "scaffolds\templates\nginx-proxy.conf") (Join-Path $work "proxy\nginx.conf")   # 기본 프록시 (체크리스트 15)
 
 # 검증용 .env — 실제 값이 아니라 치환이 되는지만 본다.
 # ⚠ BOM 없이 쓴다: PowerShell의 Set-Content -Encoding utf8은 BOM을 붙이는데,

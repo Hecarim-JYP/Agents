@@ -13,7 +13,7 @@
 공통 원칙 (스택 무관):
 
 - **멀티스테이지 빌드 필수** — 런타임 이미지에 빌드 도구·소스·devDependencies를 남기지 않는다 (이미지 크기·공격 표면 축소).
-- **non-root 사용자로 실행**. root 실행 금지.
+- **non-root 사용자로 실행**. root 실행 금지. **적용 범위는 우리가 빌드하는 이미지와 프록시(nginx-unprivileged)**다 — 벤더 인프라 이미지는 벤더의 권한 설계를 따르고 `user:`로 덮어쓰지 않는다 (2026-07-17 실측: MariaDB는 root가 초기화 1초 미만 — 데이터 디렉토리 소유권 정리뿐이고 데몬은 mysql(999)로 돈다. 덮어쓰면 첫 기동 초기화가 깨진다). Caddy 채택 시(7절 — 외부 노출) 프록시는 수명 전체가 root다 — 공식 unprivileged 변형이 없어, 자동 HTTPS의 운영 절감과 맞바꾸는 수용 비용으로 CLAUDE.md에 기록한다.
 - **볼륨 마운트 지점은 이미지에서 미리 만들고 실행 사용자 소유로 둔다** — `USER` 전환 전에 `RUN mkdir -p /app/uploads && chown node:node /app/uploads` (2026-07-17 실측): 빈 named volume은 첫 마운트 때 이미지의 해당 경로 소유권을 물려받는데, 경로가 이미지에 없으면 root 소유로 생성된다 — non-root 앱이 처음 쓰기를 시도하는 순간 EACCES. 컨테이너는 정상 기동하고 헬스체크도 통과하므로 배포가 성공한 것처럼 보이고, 개발 모드는 builder 스테이지(root)로 돌아 로컬에서는 재현되지 않는다 — "로컬은 되는데 운영에서 업로드만 죽는" 형태로 나타난다.
 - `.dockerignore` 필수: `node_modules`/`build 산출물`, `.env*`, `.git`, `uploads`, `*.log` — 특히 `.env`가 이미지에 들어가는 사고 방지.
 - 베이스 이미지는 버전 고정, `latest` 금지.
@@ -108,7 +108,7 @@ HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:8080/ >/d
 | 모드 | 조합 | 쓰는 곳 | 특징 |
 |---|---|---|---|
 | **개발 모드** | base + `docker-compose.dev.yml` | **로컬 개발 전용** | 소스 bind mount + 핫리로드. 웹서버는 Vite dev server가 겸함(프록시 컨테이너 없음 — 7절) |
-| **배포 모드** | base + `docker-compose.deploy.yml` | **개발서버 = 운영서버 = 로컬 배포 검증** | 태그 이미지 + Caddy 프록시(웹서버 포함), `restart: unless-stopped` |
+| **배포 모드** | base + `docker-compose.deploy.yml` | **개발서버 = 운영서버 = 로컬 배포 검증** | 태그 이미지 + 프록시(체크리스트 15 선택 — 7절), `restart: unless-stopped` |
 
 - **배포 모드는 어느 서버에서든 완전히 같은 파일·같은 절차다.** 개발서버와 운영서버의 차이는 `.env` 값(`SITE_ADDRESS`, DB 자격, `DEPLOY_TAG`)뿐 — "개발서버용 compose"를 따로 만드는 것 금지. 배포 모드는 로컬에서도 그대로 띄워 배포 전 검증에 쓴다.
 - **기동 명령도 하나로 통일**: 각 환경의 `.env`에 `COMPOSE_FILE`을 지정하면 (compose가 `.env`의 `COMPOSE_FILE`을 읽는다) 명령은 어디서나 `docker compose up -d` 하나다 — `-f` 나열을 환경마다 외우지 않는다:
@@ -123,7 +123,7 @@ HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:8080/ >/d
 |---|---|---|
 | base | 서비스 목록(컨테이너 DB 채택 시 db 포함), 네트워크, named volume, `depends_on` | `env_file`, 포트 노출, bind mount, `extra_hosts`, `build:`/`image:` 선택 |
 | dev override (개발 모드) | `build:`, 소스 bind mount + 핫리로드, server `user: node`(아래), 개발 포트 노출, (호스트 DB 사용 시) `extra_hosts: host.docker.internal:host-gateway` | `env_file` — 필요한 키는 base의 `environment`(변수 치환)가 이미 서비스별로 선언한다. `.env` 통째 주입은 무관한 키(`COMPOSE_FILE`, `IMAGE_PREFIX`)와 안 써도 되는 시크릿(`DB_ROOT_PASSWORD`)까지 앱 컨테이너에 들어간다 |
-| deploy override (배포 모드) | `image: <태그>`(5절), `restart: unless-stopped`, 설정 주입(3절), 프록시 서비스(7절), 80/443만 노출 | 소스 마운트, dev 전용 설정 |
+| deploy override (배포 모드) | `image: <태그>`(5절), `restart: unless-stopped`, 설정 주입(3절), 프록시 서비스(7절), 프록시 포트만 노출 | 소스 마운트, dev 전용 설정 |
 
 - DB 데이터는 **named volume**, 업로드 파일 등 앱 산출물은 volume/bind mount로 영속화하고 백업 대상에 포함(ops.md 6절).
 - 서비스 간 통신은 compose 네트워크의 서비스명으로 (`db:3306`) — IP 하드코딩 금지.
@@ -190,21 +190,22 @@ services:
 - **전제: 스택 1개 = 앱 인스턴스 1개** (2026-07-13 확정). 기본 형태는 프로젝트마다 운영서버 1대 + 개발서버 1대이며, 이때 프록시는 프로젝트 compose에 포함되고 80/443의 주인은 이 프록시다.
 - **한 호스트에 스택이 둘 이상 올라가면**(운영+개발 공존, 또는 여러 프로젝트) 이 전제가 깨진다 — 포트뿐 아니라 **compose 프로젝트명·볼륨이 충돌**한다. 대응은 **7-2절**을 따른다.
 - 전제에 기대더라도 **앱 프로세스에 상태를 두지 않는다** (patterns.md 0-3절) — 인메모리 캐시·앱 내 스케줄러·로컬 디스크 업로드처럼 단일 인스턴스에 의존하는 항목은 CLAUDE.md의 "다중화 전환 목록"에 기록해, 전제가 깨질 때 손볼 곳이 문서에 남게 한다.
-- 컨테이너 앞단에는 **리버스 프록시 1개**를 둔다. 권장: **Caddy**(자동 HTTPS — 인증서 발급·갱신 무설정) 또는 nginx + certbot.
-- **80/443 포트는 프록시만 노출**하고, 앱·DB 컨테이너는 compose 내부 네트워크로만 통신한다 (외부 직접 접근 차단).
-- **접근 주소는 포트가 아니라 도메인으로 구분한다 — 도메인 유무는 시작 결정 체크리스트에서 확인** (사내 도메인 미확보 상태를 기본으로 시작할 수 있어야 한다). 어느 쪽이든 Caddyfile은 `{$SITE_ADDRESS}` 변수 하나로 전환된다:
+- 컨테이너 앞단에는 **리버스 프록시 1개**를 둔다 (nginx-unprivileged 또는 Caddy — 아래 선택 기준).
+- **외부에 여는 포트는 프록시가 노출하는 것뿐**이고(사내망 nginx는 HTTP 하나, Caddy는 80/443), 앱·DB 컨테이너는 compose 내부 네트워크로만 통신한다 (외부 직접 접근 차단).
+- **프록시는 체크리스트 15에서 선택한다** — 권장 기준은 **"서버가 인터넷에서 도달 가능한가"**다 (근거: Let's Encrypt의 ACME 검증(HTTP-01)은 인터넷에서 80 포트에 도달해야 통과한다 — **사내망 전용 서버는 도메인이 있어도 자동 HTTPS가 불가능**하므로, 그 환경에서 Caddy의 유일한 강점이 무효가 된다):
 
-| 사내 도메인 | 운영서버 `SITE_ADDRESS` | 개발서버 `SITE_ADDRESS` | HTTPS |
-|---|---|---|---|
-| 있음 | `erp.company.com` | `erp-dev.company.com` (dev 서브도메인 — 운영과 동일 구조) | Caddy 자동 |
-| 없음 (IP 접근) | `:80` | `:80` | 불가 — HTTP 제약을 CLAUDE.md에 기록 (아래) |
+| 배포 형태 | 권장 프록시 | HTTPS |
+|---|---|---|
+| 사내망 전용 (기본) | **nginx-unprivileged** (`nginx-proxy.conf` — non-root, 2026-07-17 실기동 검증) | 불가(ACME 도달 불가) — 필요 시 사내 CA 수동 배치, HTTP 제약을 CLAUDE.md에 기록 |
+| 외부 노출 + 도메인 | **Caddy** (`SITE_ADDRESS` — 운영 `erp.company.com` / 개발 `erp-dev.company.com`) | 자동 — 발급·갱신 무설정 |
+| 외부 노출 + nginx 선택 | nginx + certbot | 수동 배관 — 갱신 cron·reload 연결·운영 책임을 CLAUDE.md에 기록 |
 
-- 도메인이 없어도 구성은 동일하다(프록시가 정적 서빙 + `/api` 프록시) — 도메인 확보 시 **`SITE_ADDRESS` 값 교체만으로 HTTPS 전환**되도록 다른 곳에 주소를 하드코딩하지 않는다. 서버 1대 = 프로젝트 1개 전제 덕에 도메인이 없어도 포트 구분(8100번대 블록 등)은 필요 없다 — 80 하나면 된다.
+- 어느 프록시든 구성 형태는 동일하다 — 라우팅 규약(아래 표)이 같고 정적 서빙은 client 담당(2-3절). 프록시 교체(예: 외부 노출 전환으로 nginx→Caddy)가 proxy 서비스·설정 파일 교체로 끝나도록 다른 곳에 주소를 하드코딩하지 않는다. 서버 1대 = 프로젝트 1개 전제 덕에 도메인이 없어도 포트 구분(8100번대 블록 등)은 필요 없다 — HTTP 포트 하나면 된다.
 - **DB 포트 노출 정책**: 운영서버는 DB 포트를 호스트에 노출하지 않는다(관리 접속은 SSH 터널). 개발서버는 노출하되 사내망/VPN 범위로 제한. 로컬은 자유(4-3절).
 - HTTPS 종단은 프록시에서 처리하고 앱은 내부 HTTP로 받는다 — Express는 `app.set('trust proxy', 1)`로 `X-Forwarded-*`를 신뢰 설정해야 클라이언트 IP·프로토콜 판별이 정상 동작한다.
 - **역할 분담 (2026-07-14 확정)**: **프록시 = HTTPS 종단 + 라우팅만**, **정적 서빙 = client(nginx) 컨테이너**(2-3절). 프록시가 같은 출처에서 `/api/*`는 server로, 그 외는 client로 넘기므로 CORS가 원천 해소된다.
-- **프록시 서비스와 Caddyfile은 스캐폴드 기본 구성이다 (STRICT)** — 없으면 배포 모드 기동 시 외부 접근 경로가 아예 없다 (근거: 규칙만 있고 스캐폴드에 프록시가 빠져 배포 기동에서 접근 불가·CORS 차단이 발생한 사례).
-- 템플릿: **`~/.claude/jyp/scaffolds/templates/Caddyfile`** (compose 3종도 같은 폴더). 라우팅 규약:
+- **프록시 서비스와 그 설정 파일은 스캐폴드 기본 구성이다 (STRICT)** — 없으면 배포 모드 기동 시 외부 접근 경로가 아예 없다 (근거: 규칙만 있고 스캐폴드에 프록시가 빠져 배포 기동에서 접근 불가·CORS 차단이 발생한 사례).
+- 템플릿: **`~/.claude/jyp/scaffolds/templates/nginx-proxy.conf`**(기본) / **`Caddyfile`**(Caddy 채택 시) — compose 3종도 같은 폴더. 라우팅 규약(두 템플릿 동일):
 
 | 경로 | 대상 | 비고 |
 |---|---|---|
@@ -231,10 +232,10 @@ services:
 |---|---|---|
 | 구성 | 스택마다 프록시를 두고 호스트 포트를 나눈다: 운영 `HTTP_PORT=80`/`HTTPS_PORT=443`, 개발 `8080`/`8443` | 호스트에 **프록시 1개**를 별도 compose로 상주(80/443 점유), 두 스택은 external network로 조인. 도메인으로 분기(`erp.company.com` / `erp-dev.company.com`) |
 | 접근 | `http://<서버IP>` / `http://<서버IP>:8080` | 도메인 |
-| HTTPS | 운영만 가능. **개발 스택은 자동 HTTPS 불가** — ACME 인증은 표준 80/443으로만 검증되므로 8443에 붙은 Caddy는 인증서를 못 받는다 | 양쪽 모두 자동 HTTPS |
+| HTTPS | 운영만 가능. **개발 스택은 자동 HTTPS 불가** — ACME 인증은 표준 80/443으로만 검증되므로 8443에 붙은 프록시는 인증서를 못 받는다 (Caddy 채택 시 해당) | 양쪽 모두 자동 HTTPS |
 | 앱 포트 노출 | 프록시만 | 없음(프록시가 내부 네트워크로 접근) |
 
-- 사내 도메인 미확보 상태(체크리스트 15)에서는 **(a)로 시작**하고, 도메인 확보 시 (b)로 전환한다 — 전환 시 각 스택의 프록시를 제거하고 `SITE_ADDRESS`를 도메인으로 바꾸는 것이 전부다.
+- 사내 도메인 미확보 상태(체크리스트 15)에서는 **(a)로 시작**하고, 도메인 확보 시 (b)로 전환한다 — 전환 시 각 스택의 프록시를 제거하고 (Caddy 채택 시) `SITE_ADDRESS`를 도메인으로 바꾸는 것이 전부다.
 - (a)에서 개발 스택의 `SITE_ADDRESS`는 `:80`(컨테이너 내부 기준) 그대로 두고 **호스트 매핑만 8080으로** 바꾼다 — 컨테이너 내부 포트는 상수 고정 원칙(2절).
 
 ### 7-2-3. 자원·운영 주의

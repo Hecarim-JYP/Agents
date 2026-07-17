@@ -33,7 +33,7 @@
 - 자동화 테스트는 `~/.claude/jyp/conventions/testing.md`를 따른다 — **테스트 DB 사용 여부(0절)에 따라 실제 DB 검증 또는 쿼리 목킹**, 핵심 로직 변경 시 테스트 동반 작성, 못 썼으면 보고·changelog에 "테스트 미작성" 명시 + 백로그 `TEST-` 항목 추가 (게이트+기록)
 - **동시 수정 방어는 SQL이 최종 방어선** (`sql.md` 8절) — 여러 사용자가 고치는 테이블은 `version` 컬럼 + 낙관적 락, 상태 전이는 조건부 UPDATE(`WHERE status='PENDING'`), 변경 0행이면 409. 읽고 계산해 쓰는 값(재고·잔액)은 `FOR UPDATE` 또는 DB 계산
 - 배포·운영은 `~/.claude/jyp/conventions/ops.md`(환경 분리·로깅·보안 체크리스트·백업), DB 마이그레이션은 `migration.md`(번호·멱등성·DDL/DML 분리·2단계 배포)를 따른다
-- 모든 서비스는 개발·운영 공통 **Docker 컨테이너**로 배포·운영 — `~/.claude/jyp/conventions/docker.md` (멀티스테이지·non-root·.env 이미지 포함 금지·태그=git 태그·롤백=직전 이미지·앞단 리버스 프록시+HTTPS)
+- 모든 서비스는 개발·운영 공통 **Docker 컨테이너**로 배포·운영 — `~/.claude/jyp/conventions/docker.md` (멀티스테이지·non-root·.env 이미지 포함 금지·태그=git 태그·롤백=직전 이미지·앞단 리버스 프록시(+외부 노출 시 자동 HTTPS))
 - 인증·권한은 `auth.md`(**인증 소스 결정 — 자체 로그인/사내 위임/SSO**, bcrypt/argon2, access 짧게+refresh, 서버측 무효화, RBAC+데이터 스코프 3종, default deny, **토큰은 메모리+httpOnly refresh 쿠키 — 로컬/세션스토리지 저장 금지**, 스택별 매핑 표), API 설계는 `api.md`(리소스 URL·상태코드·page/size/sort 표준·snake_case 필드)를 따른다
 - 사내·외부 API 연동은 `integration.md`를 따른다 — 프론트는 백엔드 경유(직접 호출 금지), `external/` 연동 계층 분리, 타임아웃 필수(기본 5초)·쓰기 재시도 금지, 외부 응답도 경계 검증, `/health`에 외부 의존 넣지 않기
 - 정기 배치·스케줄 작업은 `batch.md`를 따른다 — **첫 배치 구현 전에 실행 방식(앱 내/별도 컨테이너+호스트 cron/분산 락)을 사용자에게 제안·확정**(MANDATORY), 멱등 작성, 실행 이력 기록 + 실패 알림 필수, 컨테이너 타임존 명시

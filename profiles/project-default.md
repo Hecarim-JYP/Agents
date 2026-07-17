@@ -33,7 +33,7 @@
 - DB 위치: **컨테이너 db** (호스트 DB를 쓸 이유가 있을 때만 예외)
 - 배포: **CI가 ghcr.io로 이미지 push → 서버는 pull만**, GitHub 원격/CI 사용
 - 노출 포트: client 5173 / server 8080(Spring) 또는 3000(Node) / DB 3306 — 충돌 시 `.env`에서 변경
-- 프록시: **Caddy**(HTTPS 종단·라우팅) + client(nginx) 정적 서빙
+- 프록시: **nginx-unprivileged**(사내망 전용 기본 — non-root, HTTP) + client(nginx) 정적 서빙. 외부 노출 + 도메인이면 **Caddy**(자동 HTTPS) — 체크리스트 15에서 확인
 - **사내 도메인: 미확보 전제** (`SITE_ADDRESS=:80`) — 확보되면 값 교체만으로 HTTPS 전환
 - 배포 호스트: **운영서버 1대 + 개발서버 1대** (한 PC 공존이면 `COMPOSE_PROJECT_NAME` 분리 — docker.md 7-2절)
 - **가동 모니터링: 사내 인프라팀 위임** — 헬스 URL(`/health`)과 연락처를 전달하고 CLAUDE.md에 기록

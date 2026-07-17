@@ -9,19 +9,26 @@
 
 services:
   proxy:
-    image: caddy:2-alpine
-    environment:
-      SITE_ADDRESS: ${SITE_ADDRESS:?SITE_ADDRESS 미설정}
+    # 사내망 전용 기본: nginx-unprivileged (체크리스트 15에서 선택 — docker.md 7절)
+    image: nginxinc/nginx-unprivileged:1.27-alpine
     ports:
-      - "${HTTP_PORT:?HTTP_PORT 미설정}:80"      # 외부에 열리는 포트는 프록시뿐 (docker.md 7절)
-      - "${HTTPS_PORT:?HTTPS_PORT 미설정}:443"   # 운영 80/443, 같은 호스트의 개발 스택은 8080/8443 등
+      - "${HTTP_PORT:?HTTP_PORT 미설정}:8080"   # 외부에 열리는 포트는 프록시뿐 (docker.md 7절)
     volumes:
-      - ./proxy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data                # 발급받은 인증서 — 지우면 재발급 (rate limit 주의)
-      - caddy-config:/config
+      - ./proxy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on: [client, server]
     restart: unless-stopped
     networks: [app]
+    # 외부 노출 + 도메인(자동 HTTPS)이면 Caddy로 교체 (docker.md 7절):
+    #   image: caddy:2-alpine
+    #   environment:
+    #     SITE_ADDRESS: ${SITE_ADDRESS:?SITE_ADDRESS 미설정}
+    #   ports:
+    #     - "${HTTP_PORT:?HTTP_PORT 미설정}:80"
+    #     - "${HTTPS_PORT:?HTTPS_PORT 미설정}:443"   # 운영 80/443, 같은 호스트의 개발 스택은 8080/8443 등
+    #   volumes:
+    #     - ./proxy/Caddyfile:/etc/caddy/Caddyfile:ro
+    #     - caddy-data:/data                # 발급받은 인증서 — 지우면 재발급 (rate limit 주의)
+    #     - caddy-config:/config
 
   client:
     image: ${IMAGE_PREFIX:?IMAGE_PREFIX 미설정}-client:${DEPLOY_TAG:?DEPLOY_TAG 미설정}
@@ -76,5 +83,5 @@ services:
     networks: [app]
 
 volumes:
-  caddy-data:
+  caddy-data:                           # Caddy 채택 시에만 사용
   caddy-config:

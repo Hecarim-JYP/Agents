@@ -35,7 +35,7 @@
 | 12 | **다국어(i18n) 지원 여부** — 지원 시 언어 목록·기본 언어 | 미지원(한국어 단일) | i18n.md — 문구 키 소급 비용이 크므로 시작 시 확정 |
 | 13 | API 응답 봉투 계약 | 단일 봉투 (모든 응답 `data` 키) | api.md 5절 |
 | 14 | 테스트 파일 위치 | `tests/` 미러링 | testing.md 4절 |
-| 15 | **사내 도메인 유무** (운영·개발서버 접근 주소 = HTTPS 여부) | 미확보 — `SITE_ADDRESS=:80`(HTTP 제약 CLAUDE.md 기록), 확보 시 도메인 값 교체만으로 자동 HTTPS 전환 | docker.md 7절 |
+| 15 | **외부 노출·도메인·프록시 — 반드시 묻는다**: ①서버가 인터넷에서 접근 가능한가 ②도메인 유무 ③프록시 선택(nginx / Caddy) | 사내망 전용 — **nginx-unprivileged 프록시**(HTTP, non-root). **외부 노출 + 도메인이면 Caddy 권장**(자동 HTTPS — ACME 검증은 인터넷에서 80 도달 가능할 때만 동작). 외부 노출인데 nginx를 택하면 certbot 갱신 운영을 CLAUDE.md에 기록 | docker.md 7절 |
 | 16 | GitHub 원격/CI 사용 여부 | 사용 (test.yml + release.yml 생성) | 아래 CI 절 |
 | 17 | **가동 모니터링/알림 구현 여부 — 반드시 묻는다**: (a) 사내 인프라팀 위임 / (b) 자체 구축(Uptime Kuma) | (a) 인프라팀 위임 — 헬스 URL·연락처 전달, CLAUDE.md 기록 | ops.md 7절 |
 | 18 | **사내 API서버 연동 여부** — 있으면 대상·주소(env 키)·인증 방식·담당 창구를 CLAUDE.md에 기록 | 미연동 (연동 시 `external/` 계층 + `INTERNAL_API_URL` 추가) | integration.md |
@@ -81,7 +81,7 @@
 ├── docker-compose.dev.yml       # 개발 모드        ├ templates/에서 복사 (docker.md 4-1절)
 ├── docker-compose.deploy.yml    # 배포 모드        ┘
 ├── proxy/
-│   └── Caddyfile                # HTTPS 종단 + 라우팅 (정적 서빙은 client가 담당)
+│   └── nginx.conf | Caddyfile   # 프록시 설정 — 체크리스트 15 선택 (정적 서빙은 client가 담당)
 ├── .github/workflows/
 │   ├── test.yml                 # 스택별 job (+ 테스트 DB 서비스)
 │   └── release.yml              # 태그 push → ghcr.io 이미지 빌드·push
@@ -93,8 +93,8 @@
 
 - 패키지 관리는 client/·server/ 각자 개별 수행 (루트 package.json 없이 시작 — 필요해지면 워크스페이스 도입).
 - Dockerfile은 각 서비스별로, compose가 전체를 조립한다 (docker.md).
-- **정적 서빙은 client(nginx) 컨테이너, 프록시(Caddy)는 HTTPS 종단 + 라우팅** (docker.md 2-3·7절). 프록시 서비스와 Caddyfile은 반드시 포함 — 없으면 배포 모드에 외부 접근 경로가 없다. 로컬 개발 모드는 프록시 없이 Vite `server.proxy`로 `/api/*`를 서버에 연결해 동일 출처를 유지한다.
-- **compose·Caddyfile·nginx.conf는 `~/.claude/jyp/scaffolds/templates/`에서 복사**하고 프로젝트 결정값(스택·DB 위치·테스트 DB·배치 유무)에 맞게 불필요한 서비스를 지운다.
+- **정적 서빙은 client(nginx) 컨테이너, 프록시는 라우팅(+ Caddy 채택 시 HTTPS 종단)** (docker.md 2-3·7절). 프록시 서비스와 그 설정 파일은 반드시 포함 — 없으면 배포 모드에 외부 접근 경로가 없다. 로컬 개발 모드는 프록시 없이 Vite `server.proxy`로 `/api/*`를 서버에 연결해 동일 출처를 유지한다.
+- **compose·프록시 설정(nginx-proxy.conf 또는 Caddyfile — 체크리스트 15)·nginx.conf는 `~/.claude/jyp/scaffolds/templates/`에서 복사**하고 프로젝트 결정값(스택·DB 위치·테스트 DB·배치 유무)에 맞게 불필요한 서비스를 지운다.
 - CLAUDE.md·docs·migrations는 루트에서 공유 — "작업 정리"도 저장소 단위 1회.
 
 ## 기초 테이블 (DB 사용 프로젝트)
@@ -190,7 +190,7 @@ COMPOSE_PROJECT_NAME=<프로젝트명>-dev
 WEB_PORT=5173
 API_PORT=3000
 DB_PORT=3306
-# 프록시 노출 포트 (배포 모드 — 운영 80/443, 같은 호스트의 개발 스택은 8080/8443 등)
+# 프록시 노출 포트 (배포 모드 — 운영 80, 같은 호스트의 개발 스택은 8080 등. HTTPS_PORT는 Caddy 채택 시만)
 HTTP_PORT=80
 HTTPS_PORT=443
 # DB 접속
@@ -204,7 +204,7 @@ TEST_DB_NAME=<프로젝트명>_test
 TEST_DB_USER=
 TEST_DB_PASSWORD=
 TEST_DB_PORT=3307
-# 프록시 접근 주소 (도메인 확보 시 값 교체)
+# 프록시 접근 주소 (Caddy 채택 시만 — 도메인 값으로 교체하면 자동 HTTPS)
 SITE_ADDRESS=:80
 # 배포 이미지 (서버 .env에서만 사용 — CI가 push한 ghcr 경로와 태그)
 IMAGE_PREFIX=ghcr.io/<계정>/<저장소>
