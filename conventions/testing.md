@@ -32,7 +32,8 @@
 | 스택 | 도구 |
 |---|---|
 | TypeScript/JavaScript (클라·서버 공통) | **Vitest** (Vite 생태계, 설정 최소) |
-| API 통합 테스트 | Vitest + **supertest** (서버 기동 없이 앱 객체 직접 호출) |
+| API 통합 테스트 (TS) | Vitest + **supertest** (서버 기동 없이 앱 객체 직접 호출) |
+| **Java/Spring** | **JUnit 5** — API 계약은 `@WebMvcTest`/`MockMvc`, 서비스 도메인 로직은 컨텍스트 없는 순수 단위 테스트. 실행은 `./gradlew test` (spring.md 7절). 메서드명은 4절의 Java 예외 참조 |
 | React 컴포넌트 | Testing Library — 핵심 인터랙션(권한 게이트, 폼 검증)만 |
 | Python | **pytest** |
 
