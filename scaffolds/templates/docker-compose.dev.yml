@@ -26,12 +26,13 @@ services:
     build:
       context: ./server
       target: builder
-    # Node/Express: 핫리로드
+    user: node                              # 배포(runtime)와 같은 non-root — 권한 사고를 개발에서 드러낸다 (docker.md 4-1절)
+    # Node/Express: 핫리로드 — Windows에서 변경 감지가 안 되면 폴링 전환 (docker.md 4-1절)
     command: ["npm", "run", "dev"]
     volumes:
       - ./server/src:/app/src
       - uploads:/app/uploads
-    # Spring Boot일 때는 위 두 줄 대신:
+    # Spring Boot일 때는 user/command/volumes를 다음으로 교체 (user: node 줄 제거 — temurin builder에 해당 사용자가 없다):
     #   command: ["./gradlew", "bootRun", "--no-daemon"]
     #   volumes:
     #     - ./server/src:/app/src

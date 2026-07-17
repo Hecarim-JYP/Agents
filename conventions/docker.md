@@ -30,6 +30,7 @@ COPY package*.json ./
 RUN npm ci
 COPY . .
 RUN npm run build
+RUN mkdir -p /app/uploads && chown node:node /app/uploads   # dev 모드가 builder를 non-root로 실행 — 마운트 지점 선생성 (4-1절)
 
 FROM node:22-slim AS runtime
 WORKDIR /app
@@ -121,12 +122,17 @@ HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:8080/ >/d
 | 파일 | 담는 것 | 담지 않는 것 |
 |---|---|---|
 | base | 서비스 목록(컨테이너 DB 채택 시 db 포함), 네트워크, named volume, `depends_on` | `env_file`, 포트 노출, bind mount, `extra_hosts`, `build:`/`image:` 선택 |
-| dev override (개발 모드) | `build:`, 소스 bind mount + 핫리로드, `env_file: .env`, 개발 포트 노출, (호스트 DB 사용 시) `extra_hosts: host.docker.internal:host-gateway` | — |
+| dev override (개발 모드) | `build:`, 소스 bind mount + 핫리로드, server `user: node`(아래), 개발 포트 노출, (호스트 DB 사용 시) `extra_hosts: host.docker.internal:host-gateway` | `env_file` — 필요한 키는 base의 `environment`(변수 치환)가 이미 서비스별로 선언한다. `.env` 통째 주입은 무관한 키(`COMPOSE_FILE`, `IMAGE_PREFIX`)와 안 써도 되는 시크릿(`DB_ROOT_PASSWORD`)까지 앱 컨테이너에 들어간다 |
 | deploy override (배포 모드) | `image: <태그>`(5절), `restart: unless-stopped`, 설정 주입(3절), 프록시 서비스(7절), 80/443만 노출 | 소스 마운트, dev 전용 설정 |
 
 - DB 데이터는 **named volume**, 업로드 파일 등 앱 산출물은 volume/bind mount로 영속화하고 백업 대상에 포함(ops.md 6절).
 - 서비스 간 통신은 compose 네트워크의 서비스명으로 (`db:3306`) — IP 하드코딩 금지.
 - **호스트에 노출하는 포트는 전부 `.env` 변수로, 기본값 폴백 없이** (`"${WEB_PORT:?WEB_PORT 미설정}:5173"`) — 다른 로컬 프로젝트와의 충돌(5173, 3306이 단골)을 기동 전에 변수 하나로 피한다. `:-5173` 같은 폴백 금지 (근거: patterns.md 4절 — `.env` 누락이 기동 실패로 즉시 드러나야 한다. 폴백이 있으면 누락된 채 기본 포트로 조용히 떠서 점유 중인 엉뚱한 서비스에 연결되는 버그가 재발한다. `.env`는 스캐폴드가 생성하므로 폴백은 안전망이 아니라 은폐 장치다). 첫 기동 안내에 포트 충돌 가능성을 함께 고지한다.
+
+개발 모드 추가 규칙 (2026-07-17 실측):
+
+- **개발 모드의 server도 배포와 같은 non-root로 실행한다** — dev override에 `user: node`. 전제는 builder 스테이지에도 볼륨 마운트 지점을 node 소유로 선생성하는 것(2-1절 builder — 실측: npm 실행·소스 bind mount 읽기·uploads 볼륨 쓰기 모두 정상). 근거: 개발은 root(builder), 배포는 non-root(runtime)면 권한 사고(볼륨 쓰기 EACCES 등)가 운영에서야 드러난다 — 실행 사용자를 맞추면 개발 첫 실행에서 드러난다. **client는 제외** — Vite가 root 소유 `node_modules`에 캐시(`.vite`)를 쓰므로 EACCES(실측). 배포의 client는 어차피 nginx-unprivileged non-root다(2-3절). **Spring도 제외** — temurin builder에는 비루트 사용자가 없다. 두 예외의 간극은 배포 모드 로컬 검증(4-1절)이 잡는다.
+- ⚠ **Windows 호스트의 소스 bind mount는 파일 변경 이벤트가 컨테이너에 전달되지 않을 수 있다** — 핫리로드(Vite·watch 도구)가 조용히 멈춘다. 폴링으로 전환한다: Vite는 `server.watch: { usePolling: true, interval: <ms> }`, 서버 watcher는 도구별 폴링 옵션(nodemon `--legacy-watch` 등 — 도구가 폴링을 지원하는지 확인하고 없으면 감시 도구를 바꾼다). 간격은 반영 속도와 CPU 상시 부하의 트레이드오프다. 근거: 이 함정을 모르면 개발자가 컨테이너 개발을 포기하고 호스트 실행으로 돌아간다 — "개발도 컨테이너"(1절) 전제와 개발·배포 동일성은 컨테이너 개발이 실제로 굴러갈 때만 유지된다.
 
 ### 4-2. DB 위치 — 프로젝트 시작 시 결정 (스캐폴드 체크리스트 항목)
 
@@ -206,7 +212,7 @@ services:
 | `/health` | `server:3000` | 외부 가동 감시용(ops.md 7절). Spring이면 `/actuator/health`로 rewrite |
 | 그 외 | `client:8080` | nginx가 SPA fallback 처리 |
 
-- **개발(로컬)도 동일 출처를 유지한다**: 로컬은 프록시 컨테이너 대신 Vite `server.proxy`로 `/api/*`를 서버(컨테이너 노출 포트)로 넘긴다 — 클라이언트 코드는 dev/prod 어디서든 같은 상대 경로(`/api/...`)만 호출하고, CORS 설정 자체가 필요 없어진다. 프록시 대상 포트는 vite.config가 `loadEnv`로 `.env`의 `API_PORT`를 읽는다 — `localhost:3000` 하드코딩 금지 (포트 변수화 원칙 4-1절이 여기서만 깨지는 것 방지).
+- **개발(로컬)도 동일 출처를 유지한다**: 로컬은 프록시 컨테이너 대신 Vite `server.proxy`로 `/api/*`를 서버로 넘긴다 — 클라이언트 코드는 dev/prod 어디서든 같은 상대 경로(`/api/...`)만 호출하고, CORS 설정 자체가 필요 없어진다. **프록시 대상은 `http://server:3000`(Spring이면 `server:8080`) — compose 서비스명 + 내부 포트 상수**(2절)로, Caddyfile의 `reverse_proxy server:3000`과 같은 규약이다. Vite dev server는 client 컨테이너 안에서 돌므로(4-1절 개발 모드) `localhost`는 client 컨테이너 자신을 가리켜 서버에 닿지 않고, 루트 `.env`는 빌드 컨텍스트 밖이라 `loadEnv`로 읽을 수도 없다 — 서비스명 규약을 쓰면 환경변수 주입 자체가 필요 없다.
 - 사내망 등 HTTPS 불가 환경이면 그 제약을 프로젝트 CLAUDE.md에 기록한다 (브라우저의 HTTP 제약 — blob 다운로드 차단, secure cookie 불가 등을 설계 시 인지).
 
 ## 7-2. 한 호스트에 운영·개발 스택 공존 (2026-07-14 추가)
