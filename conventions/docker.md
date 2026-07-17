@@ -17,7 +17,7 @@
 - `.dockerignore` 필수: `node_modules`/`build 산출물`, `.env*`, `.git`, `uploads`, `*.log` — 특히 `.env`가 이미지에 들어가는 사고 방지.
 - 베이스 이미지는 버전 고정, `latest` 금지.
 - 패키지/빌드 정의 파일(package.json, gradle 파일)은 소스보다 먼저 COPY한다 — 의존성 레이어 캐시 활용.
-- 서버 앱에는 헬스 엔드포인트를 만들고 HEALTHCHECK를 연결한다 — 경로·명령은 아래 스택별 예시.
+- 서버 앱에는 헬스 엔드포인트를 만들고 HEALTHCHECK를 연결한다 — 경로·명령은 아래 스택별 예시. **HEALTHCHECK 주소는 `localhost`가 아니라 `127.0.0.1`로 고정한다 (2026-07-14 실측)**: 컨테이너 안에서 `localhost`는 IPv6(`::1`)로 먼저 풀릴 수 있고, 앱이 IPv4만 듣고 있으면 **서비스는 멀쩡한데 컨테이너만 계속 `unhealthy`로 표시된다**. IP로 고정하면 이름 해석 순서에도, 앱의 리슨 설정에도 의존하지 않는다 (Node·JVM은 기본이 듀얼스택이라 `localhost`로도 우연히 통과한다 — 그래서 종이 검증으로는 보이지 않는다).
 - **컨테이너 내부 포트는 프로젝트 상수로 고정한다** (Node 3000 / Spring 8080 / 정적 8080) — 앱이 `PORT` 환경변수 등으로 내부 포트를 바꾸는 것 금지 (근거: `EXPOSE`·HEALTHCHECK·프록시의 `server:3000` 참조가 따라가지 못해 헬스체크·라우팅이 조용히 깨진다). 포트 변경이 필요한 곳은 **호스트 매핑의 좌변뿐**이다 (4-1절).
 
 ### 2-1. Node/Express
@@ -38,7 +38,7 @@ RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
 USER node
 EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=3s CMD node -e "fetch('http://localhost:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+HEALTHCHECK --interval=30s --timeout=3s CMD node -e "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 CMD ["node", "dist/index.js"]
 ```
 
@@ -59,7 +59,7 @@ COPY --from=builder /app/build/libs/*.jar app.jar
 RUN useradd -r app
 USER app
 EXPOSE 8080
-HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://localhost:8080/actuator/health | grep -q UP || exit 1
+HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:8080/actuator/health | grep -q UP || exit 1
 CMD ["java", "-jar", "app.jar"]
 ```
 
@@ -89,7 +89,7 @@ HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:8080/ >/d
 
 - ⚠ **베이스가 `nginx-unprivileged`인 이유는 2절 non-root STRICT다** — 공식 `nginx` 이미지는 80을 열기 위해 마스터를 root로 띄우고, 리눅스는 1024 미만 포트를 root에게만 허용하므로 **non-root와 80은 양립할 수 없다**. 그래서 정적 컨테이너의 내부 포트는 8080이다(2절 포트 상수). `USER 101`은 베이스에 이미 설정돼 있지만 명시한다 — 이름(`nginx`)이 아니라 숫자 UID로 쓰는 이유는 K8s의 `runAsNonRoot` 같은 검사가 이름을 해석하지 못해 root로 간주하기 때문이다.
 - nginx.conf에는 **SPA fallback(`try_files ... /index.html`)을 반드시 포함**한다 — 없으면 새로고침·딥링크가 404가 된다. 템플릿: `~/.claude/jyp/scaffolds/templates/nginx.conf`.
-- ⚠ **HEALTHCHECK 주소는 `localhost`가 아니라 `127.0.0.1`** (2026-07-14 실측): 컨테이너 안에서 `localhost`는 IPv6(`::1`)로 먼저 풀리는데 nginx의 `listen 8080`은 IPv4만 듣는다 — 서비스는 멀쩡한데 컨테이너가 계속 `unhealthy`로 표시된다. (Node는 기본이 듀얼스택이라 이 문제가 없다.)
+- nginx.conf 템플릿은 `listen [::]:8080`도 함께 둔다 — IPv6로 들어오는 접속까지 받기 위함이다. 헬스체크는 2절 규칙대로 `127.0.0.1`로 고정하므로 이 설정에 의존하지 않는다 (두 처방은 목적이 다르다: 주소 고정은 헬스체크의 결정성, `[::]` 리슨은 트래픽 수용).
 
 ## 3. 설정 주입 (STRICT)
 
