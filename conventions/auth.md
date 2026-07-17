@@ -27,7 +27,8 @@
 
 **적용 범위는 "자격증명이 우리를 거치는가"로 갈린다** — 위임(0절 b)이라고 이 절을 통째로 면제하지 않는다. 우리 로그인 화면이 ID/PW를 받는 이상 시도를 끊는 것은 우리 몫이고, 인증 소스의 제한은 우리 것의 대체재가 아니라 뒤에 있는 별개 층이다 (근거: 인증 소스에 제한이 없으면 우리 로그인 API가 무제한 비밀번호 시도 통로가 되고, 있으면 우리 API를 통한 시도가 사내 계정을 잠가 그 계정을 쓰는 다른 시스템까지 함께 막는다. **우리가 먼저 끊으면 시도가 인증 소스에 도달하지 않아 둘 다 일어나지 않는다** — 우리 제한은 우리 시스템의 방어이자 사내 계정을 지키는 방벽이다). SSO(0절 c)는 자격증명이 IdP로 직접 가므로 이 절이 해당하지 않는다.
 
-- **적용: 자체 로그인(a)만** — 저장은 **bcrypt 또는 argon2 해시**로만. 평문·복호화 가능 암호화·MD5/SHA 단독 해시 금지.
+- **적용: 자체 로그인(a)만** — 저장은 **bcrypt 또는 argon2id 해시**로만. 평문·복호화 가능 암호화·MD5/SHA 단독 해시 금지. **강도를 정하는 것은 알고리즘 이름이 아니라 파라미터다** — bcrypt는 **cost 12 이상**(cost 4와 12는 같은 bcrypt지만 크래킹 비용이 256배 차이 난다), argon2id는 **m=19MiB·t=2·p=1 이상**(OWASP 최소 권장). **프레임워크 기본값이 이 선에 못 미친다** — Spring `BCryptPasswordEncoder`와 Node `bcrypt`의 기본 cost는 10이므로 명시적으로 지정한다.
+  - ⚠ **bcrypt는 72바이트 초과 입력을 조용히 자른다** — 한글은 UTF-8로 글자당 3바이트라 24글자에서 걸린다. 긴 비밀번호를 허용하는 정책이면 argon2id를 쓴다 (SHA-256으로 미리 줄이는 우회는 password shucking 취약점을 만든다).
 - **비밀번호 정책도 자체 로그인(a)의 몫이다** — 최소 길이와 **흔한 비밀번호 차단 목록**을 등록·변경 시점에 적용한다 (근거: 계정마다 임계값 아래로 훑는 시도(password spraying)는 계정 단위 잠금에 걸리지 않는다. 이 공격은 "누군가 흔한 비밀번호를 쓴다"는 전제 위에서만 성립하므로, 그 전제를 없애는 것이 로그인 시점에 차단하는 것보다 정확하다 — 정상 사용자를 아무도 막지 않고 공격의 성공률만 0으로 만든다).
   - **위임·SSO(b·c)에서는 비밀번호 정책에 간섭하지 않는다** — 정책은 인증 소스가 소유한다. 길이·복잡도는 물론 **형식 검증도 하지 않고** 받은 값을 그대로 전달한다 (근거: 우리 검증이 인증 소스보다 엄격하면 인증 소스에 등록된 정상 비밀번호를 우리가 거부해, 사내에서는 되는 계정이 우리 시스템에서만 로그인 실패한다. 경계 검증(express.md 1절) 습관으로 password 필드에 `min(8)`을 거는 실수가 나오는 자리다).
 - 로그인 실패 메시지는 모호하게: "아이디 또는 비밀번호가 올바르지 않습니다" (계정 존재 여부를 노출하지 않는다). 위임 방식도 동일 — 사내 API의 에러 문구를 그대로 노출하지 않는다.
@@ -86,7 +87,7 @@
 | 인증 필터 | 커스텀 미들웨어 (`authenticateToken`) | Spring Security `SecurityFilterChain` |
 | 권한 게이트 | `requireActionPermission('module.action')` | `@PreAuthorize("hasAuthority('module.action')")` |
 | JWT 발급/검증 | jsonwebtoken 또는 jose | jjwt / spring-security-oauth2-resource-server |
-| 비밀번호 해싱 (0절 a) | bcrypt | `BCryptPasswordEncoder` |
+| 비밀번호 해싱 (0절 a) | `bcrypt`(cost 12+) 또는 `argon2` | `BCryptPasswordEncoder(12)` 또는 `Argon2PasswordEncoder` |
 | 사내 인증 위임 (0절 b) | `external/` 연동 클라이언트 호출 후 자체 토큰 발급 | 동일 — `external/` 빈 호출 후 자체 토큰 발급 |
 | SSO (0절 c) | openid-client 등 OIDC 라이브러리 | `spring-boot-starter-oauth2-client` |
 | refresh 쿠키 | `res.cookie(..., { httpOnly, secure, sameSite })` | `ResponseCookie` + `HttpOnly/Secure/SameSite` |
