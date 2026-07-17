@@ -15,7 +15,7 @@
   - **(b) JPA(+QueryDSL)** — 도메인 로직이 무거운 시스템(상태 전이·이력·복잡한 연관)에서 생산성이 크다. **선택 시 N+1·즉시로딩 정책을 함께 정한다**(지연로딩 기본 강제, fetch join/`@EntityGraph`/batch size). 동적 조회는 QueryDSL 병용이 표준. 결정과 정책을 CLAUDE.md에 기록.
   - **(c) MyBatis** — SQL을 완전 통제하되 XML Mapper 자산·익숙함이 있을 때. ⚠ **MyBatis 스타터는 Boot 4.0.x까지만 호환**된다(4.1 미지원, 2026-07-14 기준) — 채택 시 **Boot 버전을 4.0.x로 고정**하고 CLAUDE.md에 기록한다.
   - 여러 방식 혼용도 가능하다(예: JPA로 도메인 + 무거운 통합 조회는 JdbcClient). 혼용 시 Boot 버전 제약은 가장 강한 것(MyBatis 포함 시 4.0.x)을 따른다.
-- 마이그레이션은 **Flyway**를 쓰되 **`spring.flyway.enabled=false`로 앱 기동 시 자동 실행을 끈다 (STRICT)** — 배포 절차의 별도 단계(`docker compose run --rm migrate`)로만 적용한다 (근거: 기동 시 자동 실행은 docker.md 5절의 "앱 기동과 분리" 원칙을 깨고, 앱이 여러 개면 동시에 마이그레이션을 돌리는 경쟁이 생긴다). 마이그레이션 파일은 저장소 루트 `migrations/`에 두고(모노레포 공유), migrate 서비스가 `filesystem:` 위치로 읽는다 — `src/main/resources/db/migration`에 두지 않는다.
+- 마이그레이션은 **Flyway**를 쓰되 **`spring.flyway.enabled=false`로 앱 기동 시 자동 실행을 끈다 (STRICT)** — 배포 절차의 별도 단계(`docker compose run --rm migrate`)로만 적용한다 (근거: docker.md 5절 "앱 기동과 분리" — 백업 확인·잠금 시간 조정·2단계 배포가 모두 분리를 전제한다. Flyway가 동시 실행을 락으로 막아주는 것과는 별개 문제다). 마이그레이션 파일은 저장소 루트 `migrations/`에 두고(모노레포 공유), migrate 서비스가 `filesystem:` 위치로 읽는다 — `src/main/resources/db/migration`에 두지 않는다.
 
 ## 1. 계층 구조
 

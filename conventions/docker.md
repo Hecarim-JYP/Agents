@@ -178,7 +178,7 @@ services:
   4. 헬스체크·기동 로그 확인 (ops.md 2절) → 이전 이미지는 즉시 삭제하지 않고 1~2개 보관
 - 서버의 ghcr 로그인(`docker login ghcr.io` — `read:packages` 토큰)은 서버 셋업 시 1회, 토큰 보관 위치는 handover 문서에 기록 (ops.md 1절 시크릿 규칙).
 - **롤백 = 직전 태그 이미지로 재기동** — 이것이 ops.md 2절 "롤백 계획"의 구체 수단이다. (DB 마이그레이션이 함께 나갔다면 migration.md 4절의 2단계 배포 여부를 먼저 확인.)
-- DB 마이그레이션은 앱 컨테이너 기동에 섞지 않고 **별도 단계로 실행**한다 — 여러 컨테이너가 동시에 마이그레이션을 돌리는 경쟁을 방지. 구현: compose의 `migrate` 서비스(`profiles: ["tools"]`로 자동 기동 제외) → **`docker compose run --rm migrate`**. ⚠ Spring Boot는 Flyway가 **기동 시 자동 실행되는 것이 기본**이므로 `spring.flyway.enabled=false`로 끄고 이 단계로 통일한다 (spring.md 0절).
+- DB 마이그레이션은 앱 컨테이너 기동에 섞지 않고 **별도 단계로 실행**한다 (근거: 이 저장소의 다른 규칙들이 분리를 전제한다 — **실행 전 백업 확인**(migration.md 5절), **대량 테이블의 잠금 시간을 보고 배포 시간대 조정**(database.md 5절), **파괴적 변경의 2단계 배포**(migration.md 4절)는 모두 마이그레이션을 앱 배포와 다른 시점에 돌릴 수 있어야 성립한다. 기동에 섞이면 그럴 틈이 없고, 마이그레이션 실패가 "앱이 안 뜸"으로 드러나며, 이미지를 직전 태그로 되돌려도 스키마는 이미 새 것이다). 구현: compose의 `migrate` 서비스(`profiles: ["tools"]`로 자동 기동 제외) → **`docker compose run --rm migrate`**. ⚠ Spring Boot는 Flyway가 **기동 시 자동 실행되는 것이 기본**이므로 `spring.flyway.enabled=false`로 끄고 이 단계로 통일한다 (spring.md 0절).
 
 ## 6. 로그
 

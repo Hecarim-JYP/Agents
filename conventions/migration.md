@@ -50,7 +50,7 @@ WHERE NOT EXISTS (SELECT 1 FROM code_table WHERE code = 'NEW_CODE');
 | 스택 | 러너 | 이력 테이블 | 파일명 |
 |---|---|---|---|
 | Node/Express | 커스텀 러너 `npm run migrate` — `migrations/`를 순번대로 읽어 미적용분만 실행·기록 (스캐폴드가 생성) | `schema_migrations` (표준 스키마 00번) | `001_설명.sql` (1절) |
-| JVM/Spring | **Flyway** (spring-boot 통합 — 기동 시 또는 `./gradlew flywayMigrate`) | `flyway_schema_history` (Flyway 자체 관리) | `V001__설명.sql` (Flyway 규약 — 1절 순번 원칙은 동일) |
+| JVM/Spring | **Flyway** — 독립 컨테이너로 실행(`docker compose run --rm migrate` — 스캐폴드 deploy 템플릿). **앱 기동 시 자동 실행은 끈다**(`spring.flyway.enabled=false` — spring.md 0절) | `flyway_schema_history` (Flyway 자체 관리) | `V001__설명.sql` (Flyway 규약 — 1절 순번 원칙은 동일) |
 | 기타 | 해당 생태계 표준 도구 채택, 없으면 커스텀 러너를 이식 | 도구 자체 테이블 | 도구 규약 |
 
 - JVM 채택 시 `00_schema_migrations.sql`은 복사하지 않는다 — Flyway의 이력 테이블이 그 역할이다. 멱등성(2절)·DDL/DML 분리(3절)·2단계 배포(4절)는 러너와 무관하게 동일 적용.
