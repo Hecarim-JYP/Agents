@@ -1,0 +1,20 @@
+# 문서 참조 무결성 자동 검증 — "도구로 강제할 수 있는 규칙은 도구로"(general.md 9절)의 자기적용.
+# check-refs.mjs는 문서끼리 가리키는 "X.md N절" 참조가 실재하는 절인지 검사한다.
+# 절 번호를 개편·삭제하면 조용히 깨지는데, 사람의 기억 대신 push/PR마다 여기서 막는다.
+name: verify
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  check-refs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # 의존성 없음 — check-refs.mjs는 Node 표준 모듈만 쓴다. 실패 시 exit 1로 잡을 막는다.
+      - run: node scripts/check-refs.mjs
