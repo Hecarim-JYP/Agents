@@ -16,6 +16,7 @@ mkdir -p "$AGENTS_DIR"
 rm -rf "$JYP_DIR"
 
 # -r 필수: scaffolds/templates/ 같은 하위 폴더까지 복사한다
+# ⚠ 이 폴더 목록은 install.ps1의 목록과 동일해야 한다 — 새 자산 폴더 추가 시 두 스크립트를 함께 고친다
 for sub in templates conventions scaffolds rules schemas profiles; do
   mkdir -p "$JYP_DIR/$sub"
   cp -r "$REPO_DIR/$sub/"* "$JYP_DIR/$sub/"
@@ -43,9 +44,20 @@ else
   echo "  node가 없어 훅 등록을 건너뜁니다 — 훅은 Node로 실행되므로 Node 설치 후 install을 다시 실행하세요."
 fi
 
+# 구버전 설치 경로 정리
+OLD_TEMPLATES_DIR="$CLAUDE_DIR/jyp-templates"
+if [ -d "$OLD_TEMPLATES_DIR" ]; then
+  rm -rf "$OLD_TEMPLATES_DIR"
+  echo "구버전 경로 제거: $OLD_TEMPLATES_DIR"
+fi
+
 echo ""
 echo "설치 완료:"
 echo "  에이전트                    -> $AGENTS_DIR  (dev-claude, doc-claude)"
 echo "  템플릿/컨벤션/스캐폴드/규칙 -> $JYP_DIR"
 echo "  스킬                        -> $SKILLS_DIR  (/work-log, /deploy-check, /paper-test, /new-project)"
-echo "  훅                          -> $HOOKS_DIR  (post-edit-check, stop-test)"
+echo "  훅                          -> $HOOKS_DIR  (post-edit-check, stop-test — settings.json 등록까지 자동)"
+echo ""
+echo "이제 어느 폴더에서든 Claude Code에서 다음처럼 사용할 수 있습니다:"
+echo '  "dev-claude로 새 프로젝트 세팅해줘"'
+echo '  "doc-claude로 주간 보고서 작성해줘"'
