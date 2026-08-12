@@ -9,6 +9,7 @@ Claude Code에서 사용하는 나만의 맞춤형 에이전트(페르소나) �
 |---|---|
 | `agents/dev-claude.md` | 개발용 페르소나 — 기능 구현, 버그 수정, 프로젝트 세팅 |
 | `agents/doc-claude.md` | 문서용 페르소나 — 업무 보고서, 기술 문서, 기획/제안서, 자료 요약 |
+| `agents/qa-claude.md` | 적대적 QA 페르소나 — 무엇이 깨지는지 발굴하고 재현 테스트 작성 (버그 수정은 dev-claude) |
 | `templates/` | 문서 템플릿 6종(doc-claude — 보고서·기술문서·기획서·요약·장애기록·인수인계) + 개발 템플릿 2종(changelog, backlog) |
 | `conventions/` | 코딩 컨벤션 — general(범용), patterns(구현 패턴), sql, database(스키마), express, spring(Spring Boot), react, design(UI/UX·테마), i18n(다국어), api(REST 설계·응답 봉투), auth(인증·권한), integration(사내·외부 API 연동), batch(정기 배치), testing, migration(DB 변경), ops(배포·운영), docker(컨테이너·프록시) |
 | `profiles/` | 프로젝트 생성 프리셋 — 결정 항목의 기본 답안 (`project-default.md`: 사내 업무 시스템 표준) |
@@ -42,6 +43,7 @@ Claude Code 대화에서 에이전트 이름을 지목하면 된다:
 dev-claude로 로그인 기능 구현해줘
 doc-claude로 이번 주 주간 보고서 써줘
 doc-claude로 이 PDF 내용 정리해줘
+qa-claude로 결제 모듈 깨뜨려봐
 ```
 
 슬래시 커맨드로도 호출할 수 있다 (자연어 표현도 동일하게 동작):

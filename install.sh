@@ -45,7 +45,7 @@ fi
 
 echo ""
 echo "설치 완료:"
-echo "  에이전트                    -> $AGENTS_DIR  (dev-claude, doc-claude)"
+echo "  에이전트                    -> $AGENTS_DIR  (dev-claude, doc-claude, qa-claude)"
 echo "  템플릿/컨벤션/스캐폴드/규칙 -> $JYP_DIR"
 echo "  스킬                        -> $SKILLS_DIR  (/work-log, /deploy-check, /paper-test, /new-project)"
 echo "  훅                          -> $HOOKS_DIR  (post-edit-check, stop-test)"

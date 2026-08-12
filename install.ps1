@@ -50,7 +50,7 @@ if (Test-Path $oldTemplatesDir) {
 
 Write-Host ""
 Write-Host "설치 완료:"
-Write-Host "  에이전트              -> $agentsDir  (dev-claude, doc-claude)"
+Write-Host "  에이전트              -> $agentsDir  (dev-claude, doc-claude, qa-claude)"
 Write-Host "  템플릿/컨벤션/스캐폴드/규칙 -> $jypDir"
 Write-Host "  스킬                  -> $skillsDir  (/work-log, /deploy-check, /paper-test, /new-project)"
 Write-Host "  훅                    -> $hooksDir  (post-edit-check, stop-test — settings.json 등록까지 자동)"
