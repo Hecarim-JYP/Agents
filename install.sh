@@ -53,9 +53,9 @@ fi
 
 echo ""
 echo "설치 완료:"
-echo "  에이전트                    -> $AGENTS_DIR  (dev-claude, doc-claude)"
+echo "  에이전트                    -> $AGENTS_DIR  (dev-claude, doc-claude, qa-claude)"
 echo "  템플릿/컨벤션/스캐폴드/규칙 -> $JYP_DIR"
-echo "  스킬                        -> $SKILLS_DIR  (/work-log, /deploy-check, /paper-test, /new-project)"
+echo "  스킬                        -> $SKILLS_DIR  (/work-log, /deploy-check, /paper-test, /review, /new-project)"
 echo "  훅                          -> $HOOKS_DIR  (post-edit-check, stop-test — settings.json 등록까지 자동)"
 echo ""
 echo "이제 어느 폴더에서든 Claude Code에서 다음처럼 사용할 수 있습니다:"
