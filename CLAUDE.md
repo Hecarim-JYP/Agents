@@ -39,8 +39,8 @@ Claude Code의 규칙·컨벤션·스킬·훅을 버전 관리하는 저장소. 
 
 이 저장소의 산출물은 **실제로 돌려서** 검증한다. 종이 검증만으로는 안 보이는 결함이 반복해서 나왔다(2026-07-14 실검증에서 12건).
 
-- **문서 참조**: `node scripts\check-refs.mjs` (문서끼리 "X.md N절"로 193곳을 가리킨다 — 절을 개편·삭제하면 조용히 깨진다. 절 번호를 건드렸으면 반드시 실행)
-- **compose 템플릿**: `.\scripts\verify-templates.ps1` (임시 폴더 조립 + 두 모드 `docker compose config`)
+- **문서 참조**: `node scripts\check-refs.mjs` (문서끼리 "X.md N절"로 193곳을 가리킨다 — 절을 개편·삭제하면 조용히 깨진다. 절 번호를 건드렸으면 반드시 실행. **CI(`.github/workflows/verify.yml`)가 push/PR마다 자동 실행하지만, 로컬에서 먼저 돌려 잡는 게 빠르다**)
+- **compose 템플릿**: `.\scripts\verify-templates.ps1`(Windows) / `./scripts/verify-templates.sh`(Mac/Linux) (임시 폴더 조립 + 두 모드 `docker compose config`)
 - **ESLint 템플릿**: 위반 코드를 일부러 만들어 검출되는지 + 정상 코드에서 오탐이 없는지 둘 다 확인
 - **훅**: 깨진 코드로 exit 2(검출), 정상 코드로 exit 0(오탐 없음)을 각각 확인. 훅에 stdin으로 넣는 JSON은 **BOM 없이** 만든다(BOM이면 파싱 실패로 조용히 통과한다)
 - 스택별 규칙(Dockerfile·빌드·헬스체크)을 바꾸면 그 스택을 실제로 기동해 확인한다

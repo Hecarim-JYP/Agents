@@ -55,7 +55,8 @@ Agents/
 ├── templates/         # 문서 템플릿 8종 (doc-claude용 6 + 개발용 2)
 ├── hooks/             # 자동 검증 훅 스크립트 2종 (post-edit-check, stop-test)
 ├── docs/              # 저장소 자체 문서 (이 파일)
-├── scripts/           # 검증·설치 보조 (verify-templates, register-hooks)
+├── scripts/           # 검증·설치 보조 (check-refs, verify-templates(ps1/sh), register-hooks)
+├── .github/workflows/ # CI — push/PR마다 check-refs 자동 실행
 ├── install.ps1        # Windows 설치 스크립트
 ├── install.sh         # Mac/Linux 설치 스크립트
 ├── CLAUDE.md          # 이 저장소를 고칠 때의 규칙 (수정 사이클·SSOT·인코딩·검증)
@@ -214,7 +215,7 @@ doc-claude 규칙의 프로젝트 import용 축약판 — 템플릿 준수, 추�
 |---|---|
 | [profiles/project-default.md](../profiles/project-default.md) | **사내 표준 프로필** — 결정 항목의 기본 답안. 매번 묻는 것은 **[확인] 4개**(프로젝트명·목적 / 인증 소스 / 사내 API 연동 / 특수 요구)뿐이고 나머지는 [고정]으로 적용한다. 프로젝트마다 같은 예외를 반복하면 프로필을 고친다 |
 | [scaffolds/default.md](../scaffolds/default.md) | 절차(확인 → 생성 → `.env` 자동 생성 → git init → 보고) · **시작 결정 체크리스트 23항목**(프로필의 근거이자 미적용 시 전체 목록) · 기본/모노레포 구조 · 기초 테이블 · 스택별 조정표 · **린트 강제** · 초기 파일 전문(README·CLAUDE.md·.env.example·test.yml·release.yml) |
-| [scaffolds/templates/](../scaffolds/templates/) | **실물 파일 템플릿** — docker-compose 3종(base/dev/deploy) · nginx-proxy.conf · Caddyfile · nginx.conf · ESLint 설정 4종(client/server × TS/JS). docker.md 규칙(`${VAR:?}` 폴백 금지 · base 최소 · migrate/batch는 `profiles: tools`)이 이미 반영돼 있어 즉흥 작성을 금지한다. 검증: `scripts/verify-templates.ps1` (임시 폴더에 조립 후 두 모드의 `docker compose config` 실행 — 2026-07-14 통과) · `scripts/check-refs.mjs` (문서 간 절 참조 무결성 — 2026-07-17 신설) |
+| [scaffolds/templates/](../scaffolds/templates/) | **실물 파일 템플릿** — docker-compose 3종(base/dev/deploy) · nginx-proxy.conf · Caddyfile · nginx.conf · ESLint 설정 4종(client/server × TS/JS). docker.md 규칙(`${VAR:?}` 폴백 금지 · base 최소 · migrate/batch는 `profiles: tools`)이 이미 반영돼 있어 즉흥 작성을 금지한다. 검증: `scripts/verify-templates.ps1`(Windows)·`scripts/verify-templates.sh`(Mac/Linux) (임시 폴더에 조립 후 두 모드의 `docker compose config` 실행) · `scripts/check-refs.mjs` (문서 간 절 참조 무결성 — 2026-07-17 신설, **CI가 push/PR마다 자동 실행** — 2026-07-22) |
 
 - 주의: 파일 있는 폴더에 생성 금지, 요청 없는 샘플 코드 금지(단, CLI 데모 잔재 제거는 필수), 백로그는 첫 발견 시점에 생성.
 
