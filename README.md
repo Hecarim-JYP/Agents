@@ -26,6 +26,7 @@ git clone https://github.com/Hecarim-JYP/Agents.git
 cd Agents
 .\install.ps1        # Windows
 ./install.sh         # Mac/Linux
+powershell -ExecutionPolicy Bypass -File .\install.ps1 # Powershell
 ```
 
 에이전트는 `~/.claude/agents/`에, 템플릿·컨벤션·스캐폴드·규칙은 `~/.claude/jyp/`에 복사된다.
