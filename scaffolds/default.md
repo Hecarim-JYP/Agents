@@ -47,6 +47,7 @@
 | 24 | **Spring 데이터 접근 — 백엔드=Spring일 때 반드시 묻는다**: (a) JdbcClient / (b) JPA(+QueryDSL) / (c) MyBatis | (a) JdbcClient (순수 SQL·Boot 버전 자유) | spring.md 0절 — 리포지토리 계층·의존성·Boot 버전 제약이 갈린다. MyBatis 채택 시 Boot 4.0.x 고정, JPA 채택 시 N+1·지연로딩 정책을 CLAUDE.md에 함께 기록 |
 | 25 | **운영 DB 식별자** — 호스트·포트·DB명 | 생성 시 묻지 않는다 — 배포 호스트가 정해지면 기록. 미기록이면 `/live-test`가 첫 실행 때 묻고 기록 | testing.md 6-1절 — 개발 DB 쓰기를 허용하는 실동작 검증이 운영 DB를 가려내는 유일한 기준. 없으면 검증이 진행되지 않는다 |
 | 26 | **결재 필요 여부·방식** — 결재 대상 문서가 있으면: (a) 사내 전자결재 연동 / (b) 자체 결재 | 결재 없음. 필요하면 **(a) 사내 전자결재가 있으면 연동 우선** — 결재함이 둘이 되면 결재자가 한쪽을 놓친다 | approval.md 2절 — 테이블·화면·연동이 통째로 갈린다 |
+| 27 | **개인정보 처리 여부·등급** — 고유식별정보·민감정보 포함 여부, 정보주체 규모 | 처리함(일반) — 화면 마스킹 + 접속기록 **별도 DB**(`{DB_NAME}_log`, 앱 계정 SELECT·INSERT만) | personal-data.md 2절 — 접속기록 DB·계정 권한은 인프라 구성이라 시작 시 정한다 |
 
 ## 기본 구조
 
@@ -102,7 +103,7 @@
 ## 기초 테이블 (DB 사용 프로젝트)
 
 - `~/.claude/jyp/schemas/`의 표준 스키마(schema_migrations / 인증·권한 / 공통코드 / 파일 메타 / 감사 로그 / company)를 `migrations/001_core_tables.sql`(DDL이므로 필요 시 분할)로 복사해 첫 마이그레이션으로 삼는다.
-- 프로젝트 요구에 맞게 조정한다: **멀티테넌트면 `05_company.sql` 포함 + 전 업무 테이블에 스코프 컬럼**(database.md 3절), 불필요한 테이블(예: 파일 업로드 없는 프로젝트의 files)은 제외. **다국어면 코드성 테이블에 `_i18n` 번역 테이블 동반 + `user`에 `locale VARCHAR(10) NULL` 추가** (i18n.md 3·4절 — 사용자 선호 locale은 fallback 사슬의 첫 층이다. 법인 기본값 `company.locale`은 05_company.sql에 이미 있다). **인증 소스가 위임·SSO면(체크리스트 19) user 테이블 조정** — `password_hash` 제거 + `external_user_key` 추가. **위임(b)은 잠금 컬럼(`failed_login_count`·`locked_at`) 유지, SSO(c)는 함께 제거** (auth.md 0절). **정기 배치가 있으면(체크리스트 20) `06_batch_history.sql` 포함** (batch.md 3절). **쓰기 연동이 있으면(체크리스트 18) `07_outbox.sql` 포함** (features/outbox.md 3절). 변경 이력을 보여줄 업무 문서가 있으면 `08_change_log.sql`(change-history.md 3절), **자체 결재면(체크리스트 26) `09_approval.sql`**(approval.md 3절), 화면 알림이 있으면 `10_notification.sql`(notification.md 3절).
+- 프로젝트 요구에 맞게 조정한다: **멀티테넌트면 `05_company.sql` 포함 + 전 업무 테이블에 스코프 컬럼**(database.md 3절), 불필요한 테이블(예: 파일 업로드 없는 프로젝트의 files)은 제외. **다국어면 코드성 테이블에 `_i18n` 번역 테이블 동반 + `user`에 `locale VARCHAR(10) NULL` 추가** (i18n.md 3·4절 — 사용자 선호 locale은 fallback 사슬의 첫 층이다. 법인 기본값 `company.locale`은 05_company.sql에 이미 있다). **인증 소스가 위임·SSO면(체크리스트 19) user 테이블 조정** — `password_hash` 제거 + `external_user_key` 추가. **위임(b)은 잠금 컬럼(`failed_login_count`·`locked_at`) 유지, SSO(c)는 함께 제거** (auth.md 0절). **정기 배치가 있으면(체크리스트 20) `06_batch_history.sql` 포함** (batch.md 3절). **쓰기 연동이 있으면(체크리스트 18) `07_outbox.sql` 포함** (features/outbox.md 3절). **기본 포함: `12_error_event.sql`(error-alert.md 3절)·`13_app_setting.sql`(maintenance-mode.md 3절)·`15_user_session.sql`(session-control.md 3절)**. 개인정보를 처리하면(체크리스트 27) `14_personal_data_access_log.sql`을 **별도 DB에**(personal-data.md 3-4절), 장시간 작업이 있으면 `11_async_job.sql`(long-running-job.md 3절). 변경 이력을 보여줄 업무 문서가 있으면 `08_change_log.sql`(change-history.md 3절), **자체 결재면(체크리스트 26) `09_approval.sql`**(approval.md 3절), 화면 알림이 있으면 `10_notification.sql`(notification.md 3절).
 - JVM(Flyway) 채택 시 `00_schema_migrations.sql`은 복사하지 않고, 파일명은 Flyway 규약(`V001__core_tables.sql`)을 따른다 (migration.md 5절).
 - 초기 관리자 계정·기본 역할(ADMIN 등) 시드는 별도 마이그레이션 파일로, `NOT EXISTS` 가드와 함께.
 
@@ -214,6 +215,10 @@ DEPLOY_TAG=
 # 사내 API 연동 (체크리스트 18 — 연동 프로젝트만, integration.md 3절)
 INTERNAL_API_URL=
 INTERNAL_API_KEY=
+# refresh 쿠키 Secure — HTTPS 운영이면 true. HTTP 사내망에서 true면 쿠키가 저장되지 않아 새로고침마다 로그아웃 (features/session-control.md 3-2절)
+COOKIE_SECURE=false
+# 사용자가 접속하는 주소 — 메일 알림 링크 등 (features/notification.md 3-3절, 알림 메일을 보내는 프로젝트만)
+APP_BASE_URL=
 ```
 
 ### .github/workflows/test.yml

@@ -1,6 +1,6 @@
 # 프로필 — 사내 업무 시스템 표준 (기본값)
 
-새 프로젝트 생성 시 **시작 결정 체크리스트(scaffolds/default.md)의 기본 답안**이다. 이 프로필을 적용하면 26개 항목 중 대부분이 자동 확정되고, **실제로 물어야 할 것만 남는다.**
+새 프로젝트 생성 시 **시작 결정 체크리스트(scaffolds/default.md)의 기본 답안**이다. 이 프로필을 적용하면 27개 항목 중 대부분이 자동 확정되고, **실제로 물어야 할 것만 남는다.**
 
 ## 적용 방법
 
@@ -36,6 +36,7 @@
 - 노출 포트: client 5173 / server 8080(Spring) 또는 3000(Node) / DB 3306 — 충돌 시 `.env`에서 변경
 - 프록시: **nginx-unprivileged**(사내망 전용 기본 — non-root, HTTP) + client(nginx) 정적 서빙. 외부 노출 + 도메인이면 **Caddy**(자동 HTTPS) — 체크리스트 15에서 확인
 - **사내 도메인: 미확보 전제** (`SITE_ADDRESS=:80`) — 확보되면 값 교체만으로 HTTPS 전환
+- **HTTP 운영 제약**: `COOKIE_SECURE=false` (HTTPS 전환 시 true), `crypto.randomUUID`·`navigator.locks` 사용 금지 — docker.md 7절
 - 배포 호스트: **운영서버 1대 + 개발서버 1대** (한 PC 공존이면 `COMPOSE_PROJECT_NAME` 분리 — docker.md 7-2절)
 - **가동 모니터링: 사내 인프라팀 위임** — 헬스 URL(`/health`)과 연락처를 전달하고 CLAUDE.md에 기록
 

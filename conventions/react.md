@@ -97,6 +97,7 @@ auth.md 3절(access 메모리 + refresh httpOnly 쿠키)의 클라이언트 구�
   - 무한루프 가드 필수: 재시도 플래그를 요청에 표시하고, **refresh 요청 자체의 401은 재시도 금지**.
   - 동시에 여러 요청이 401을 받으면 refresh는 **한 번만** 수행한다 (진행 중인 refresh Promise를 공유하고 나머지는 대기).
 - 에러 메시지 추출(`err.response?.data?.message` 접근)은 단일 유틸 함수로 통일한다 — 호출 지점마다 접근식을 복제하지 않는다 (SSOT). 5xx면 응답 헤더의 요청 ID를 "문의 코드"로 덧붙인다 (`features/request-id.md` 3-2절). `responseType: 'blob'` 요청(파일 다운로드)의 에러 본문은 Blob이다 — 텍스트로 읽어 JSON 파싱한 뒤 `message`를 꺼낸다 (`features/excel-download.md` 3-4절).
+- 응답 인터셉터는 503 + `MAINTENANCE`·`SERVICE_UNAVAILABLE`이면 점검 화면으로 전환한다 (`features/maintenance-mode.md` 3-4절). 탭 간 로그아웃 전파는 `BroadcastChannel` — `navigator.locks`는 HTTP 사내망에 없다 (`features/session-control.md` 3-3절).
 - 중요 생성 폼은 폼을 열 때 만든 멱등 키를 `Idempotency-Key`로 보낸다 — ⚠ HTTP 사내망에서는 `crypto.randomUUID()`가 없다 (`features/idempotency.md` 3-3절).
 
 ## 8. 라우팅·인증 가드
