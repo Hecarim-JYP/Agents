@@ -1,6 +1,6 @@
 # JYP Agents 전체 기능 통합 가이드
 
-> 최종 수정: 2026-10-14 | 버전: 1.5 | 대상 독자: 이 저장소를 처음 보는 개발자, 그리고 전체 구조를 한눈에 복기하려는 관리자(박진영)
+> 최종 수정: 2026-10-14 | 버전: 1.6 | 대상 독자: 이 저장소를 처음 보는 개발자, 그리고 전체 구조를 한눈에 복기하려는 관리자(박진영)
 
 ## 1. 개요
 
@@ -52,7 +52,7 @@ Agents/
 ├── skills/            # 슬래시 커맨드 6종 (new-project, work-log, deploy-check, paper-test, live-test, review)
 ├── profiles/          # 프로젝트 생성 프리셋 (project-default.md — 결정 항목의 기본 답안)
 ├── scaffolds/         # 새 프로젝트 초기 구조 스펙 (default.md + templates/ 실물 파일)
-├── schemas/           # DB 기초 테이블 표준 DDL 11종
+├── schemas/           # DB 기초 테이블 표준 DDL 16종
 ├── templates/         # 문서 템플릿 8종 (doc-claude용 6 + 개발용 2)
 ├── hooks/             # 자동 검증 훅 스크립트 2종 (post-edit-check, stop-test)
 ├── docs/              # 저장소 자체 문서 (이 파일)
@@ -223,12 +223,12 @@ doc-claude 규칙의 프로젝트 import용 축약판 — 템플릿 준수, 추�
 | 구성 | 역할 |
 |---|---|
 | [profiles/project-default.md](../profiles/project-default.md) | **사내 표준 프로필** — 결정 항목의 기본 답안. 매번 묻는 것은 **[확인] 4개**(프로젝트명·목적 / 인증 소스 / 사내 API 연동 / 특수 요구)뿐이고 나머지는 [고정]으로 적용한다. 프로젝트마다 같은 예외를 반복하면 프로필을 고친다 |
-| [scaffolds/default.md](../scaffolds/default.md) | 절차(확인 → 생성 → `.env` 자동 생성 → git init → 보고) · **시작 결정 체크리스트 26항목**(프로필의 근거이자 미적용 시 전체 목록) · 기본/모노레포 구조 · 기초 테이블 · 스택별 조정표 · **린트 강제** · 초기 파일 전문(README·CLAUDE.md·.env.example·test.yml·release.yml) |
+| [scaffolds/default.md](../scaffolds/default.md) | 절차(확인 → 생성 → `.env` 자동 생성 → git init → 보고) · **시작 결정 체크리스트 27항목**(프로필의 근거이자 미적용 시 전체 목록) · 기본/모노레포 구조 · 기초 테이블 · 스택별 조정표 · **린트 강제** · 초기 파일 전문(README·CLAUDE.md·.env.example·test.yml·release.yml) |
 | [scaffolds/templates/](../scaffolds/templates/) | **실물 파일 템플릿** — docker-compose 3종(base/dev/deploy) · nginx-proxy.conf · Caddyfile · nginx.conf · ESLint 설정 4종(client/server × TS/JS). docker.md 규칙(`${VAR:?}` 폴백 금지 · base 최소 · migrate/batch는 `profiles: tools`)이 이미 반영돼 있어 즉흥 작성을 금지한다. 검증: `scripts/verify-templates.ps1`(Windows)·`scripts/verify-templates.sh`(Mac/Linux) (임시 폴더에 조립 후 두 모드의 `docker compose config` 실행) · `scripts/check-refs.mjs` (문서 간 절 참조 무결성 — 2026-07-17 신설, **CI가 push/PR마다 자동 실행** — 2026-07-22) |
 
 - 주의: 파일 있는 폴더에 생성 금지, 요청 없는 샘플 코드 금지(단, CLI 데모 잔재 제거는 필수), 백로그는 첫 발견 시점에 생성.
 
-### 4-6. 표준 스키마 (schemas/ 11종)
+### 4-6. 표준 스키마 (schemas/ 16종)
 
 database.md 규칙(PK 네이밍, 공통 컬럼, 논리 FK + 인덱스, utf8mb4)의 **살아있는 레퍼런스**이자, 새 프로젝트의 첫 마이그레이션 원본.
 
@@ -245,6 +245,11 @@ database.md 규칙(PK 네이밍, 공통 컬럼, 논리 FK + 인덱스, utf8mb4)�
 | `08_change_log.sql` | change_log | 업무 데이터 변경 이력(컬럼 단위 전·후, 상태 전이) — 변경 이력을 보여줄 문서가 있는 프로젝트만 (change-history.md 3절) |
 | `09_approval.sql` | approval_request, approval_line, approval_delegation | 자체 결재 — 사내 전자결재 연동이면 쓰지 않는다 (approval.md 3절) |
 | `10_notification.sql` | notification | 화면 알림함 — 외부 채널은 outbox로 (notification.md 3절) |
+| `11_async_job.sql` | async_job | 장시간 작업 대기열 — 202 접수·진행률·결과 파일 (long-running-job.md 3절) |
+| `12_error_event.sql` | error_event | 서버 에러 지문별 집계·알림 억제 — 기본 포함 (error-alert.md 3절) |
+| `13_app_setting.sql` | app_setting | 점검 모드·공지 배너·기능 스위치 — 기본 포함 (maintenance-mode.md 3절) |
+| `14_personal_data_access_log.sql` | personal_data_access_log | 개인정보 접속기록 — **별도 DB**, 앱 계정 SELECT·INSERT만 (personal-data.md 3-4절) |
+| `15_user_session.sql` | user_session | 로그인 세션·refresh 회전·기기별 종료 — 기본 포함 (session-control.md 3절) |
 
 ### 4-7. 템플릿 (templates/ 8종)
 
