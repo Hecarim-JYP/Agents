@@ -1,6 +1,6 @@
 # JYP Agents 전체 기능 통합 가이드
 
-> 최종 수정: 2026-10-14 | 버전: 1.3 | 대상 독자: 이 저장소를 처음 보는 개발자, 그리고 전체 구조를 한눈에 복기하려는 관리자(박진영)
+> 최종 수정: 2026-10-14 | 버전: 1.4 | 대상 독자: 이 저장소를 처음 보는 개발자, 그리고 전체 구조를 한눈에 복기하려는 관리자(박진영)
 
 ## 1. 개요
 
@@ -48,11 +48,11 @@ doc-claude로 주간 보고서 써줘            # 문서 페르소나 호출
 Agents/
 ├── agents/            # 페르소나 3종 (dev-claude, doc-claude, qa-claude)
 ├── rules/             # 작업 규칙 2종 — 페르소나와 프로젝트 CLAUDE.md가 참조하는 SSOT
-├── conventions/       # 코딩 컨벤션 17종 (범용 → 스택별 → 운영까지)
+├── conventions/       # 코딩 컨벤션 17종 (범용 → 스택별 → 운영까지) + features/ 운영 기능 카탈로그·레시피
 ├── skills/            # 슬래시 커맨드 6종 (new-project, work-log, deploy-check, paper-test, live-test, review)
 ├── profiles/          # 프로젝트 생성 프리셋 (project-default.md — 결정 항목의 기본 답안)
 ├── scaffolds/         # 새 프로젝트 초기 구조 스펙 (default.md + templates/ 실물 파일)
-├── schemas/           # DB 기초 테이블 표준 DDL 7종
+├── schemas/           # DB 기초 테이블 표준 DDL 8종
 ├── templates/         # 문서 템플릿 8종 (doc-claude용 6 + 개발용 2)
 ├── hooks/             # 자동 검증 훅 스크립트 2종 (post-edit-check, stop-test)
 ├── docs/              # 저장소 자체 문서 (이 파일)
@@ -211,6 +211,10 @@ doc-claude 규칙의 프로젝트 import용 축약판 — 템플릿 준수, 추�
 | 운영 | [batch.md](../conventions/batch.md) | 정기 배치 — **구현 전 방식 확정(MANDATORY)** · 실행 방식 3택 · 멱등 작성 · 실행 이력 + 실패 알림 필수 |
 
 - **강제 수준 마커**: STRICT(위반 금지) / MANDATORY(필수 적용)가 붙은 규칙은 근거(어떤 버그에서 나왔는지)와 확정 날짜를 함께 담고 있다.
+#### 운영 기능 카탈로그 (conventions/features/ — 2026-10-14 신설)
+
+도메인 이벤트·outbox·중복 제출 방지처럼 **기능과 무관하게 반복해서 만드는 운영 기능**의 표준 설계 모음이다. [catalog.md](../conventions/features/catalog.md)가 인덱스(`[공통]`/`[사내]`/`[대외]` 태그, 현황, 차수)이고, 기능마다 레시피 한 파일(언제 쓰나 / 결정 항목 / 표준 설계 / 함정 / 스택별 구현 / 검증 포인트)이다. 이미 컨벤션이 다루는 기능은 카탈로그에서 해당 절로 링크만 한다. 레시피가 있는 기능은 즉흥 설계를 금지한다(dev-rules).
+
 - **도구로 강제되는 규칙**은 스캐폴드의 린트 설정(`scaffolds/templates/eslint.config.*.mjs`, Spotless/Checkstyle)이 CI·훅에서 검사한다 — 문서를 다 읽지 않아도 위반이 빨간불로 드러난다.
 ### 4-5. 스캐폴드 (scaffolds/ + profiles/)
 
@@ -224,7 +228,7 @@ doc-claude 규칙의 프로젝트 import용 축약판 — 템플릿 준수, 추�
 
 - 주의: 파일 있는 폴더에 생성 금지, 요청 없는 샘플 코드 금지(단, CLI 데모 잔재 제거는 필수), 백로그는 첫 발견 시점에 생성.
 
-### 4-6. 표준 스키마 (schemas/ 7종)
+### 4-6. 표준 스키마 (schemas/ 8종)
 
 database.md 규칙(PK 네이밍, 공통 컬럼, 논리 FK + 인덱스, utf8mb4)의 **살아있는 레퍼런스**이자, 새 프로젝트의 첫 마이그레이션 원본.
 
@@ -237,6 +241,7 @@ database.md 규칙(PK 네이밍, 공통 컬럼, 논리 FK + 인덱스, utf8mb4)�
 | `04_audit_log.sql` | audit_log | 권한 변경 등 책임 추적 행위 기록 |
 | `05_company.sql` | company | 멀티테넌트(다중 법인) 기준 테이블 — 멀티테넌트 프로젝트만 복사 (database.md 3절) |
 | `06_batch_history.sql` | batch_history | 배치 실행 이력 — 정기 배치가 있는 프로젝트만 복사 (batch.md 3절) |
+| `07_outbox.sql` | outbox_message | 반드시 전달해야 하는 비동기 작업(외부 쓰기 연동)의 발송 대기열 — 쓰기 연동 프로젝트만 복사 (outbox.md 3절) |
 
 ### 4-7. 템플릿 (templates/ 8종)
 

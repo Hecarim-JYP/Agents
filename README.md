@@ -11,12 +11,12 @@ Claude Code에서 사용하는 나만의 맞춤형 에이전트(페르소나) �
 | `agents/doc-claude.md` | 문서용 페르소나 — 업무 보고서, 기술 문서, 기획/제안서, 자료 요약 |
 | `agents/qa-claude.md` | 적대적 QA 페르소나 — 무엇이 깨지는지 발굴하고 재현을 스니펫으로 기록 (버그 수정은 dev-claude) |
 | `templates/` | 문서 템플릿 6종(doc-claude — 보고서·기술문서·기획서·요약·장애기록·인수인계) + 개발 템플릿 2종(changelog, backlog) |
-| `conventions/` | 코딩 컨벤션 — general(범용), patterns(구현 패턴), sql, database(스키마), express, spring(Spring Boot), react, design(UI/UX·테마), i18n(다국어), api(REST 설계·응답 봉투), auth(인증·권한), integration(사내·외부 API 연동), batch(정기 배치), testing, migration(DB 변경), ops(배포·운영), docker(컨테이너·프록시) |
+| `conventions/` | 코딩 컨벤션 — general(범용), patterns(구현 패턴), sql, database(스키마), express, spring(Spring Boot), react, design(UI/UX·테마), i18n(다국어), api(REST 설계·응답 봉투), auth(인증·권한), integration(사내·외부 API 연동), batch(정기 배치), testing, migration(DB 변경), ops(배포·운영), docker(컨테이너·프록시) + `features/`(운영 기능 카탈로그·레시피 — 도메인 이벤트, outbox, 중복 제출 방지, 요청 추적 ID, 안전 종료) |
 | `profiles/` | 프로젝트 생성 프리셋 — 결정 항목의 기본 답안 (`project-default.md`: 사내 업무 시스템 표준) |
 | `scaffolds/` | 새 프로젝트 폴더 구조·초기 파일 스펙 + `templates/`(compose·프록시(nginx-proxy/Caddyfile)·nginx·ESLint 실물 템플릿) |
 | `rules/` | 프로젝트 CLAUDE.md에 import해서 쓰는 규칙 파일 |
 | `skills/` | 슬래시 커맨드 — `/work-log`(작업 정리), `/deploy-check`(배포 준비), `/paper-test`(통합 테스트), `/live-test`(실동작 테스트), `/review`(컨벤션 준수 리뷰), `/new-project`(프로젝트 세팅) |
-| `schemas/` | DB 기초 테이블 표준 DDL — 인증·권한, 공통코드, 파일 메타, 감사 로그, 법인(멀티테넌트), 배치 이력, schema_migrations |
+| `schemas/` | DB 기초 테이블 표준 DDL — 인증·권한, 공통코드, 파일 메타, 감사 로그, 법인(멀티테넌트), 배치 이력, outbox(쓰기 연동 대기열), schema_migrations |
 | `install.ps1` | `~/.claude`에 에이전트·템플릿·컨벤션·스캐폴드를 설치 |
 
 ## 설치
