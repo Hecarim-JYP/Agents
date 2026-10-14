@@ -40,6 +40,8 @@ IMAGE_PREFIX=ghcr.io/example/verify
 DEPLOY_TAG=v0.0.1
 INTERNAL_API_URL=
 INTERNAL_API_KEY=
+COOKIE_SECURE=false
+APP_BASE_URL=
 '@
 [System.IO.File]::WriteAllText((Join-Path $work ".env"), $envText, [System.Text.UTF8Encoding]::new($false))
 

@@ -41,12 +41,13 @@
 - **access token은 짧게**(수 시간 이내) + **refresh token으로 갱신** — 장기 access 토큰(수십 일) 금지 (근거: 탈취 시 만료까지 무방비).
 - 시크릿은 환경변수로만(길고 랜덤하게), 페이로드에 비밀번호·민감정보 금지 — JWT는 암호화가 아니라 서명이며 내용은 누구나 읽는다.
 - 페이로드 표준: 사용자 ID, 테넌트/회사 ID, 역할 코드 — 이것이 `req.user` 신뢰값의 원천이다.
-- **서버 측 무효화 수단 필수**: 강제 로그아웃·계정 비활성화·권한 변경 시 기존 토큰을 무효화할 수 있어야 한다 (토큰 버전 컬럼 또는 세션 상태 확인). "만료까지 기다리기"는 무효화가 아니다.
+- **서버 측 무효화 수단 필수**: 강제 로그아웃·계정 비활성화·권한 변경 시 기존 토큰을 무효화할 수 있어야 한다 (토큰 버전 컬럼 또는 세션 상태 확인). "만료까지 기다리기"는 무효화가 아니다. 구현(세션 테이블·refresh 회전·기기별 종료)은 `features/session-control.md`.
 
 ## 3. 토큰 저장 — 클라이언트 (STRICT)
 
 - **localStorage / sessionStorage에 토큰 저장 금지** (근거: JS로 읽을 수 있어 XSS 한 번에 토큰이 탈취된다).
 - 표준 패턴: **access token은 메모리(앱 상태)에만 보관 + refresh token은 `httpOnly` + `Secure` + `SameSite=Lax` 쿠키**.
+  - ⚠ **`Secure`는 HTTPS일 때만 붙인다 (2026-10-14 정정)** — HTTP 사내망에서 `Secure` 쿠키는 브라우저가 저장하지 않아 **운영에서만 새로고침마다 로그아웃**된다(localhost는 예외라 개발에선 정상 — 실측). 설정값 `COOKIE_SECURE`로 분기하고, HTTP 운영 제약은 CLAUDE.md에 기록한다 (docker.md 7절). 쿠키 Path·회전·강제 종료는 `features/session-control.md`.
   - 새로고침 시 refresh 쿠키로 access를 재발급받는다(silent refresh) — 첫 로드에 재발급 API 1회 호출.
   - XSS로는 refresh 쿠키를 읽을 수 없고, CSRF로는 access token을 얻을 수 없는 조합.
 - 쿠키를 쓰므로 **CSRF 대응 필수**: `SameSite` 속성 + 상태 변경 요청(POST/PUT/DELETE)은 커스텀 헤더(예: `Authorization: Bearer <access>`) 요구 — 단순 폼 전송으로는 위조 불가.

@@ -38,6 +38,8 @@ IMAGE_PREFIX=ghcr.io/example/verify
 DEPLOY_TAG=v0.0.1
 INTERNAL_API_URL=
 INTERNAL_API_KEY=
+COOKIE_SECURE=false
+APP_BASE_URL=
 ENV
 
 # 개발 모드는 build 컨텍스트(client/·server/)가 필요하다 — 검증용 빈 Dockerfile
