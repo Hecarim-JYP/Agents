@@ -15,7 +15,7 @@ Claude Code에서 사용하는 나만의 맞춤형 에이전트(페르소나) �
 | `profiles/` | 프로젝트 생성 프리셋 — 결정 항목의 기본 답안 (`project-default.md`: 사내 업무 시스템 표준) |
 | `scaffolds/` | 새 프로젝트 폴더 구조·초기 파일 스펙 + `templates/`(compose·프록시(nginx-proxy/Caddyfile)·nginx·ESLint 실물 템플릿) |
 | `rules/` | 프로젝트 CLAUDE.md에 import해서 쓰는 규칙 파일 |
-| `skills/` | 슬래시 커맨드 — `/work-log`(작업 정리), `/deploy-check`(배포 준비), `/paper-test`(통합 테스트), `/review`(컨벤션 준수 리뷰), `/new-project`(프로젝트 세팅) |
+| `skills/` | 슬래시 커맨드 — `/work-log`(작업 정리), `/deploy-check`(배포 준비), `/paper-test`(통합 테스트), `/live-test`(실동작 테스트), `/review`(컨벤션 준수 리뷰), `/new-project`(프로젝트 세팅) |
 | `schemas/` | DB 기초 테이블 표준 DDL — 인증·권한, 공통코드, 파일 메타, 감사 로그, 법인(멀티테넌트), 배치 이력, schema_migrations |
 | `install.ps1` | `~/.claude`에 에이전트·템플릿·컨벤션·스캐폴드를 설치 |
 
@@ -54,6 +54,7 @@ qa-claude로 결제 모듈 깨뜨려봐
 /work-log         # 작업 정리 (changelog·memory·CLAUDE.md·백로그 동기화)
 /deploy-check     # 배포 준비 체크리스트
 /paper-test       # 통합 테스트 (정적 추적)
+/live-test        # 실동작 테스트 (개발 환경 실측 — 사용자 화면 조작 + DB·로그 확인)
 /review           # 컨벤션 준수 리뷰 (현재 변경 diff)
 ```
 

@@ -42,7 +42,7 @@ src/external/{system}/     # Express — 예: src/external/hqApi/hqApiClient.ts
 ## 7. 로깅·테스트
 
 - 아웃바운드 호출은 대상 시스템·경로·소요 시간·성공 여부를 로깅한다 — 인증 키·요청/응답 본문 전체는 로그 금지 (ops.md 3절).
-- 테스트는 external 계층을 mock 경계로 삼는다 — 실제 사내 API를 호출하는 테스트 금지 (testing.md 1절: 단위 테스트는 외부 의존 없이).
+- **자동화 테스트**는 external 계층을 mock 경계로 삼는다 — 실제 사내 API를 호출하는 자동화 테스트 금지 (testing.md 1절: 단위 테스트는 외부 의존 없이). 개발 환경에서 실제 연동을 돌려 보는 수동 실동작 검증은 testing.md 6-3절을 따른다 (2026-10-14).
 
 ## 8. 스택별 구현 노트
 

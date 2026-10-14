@@ -30,7 +30,7 @@
 - 구현 구조는 `~/.claude/jyp/conventions/patterns.md`(계층 분리·책임 배치·신뢰 경계)를 따른다
 - 스택별 추가 적용: SQL은 `sql.md`, DB 스키마 설계·운영은 `database.md`(네이밍·공통 컬럼·타입·인덱스/제약), Express/Node 서버는 `express.md`, Spring Boot 서버는 `spring.md`, React 클라이언트는 `react.md`
 - DB 기초 테이블(인증·권한, 공통코드, 파일 메타, 감사 로그, schema_migrations)은 새로 설계하지 말고 `~/.claude/jyp/schemas/`의 표준 DDL을 복사·조정해서 시작한다
-- 자동화 테스트는 `~/.claude/jyp/conventions/testing.md`를 따른다 — **테스트 DB 사용 여부(0절)에 따라 실제 DB 검증 또는 쿼리 목킹**, 핵심 로직 변경 시 테스트 동반 작성, 못 썼으면 보고·changelog에 "테스트 미작성" 명시 + 백로그 `TEST-` 항목 추가 (게이트+기록)
+- 자동화 테스트는 `~/.claude/jyp/conventions/testing.md`를 따른다 — **테스트 DB 사용 여부(0절)에 따라 실제 DB 검증 또는 쿼리 목킹**, 핵심 로직 변경 시 테스트 동반 작성, 못 썼으면 보고·changelog에 "테스트 미작성" 명시 + 백로그 `TEST-` 항목 추가 (게이트+기록). **운영 DB는 어떤 테스트·검증에도 사용 금지**, 자동화 테스트는 테스트 DB 전용, 개발 DB 실동작 검증은 삭제·DDL 금지 (6절)
 - **동시 수정 방어는 SQL이 최종 방어선** (`sql.md` 8절) — 여러 사용자가 고치는 테이블은 `version` 컬럼 + 낙관적 락, 상태 전이는 조건부 UPDATE(`WHERE status='PENDING'`), 변경 0행이면 409. 읽고 계산해 쓰는 값(재고·잔액)은 `FOR UPDATE` 또는 DB 계산
 - 배포·운영은 `~/.claude/jyp/conventions/ops.md`(환경 분리·로깅·보안 체크리스트·백업), DB 마이그레이션은 `migration.md`(번호·멱등성·DDL/DML 분리·2단계 배포)를 따른다
 - 모든 서비스는 개발·운영 공통 **Docker 컨테이너**로 배포·운영 — `~/.claude/jyp/conventions/docker.md` (멀티스테이지·non-root·.env 이미지 포함 금지·태그=git 태그·롤백=직전 이미지·앞단 리버스 프록시(+외부 노출 시 자동 HTTPS))
@@ -61,6 +61,7 @@
 - "작업 정리" → `~/.claude/skills/work-log/SKILL.md`
 - "배포 준비" → `~/.claude/skills/deploy-check/SKILL.md`
 - "통합 테스트" → `~/.claude/skills/paper-test/SKILL.md`
+- "실동작 테스트"·"화면 테스트" → `~/.claude/skills/live-test/SKILL.md`
 - "새 프로젝트 세팅" → `~/.claude/skills/new-project/SKILL.md`
 
 ## CLAUDE.md 운영 규칙 (프로젝트 헌법 관리)

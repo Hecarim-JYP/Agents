@@ -1,6 +1,6 @@
 # JYP Agents 전체 기능 통합 가이드
 
-> 최종 수정: 2026-08-12 | 버전: 1.2 | 대상 독자: 이 저장소를 처음 보는 개발자, 그리고 전체 구조를 한눈에 복기하려는 관리자(박진영)
+> 최종 수정: 2026-10-14 | 버전: 1.3 | 대상 독자: 이 저장소를 처음 보는 개발자, 그리고 전체 구조를 한눈에 복기하려는 관리자(박진영)
 
 ## 1. 개요
 
@@ -30,6 +30,7 @@ doc-claude로 주간 보고서 써줘            # 문서 페르소나 호출
 /work-log                                # 작업 정리
 /deploy-check                            # 배포 준비 점검
 /paper-test                              # 통합 테스트 (정적 추적)
+/live-test                               # 실동작 테스트 (개발 환경 실측)
 /review                                  # 컨벤션 준수 리뷰 (현재 변경 diff)
 ```
 
@@ -48,7 +49,7 @@ Agents/
 ├── agents/            # 페르소나 3종 (dev-claude, doc-claude, qa-claude)
 ├── rules/             # 작업 규칙 2종 — 페르소나와 프로젝트 CLAUDE.md가 참조하는 SSOT
 ├── conventions/       # 코딩 컨벤션 17종 (범용 → 스택별 → 운영까지)
-├── skills/            # 슬래시 커맨드 5종 (new-project, work-log, deploy-check, paper-test, review)
+├── skills/            # 슬래시 커맨드 6종 (new-project, work-log, deploy-check, paper-test, live-test, review)
 ├── profiles/          # 프로젝트 생성 프리셋 (project-default.md — 결정 항목의 기본 답안)
 ├── scaffolds/         # 새 프로젝트 초기 구조 스펙 (default.md + templates/ 실물 파일)
 ├── schemas/           # DB 기초 테이블 표준 DDL 7종
@@ -139,7 +140,7 @@ dev-claude가 읽고, 프로젝트 CLAUDE.md가 `@`로 import하는 파일. 주�
 
 doc-claude 규칙의 프로젝트 import용 축약판 — 템플릿 준수, 추측 금지(모호하면 질문, 복수 해석은 병기 — 2026-07-13 추가), 두괄식, 근거 표기, 수치 우선, 금지사항.
 
-### 4-3. 스킬 (슬래시 커맨드 5종)
+### 4-3. 스킬 (슬래시 커맨드 6종)
 
 자연어("작업 정리해줘")와 슬래시 커맨드(`/work-log`)가 동일하게 동작하는 정식 명령. 절차의 SSOT는 각 SKILL.md다.
 
@@ -173,11 +174,15 @@ doc-claude 규칙의 프로젝트 import용 축약판 — 템플릿 준수, 추�
 
 #### /paper-test — 통합 테스트 (정적 추적)
 
-앱을 실행하지 않고 **코드를 읽어** 계층 간 계약을 검증한다(paper execution). 검증 대상마다 구체적 가상 시나리오(입력값·권한·상태)를 세우고 화면 → API → 컨트롤러 → 서비스 → 쿼리 → DB → 응답까지 따라간다. 절차: 인벤토리 구축(사용자 확인) → CLAUDE.md 규칙을 계약 체크리스트로 → **읽기 전용 에이전트 fan-out**(수정 금지) → 라운드 분할 → 백로그 반영. 출력은 ①확인된 버그 ②의심 ③정상 확인 3분류 + 근거(`파일:라인`) 필수. 런타임·실DB·동시성은 검증 불가함을 반드시 고지.
+앱을 실행하지 않고 **코드를 읽어** 계층 간 계약을 검증한다(paper execution). 검증 대상마다 구체적 가상 시나리오(입력값·권한·상태)를 세우고 화면 → API → 컨트롤러 → 서비스 → 쿼리 → DB → 응답까지 따라간다. 절차: 인벤토리 구축(사용자 확인) → CLAUDE.md 규칙을 계약 체크리스트로 → **읽기 전용 에이전트 fan-out**(수정 금지) → 라운드 분할 → 백로그 반영. 출력은 ①확인된 버그 ②의심 ③정상 확인 3분류 + 근거(`파일:라인`) 필수. 런타임·실DB·동시성은 검증 불가함을 반드시 고지하고, 실측이 필요하면 /live-test로 넘긴다.
+
+#### /live-test — 실동작 테스트 (개발 환경 실측)
+
+/paper-test가 못 보는 런타임 동작·실DB 데이터·외부 시스템 실응답·동시성·브라우저 렌더링을 **개발 환경에서 실제로 돌려** 확인한다(2026-10-14 신설). 사용자가 화면을 조작하면 Claude가 뒤에서 DB·로그·API를 조회해 판정하는 **하이브리드**(자동 조작 + 관찰자) 방식이다. 규칙의 SSOT는 [testing.md](../conventions/testing.md) 6절(운영 DB 접속 금지·개발 DB 허용 범위·작업 폴더·증거)이고 스킬은 절차만 담는다. 절차: 대상 환경 판별(운영 DB 식별자 대조, 생략 금지) → 대상 선정(/paper-test의 ② 의심 우선) → 기동 확인 → 실행 → 라운드 분할 → 정리(소프트삭제) → 백로그 반영(코드 수정 금지). 출력은 ①②③ 3분류 + 실측 증거.
 
 #### /review — 컨벤션 준수 리뷰
 
-변경(diff)이 JYP 컨벤션·설계 원칙을 지켰는지 읽어서 검토한다. **린트가 못 잡는 판단 규칙만** 본다 — 계층 분리·계약 형태·논리 FK·동시성 누락·성급한 추상화·데이터 스코프 등. 도구로 강제되는 항목(파일 헤더·`any` 금지·네이밍)은 post-edit 훅이 이미 잡으므로 중복 지적을 금지한다(다른 자산과의 경계: 범용 버그는 기본 /code-review, 계층 데이터 계약 추적은 /paper-test, 런타임 파괴는 qa-claude). 절차: 대상 diff 확정 → dev-rules 라우팅표로 건드린 영역의 컨벤션만 로드 → STRICT/MANDATORY를 체크리스트화 → 읽기 전용 검토(수정 금지·`파일:라인` 근거) → 백로그 인계(발견 ≠ 완료). 출력은 ① 확인된 위반 ② 의심 ③ 정상 확인 3분류. 정적 검토라 런타임·실DB·동시성은 검증 불가함을 고지한다.
+변경(diff)이 JYP 컨벤션·설계 원칙을 지켰는지 읽어서 검토한다. **린트가 못 잡는 판단 규칙만** 본다 — 계층 분리·계약 형태·논리 FK·동시성 누락·성급한 추상화·데이터 스코프 등. 도구로 강제되는 항목(파일 헤더·`any` 금지·네이밍)은 post-edit 훅이 이미 잡으므로 중복 지적을 금지한다(다른 자산과의 경계: 범용 버그는 기본 /code-review, 계층 데이터 계약 추적은 /paper-test, 런타임 파괴는 qa-claude, 개발 환경 실측은 /live-test). 절차: 대상 diff 확정 → dev-rules 라우팅표로 건드린 영역의 컨벤션만 로드 → STRICT/MANDATORY를 체크리스트화 → 읽기 전용 검토(수정 금지·`파일:라인` 근거) → 백로그 인계(발견 ≠ 완료). 출력은 ① 확인된 위반 ② 의심 ③ 정상 확인 3분류. 정적 검토라 런타임·실DB·동시성은 검증 불가함을 고지한다.
 
 ### 4-4. 컨벤션 (17종)
 
@@ -199,7 +204,7 @@ doc-claude 규칙의 프로젝트 import용 축약판 — 템플릿 준수, 추�
 | 횡단 | [auth.md](../conventions/auth.md) | **0절 인증 소스**(자체/사내 위임/SSO) · 비밀번호 · 토큰(메모리+httpOnly) · RBAC + 데이터 스코프 3종 · 감사 · 스택 매핑 |
 | 횡단 | [integration.md](../conventions/integration.md) | 사내·외부 API 연동 — BFF(프론트 직접 호출 금지) · `external/` 계층 · 타임아웃 5초 · 쓰기 재시도 금지 · `/health` 격리 |
 | 횡단 | [i18n.md](../conventions/i18n.md) | 다국어 — 문구 키 강제 · fallback 사슬 · `_i18n` 번역 테이블 · `Intl` 포맷 |
-| 횡단 | [testing.md](../conventions/testing.md) | **0절 테스트 DB 결정** · 테스트 우선순위 · 도구 표준 · **게이트+기록**(미작성이면 보고·changelog·백로그) |
+| 횡단 | [testing.md](../conventions/testing.md) | **0절 테스트 DB 결정** · 테스트 우선순위 · 도구 표준 · **게이트+기록**(미작성이면 보고·changelog·백로그) · **6절 실동작 검증**(운영 DB 금지·개발 DB 허용 범위) |
 | 운영 | [migration.md](../conventions/migration.md) | 번호·멱등성·DDL/DML 분리 · 2단계 배포(API 계약 파괴 포함) · **러너 원칙/도구**(Node 커스텀·JVM Flyway) |
 | 운영 | [docker.md](../conventions/docker.md) | Dockerfile(스택별) · 설정 주입 · **compose 모드 2개·명령 1개** · DB 위치·접속 매트릭스 · 태깅/롤백/CD · 프록시 · **7-2절 한 호스트 공존** |
 | 운영 | [ops.md](../conventions/ops.md) | 환경 분리·시크릿 · 배포 원칙 · 로깅 · 장애 대응 · **보안 체크리스트** · 백업/복구 리허설 · 모니터링 · 호스트 관리 |
@@ -214,7 +219,7 @@ doc-claude 규칙의 프로젝트 import용 축약판 — 템플릿 준수, 추�
 | 구성 | 역할 |
 |---|---|
 | [profiles/project-default.md](../profiles/project-default.md) | **사내 표준 프로필** — 결정 항목의 기본 답안. 매번 묻는 것은 **[확인] 4개**(프로젝트명·목적 / 인증 소스 / 사내 API 연동 / 특수 요구)뿐이고 나머지는 [고정]으로 적용한다. 프로젝트마다 같은 예외를 반복하면 프로필을 고친다 |
-| [scaffolds/default.md](../scaffolds/default.md) | 절차(확인 → 생성 → `.env` 자동 생성 → git init → 보고) · **시작 결정 체크리스트 23항목**(프로필의 근거이자 미적용 시 전체 목록) · 기본/모노레포 구조 · 기초 테이블 · 스택별 조정표 · **린트 강제** · 초기 파일 전문(README·CLAUDE.md·.env.example·test.yml·release.yml) |
+| [scaffolds/default.md](../scaffolds/default.md) | 절차(확인 → 생성 → `.env` 자동 생성 → git init → 보고) · **시작 결정 체크리스트 25항목**(프로필의 근거이자 미적용 시 전체 목록) · 기본/모노레포 구조 · 기초 테이블 · 스택별 조정표 · **린트 강제** · 초기 파일 전문(README·CLAUDE.md·.env.example·test.yml·release.yml) |
 | [scaffolds/templates/](../scaffolds/templates/) | **실물 파일 템플릿** — docker-compose 3종(base/dev/deploy) · nginx-proxy.conf · Caddyfile · nginx.conf · ESLint 설정 4종(client/server × TS/JS). docker.md 규칙(`${VAR:?}` 폴백 금지 · base 최소 · migrate/batch는 `profiles: tools`)이 이미 반영돼 있어 즉흥 작성을 금지한다. 검증: `scripts/verify-templates.ps1`(Windows)·`scripts/verify-templates.sh`(Mac/Linux) (임시 폴더에 조립 후 두 모드의 `docker compose config` 실행) · `scripts/check-refs.mjs` (문서 간 절 참조 무결성 — 2026-07-17 신설, **CI가 push/PR마다 자동 실행** — 2026-07-22) |
 
 - 주의: 파일 있는 폴더에 생성 금지, 요청 없는 샘플 코드 금지(단, CLI 데모 잔재 제거는 필수), 백로그는 첫 발견 시점에 생성.
