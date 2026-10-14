@@ -38,7 +38,7 @@
 | 15 | **외부 노출·도메인·프록시 — 반드시 묻는다**: ①서버가 인터넷에서 접근 가능한가 ②도메인 유무 ③프록시 선택(nginx / Caddy) | 사내망 전용 — **nginx-unprivileged 프록시**(HTTP, non-root). **외부 노출 + 도메인이면 Caddy 권장**(자동 HTTPS — ACME 검증은 인터넷에서 80 도달 가능할 때만 동작). 외부 노출인데 nginx를 택하면 certbot 갱신 운영을 CLAUDE.md에 기록 | docker.md 7절 |
 | 16 | GitHub 원격/CI 사용 여부 | 사용 (test.yml + release.yml 생성) | 아래 CI 절 |
 | 17 | **가동 모니터링/알림 구현 여부 — 반드시 묻는다**: (a) 사내 인프라팀 위임 / (b) 자체 구축(Uptime Kuma) | (a) 인프라팀 위임 — 헬스 URL·연락처 전달, CLAUDE.md 기록 | ops.md 7절 |
-| 18 | **사내 API서버 연동 여부** — 있으면 대상·주소(env 키)·인증 방식·담당 창구를 CLAUDE.md에 기록 | 미연동 (연동 시 `external/` 계층 + `INTERNAL_API_URL` 추가) | integration.md |
+| 18 | **사내 API서버 연동 여부** — 있으면 대상·주소(env 키)·인증 방식·담당 창구를 CLAUDE.md에 기록. **쓰기 연동이 있으면 outbox**(`07_outbox.sql` + relay 워커) + 수신 측 멱등 방식 기록 | 미연동 (연동 시 `external/` 계층 + `INTERNAL_API_URL` 추가) | integration.md 4절 / features/outbox.md |
 | 19 | **인증 소스 — 반드시 묻는다**: (a) 자체 로그인 / (b) 사내 인증 위임 / (c) SSO(OIDC·SAML) | (a) 자체 로그인 — 표준 스키마 그대로. (b)(c)는 user 테이블 조정(`password_hash` 제거 + `external_user_key`) + 계정 프로비저닝(JIT/사전등록) 결정 필요. **(b)는 잠금 컬럼 유지 + 시도 제한 구현**(우리가 ID/PW를 받는다), (c)는 잠금 컬럼도 제거 | auth.md 0·1절 |
 | 20 | **정기 배치 작업 필요 여부** (집계·사내 API 동기화·알림 발송·정리) | 없음 (필요하면 `06_batch_history.sql` 포함 + 첫 배치 구현 전에 실행 방식을 사용자에게 제안·확정) | batch.md 0·1절 |
 | 21 | **테스트 DB 사용 여부** — 있으면 실제 DB로 서비스·쿼리 검증(동시성·제약까지), 없으면 쿼리 목킹 | (a) 사용 — compose에 `db-test` + CI에도 구성 | testing.md 0절 |
@@ -101,7 +101,7 @@
 ## 기초 테이블 (DB 사용 프로젝트)
 
 - `~/.claude/jyp/schemas/`의 표준 스키마(schema_migrations / 인증·권한 / 공통코드 / 파일 메타 / 감사 로그 / company)를 `migrations/001_core_tables.sql`(DDL이므로 필요 시 분할)로 복사해 첫 마이그레이션으로 삼는다.
-- 프로젝트 요구에 맞게 조정한다: **멀티테넌트면 `05_company.sql` 포함 + 전 업무 테이블에 스코프 컬럼**(database.md 3절), 불필요한 테이블(예: 파일 업로드 없는 프로젝트의 files)은 제외. **다국어면 코드성 테이블에 `_i18n` 번역 테이블 동반 + `user`에 `locale VARCHAR(10) NULL` 추가** (i18n.md 3·4절 — 사용자 선호 locale은 fallback 사슬의 첫 층이다. 법인 기본값 `company.locale`은 05_company.sql에 이미 있다). **인증 소스가 위임·SSO면(체크리스트 19) user 테이블 조정** — `password_hash` 제거 + `external_user_key` 추가. **위임(b)은 잠금 컬럼(`failed_login_count`·`locked_at`) 유지, SSO(c)는 함께 제거** (auth.md 0절). **정기 배치가 있으면(체크리스트 20) `06_batch_history.sql` 포함** (batch.md 3절).
+- 프로젝트 요구에 맞게 조정한다: **멀티테넌트면 `05_company.sql` 포함 + 전 업무 테이블에 스코프 컬럼**(database.md 3절), 불필요한 테이블(예: 파일 업로드 없는 프로젝트의 files)은 제외. **다국어면 코드성 테이블에 `_i18n` 번역 테이블 동반 + `user`에 `locale VARCHAR(10) NULL` 추가** (i18n.md 3·4절 — 사용자 선호 locale은 fallback 사슬의 첫 층이다. 법인 기본값 `company.locale`은 05_company.sql에 이미 있다). **인증 소스가 위임·SSO면(체크리스트 19) user 테이블 조정** — `password_hash` 제거 + `external_user_key` 추가. **위임(b)은 잠금 컬럼(`failed_login_count`·`locked_at`) 유지, SSO(c)는 함께 제거** (auth.md 0절). **정기 배치가 있으면(체크리스트 20) `06_batch_history.sql` 포함** (batch.md 3절). **쓰기 연동이 있으면(체크리스트 18) `07_outbox.sql` 포함** (features/outbox.md 3절).
 - JVM(Flyway) 채택 시 `00_schema_migrations.sql`은 복사하지 않고, 파일명은 Flyway 규약(`V001__core_tables.sql`)을 따른다 (migration.md 5절).
 - 초기 관리자 계정·기본 역할(ADMIN 등) 시드는 별도 마이그레이션 파일로, `NOT EXISTS` 가드와 함께.
 

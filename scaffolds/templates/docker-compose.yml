@@ -35,6 +35,7 @@ services:
       # 사내 API 연동 프로젝트만 (integration.md 3절)
       INTERNAL_API_URL: ${INTERNAL_API_URL:-}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
+    stop_grace_period: 30s               # 앱 종료 대기(20초)보다 길게 — 짧으면 정리 도중 SIGKILL (features/graceful-shutdown.md 2절)
     depends_on:
       db:
         condition: service_healthy
