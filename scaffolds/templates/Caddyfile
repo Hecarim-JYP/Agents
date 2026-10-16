@@ -11,6 +11,18 @@
 
 {$SITE_ADDRESS}
 
+# 보안 헤더 — 화면·API·파일 응답 전부 (features/security-headers.md 3-1절)
+header {
+	X-Content-Type-Options "nosniff"
+	Referrer-Policy "strict-origin-when-cross-origin"
+	X-Frame-Options "DENY"
+	# HTTPS일 때만 효력 — HTTP 응답의 HSTS는 브라우저가 무시한다(RFC 6797 8.1절). includeSubDomains는 붙이지 않는다(security-headers.md 2절)
+	Strict-Transport-Security "max-age=31536000"
+	-Server
+	# CSP — 대외 필수. 켠 뒤 배포 화면에서 콘솔 위반 0건 확인 (security-headers.md 3-2절)
+	# Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+}
+
 handle /api/* {
 	reverse_proxy server:3000
 }
@@ -21,4 +33,28 @@ handle /health {
 
 handle {
 	reverse_proxy client:8080
+}
+
+# 앱·client가 내려가 있는 동안(배포·재시작) — /api는 JSON 503, 화면은 안내 HTML 503 (features/maintenance-mode.md 3-1절)
+# 502·504(프록시가 앱에 못 닿음)만 바꾼다 — 앱이 직접 보낸 에러 봉투는 그대로 통과. /health는 그대로 502(가동 감시가 진짜 장애를 봐야 함)
+# Caddy 2.6은 `handle_errors 502 504` 형식을 지원하지 않는다 — expression 매처로 쓴다 (2026-10-16 실측)
+handle_errors {
+	@api_down {
+		expression `{err.status_code} in [502, 504]`
+		path /api/*
+	}
+	@page_down {
+		expression `{err.status_code} in [502, 504]`
+		not path /api/* /health
+	}
+	handle @api_down {
+		header Content-Type "application/json"
+		header Retry-After "30"
+		respond `{"message":"서비스 점검 중입니다. 잠시 후 다시 시도해 주세요.","error":"SERVICE_UNAVAILABLE"}` 503
+	}
+	handle @page_down {
+		header Content-Type "text/html; charset=utf-8"
+		header Cache-Control "no-store"
+		respond `<!doctype html><meta charset="utf-8"><title>점검 중</title><p>서비스 점검 중입니다. 잠시 후 새로고침해 주세요.</p>` 503
+	}
 }

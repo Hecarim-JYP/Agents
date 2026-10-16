@@ -1,6 +1,6 @@
 # 레시피: 점검 모드·공지 배너·기능 스위치 `[공통]`
 
-> 확정: 2026-10-14 | 테이블: `schemas/13_app_setting.sql` | 템플릿: `scaffolds/templates/nginx-proxy.conf`(앱이 꺼진 동안의 안내) | 짝: cache.md
+> 확정: 2026-10-14 | 테이블: `schemas/13_app_setting.sql` | 템플릿: `scaffolds/templates/nginx-proxy.conf`·`Caddyfile`(앱이 꺼진 동안의 안내) | 짝: cache.md
 > 점검 안내는 **세 층**이다 — 앱이 꺼져 있는 동안은 **프록시**가, 앱은 켜두고 업무만 막을 때는 **앱의 점검 모드**가, 특정 기능만 막을 때는 **기능 스위치**가 한다. 모두 재배포 없이 바꾼다.
 
 ## 1. 언제 쓰나
@@ -49,6 +49,7 @@ location @page_unavailable {
 - `proxy_intercept_errors`는 켜지 않는다 — 켜면 **앱이 직접 보낸 에러 봉투**(400·409·503 `MAINTENANCE`)까지 프록시가 가로챈다. 위 설정은 프록시가 앱에 닿지 못한 경우(502·504)만 바꾼다.
 - `/health`에는 걸지 않는다 — 가동 감시는 진짜 502를 봐야 한다 (ops.md 7절).
 - 실측(2026-10-14, nginx 1.24): 앱 정지 → `/api` JSON 503·화면 HTML 503 / 앱이 보낸 503 JSON → 그대로 전달.
+- **Caddy**는 같은 구성을 `handle_errors` + expression 매처(`{err.status_code} in [502, 504]`)로 한다 — Caddyfile 템플릿에 포함. Caddy 2.6은 `handle_errors 502 504` 형식을 지원하지 않는다 (실측 2026-10-16, Caddy 2.6.2: 템플릿 그대로 앱 정지 → `/api` JSON 503·화면 HTML 503·`/health` 502 / 앱이 보낸 503 → 그대로 전달).
 
 ### 3-2. 앱 점검 모드 — 미들웨어
 
@@ -102,7 +103,7 @@ export async function maintenanceGate(req, res, next) {
 | 설정 조회 | `getSetting(key, 기본값)` — cache.md 3-1절 캐시 + JSON 파싱 실패 시 기본값 | `AppSettingService` + Caffeine |
 | 점검 게이트 | 인증 미들웨어 뒤에 3-2절 미들웨어 | `OncePerRequestFilter` 또는 `HandlerInterceptor` |
 | 기능 스위치 | 해당 라우트 앞 `requireFeature('excel_upload')` | 인터셉터 + 커스텀 어노테이션 |
-| 프록시 | 스캐폴드 nginx 템플릿 (3-1절). Caddy 채택 시 `handle_errors`로 같은 구성이 필요하다(이 레시피에서 미검증) | 동일 |
+| 프록시 | 스캐폴드 nginx·Caddy 템플릿 (3-1절) | 동일 |
 
 ## 6. 검증 포인트
 

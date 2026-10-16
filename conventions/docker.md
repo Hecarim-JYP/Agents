@@ -215,7 +215,7 @@ services:
 | 그 외 | `client:8080` | nginx가 SPA fallback 처리 |
 
 - **개발(로컬)도 동일 출처를 유지한다**: 로컬은 프록시 컨테이너 대신 Vite `server.proxy`로 `/api/*`를 서버로 넘긴다 — 클라이언트 코드는 dev/prod 어디서든 같은 상대 경로(`/api/...`)만 호출하고, CORS 설정 자체가 필요 없어진다. **프록시 대상은 `http://server:3000`(Spring이면 `server:8080`) — compose 서비스명 + 내부 포트 상수**(2절)로, Caddyfile의 `reverse_proxy server:3000`과 같은 규약이다. Vite dev server는 client 컨테이너 안에서 돌므로(4-1절 개발 모드) `localhost`는 client 컨테이너 자신을 가리켜 서버에 닿지 않고, 루트 `.env`는 빌드 컨텍스트 밖이라 `loadEnv`로 읽을 수도 없다 — 서비스명 규약을 쓰면 환경변수 주입 자체가 필요 없다.
-- 사내망 등 HTTPS 불가 환경이면 그 제약을 프로젝트 CLAUDE.md에 기록한다. **브라우저의 HTTP(비보안 컨텍스트) 제약 — 2026-10-14 Chromium 실측으로 정정**: `Secure` 쿠키 저장·전송 안 됨(auth.md 3절), `crypto.randomUUID` 없음(features/idempotency.md 3-3절), `navigator.locks` 없음(features/session-control.md 3-3절). **blob 다운로드는 HTTP에서도 동작한다**(이전 문구의 "blob 다운로드 차단"은 재현되지 않음). localhost는 보안 컨텍스트로 취급되므로 이 제약들은 **개발에선 안 보이고 운영(HTTP)에서만** 드러난다.
+- 사내망 등 HTTPS 불가 환경이면 그 제약을 프로젝트 CLAUDE.md에 기록한다. **브라우저의 HTTP(비보안 컨텍스트) 제약 — 2026-10-14 Chromium 실측으로 정정**: `Secure` 쿠키 저장·전송 안 됨(auth.md 3절), `crypto.randomUUID` 없음(features/idempotency.md 3-3절), `navigator.locks` 없음(features/session-control.md 3-3절), **CSP `upgrade-insecure-requests`(helmet 기본값)가 있으면 JS·CSS를 https로 요청해 빈 화면**(features/security-headers.md 3-3절). **blob 다운로드는 HTTP에서도 동작한다**(이전 문구의 "blob 다운로드 차단"은 재현되지 않음). localhost는 보안 컨텍스트로 취급되므로 이 제약들은 **개발에선 안 보이고 운영(HTTP)에서만** 드러난다.
 
 ## 7-2. 한 호스트에 운영·개발 스택 공존 (2026-07-14 추가)
 
