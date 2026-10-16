@@ -61,8 +61,8 @@
 아래 명령(또는 동등한 자연어)을 요청받으면 **해당 스킬 파일을 읽고 그 절차를 그대로 수행**한다. 절차를 이 문서에 중복 정의하지 않으며, 절차 수정은 스킬 파일에서만 한다.
 - "작업 정리" → `~/.claude/skills/work-log/SKILL.md`
 - "배포 준비" → `~/.claude/skills/deploy-check/SKILL.md`
-- "통합 테스트" → `~/.claude/skills/paper-test/SKILL.md`
-- "실동작 테스트"·"화면 테스트" → `~/.claude/skills/live-test/SKILL.md`
+- "통합 테스트"·"실동작 테스트"·"화면 테스트" → `~/.claude/skills/live-test/SKILL.md` (정적 추적 + 실측 — 실측 불가 환경이면 정적 단계만)
+- "정적 추적"·"페이퍼 테스트" → `~/.claude/skills/paper-test/SKILL.md`
 - "새 프로젝트 세팅" → `~/.claude/skills/new-project/SKILL.md`
 
 ## CLAUDE.md 운영 규칙 (프로젝트 헌법 관리)
