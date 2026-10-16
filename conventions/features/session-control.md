@@ -24,7 +24,7 @@ auth.md의 토큰 체계(access 메모리 + refresh httpOnly 쿠키)를 쓰는 �
 
 | 사건 | 처리 |
 |---|---|
-| 로그인 | `user_session` INSERT(`session_key` UUID, refresh 해시, `expires_at = NOW()+24h`) → access JWT에 `sid`(session_key)·`tv`(token_version) |
+| 로그인 | (2단계 인증 대상이면 코드 통과 후 — mfa.md 3-2절) `user_session` INSERT(`session_key` UUID, refresh 해시, `expires_at = NOW()+24h`) → access JWT에 `sid`(session_key)·`tv`(token_version) |
 | 요청 | JWT 검증 + `tv`가 현재 `user.token_version`과 같은지(캐시 30초) |
 | 갱신 | 3-3절 |
 | 로그아웃 | 해당 세션 `revoked_at`·`LOGOUT` + 쿠키 삭제(**발급 때와 같은 Path**) |

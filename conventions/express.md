@@ -106,9 +106,9 @@ try {
 ## 6. 파일 업로드 (STRICT)
 
 - **저장 파일명은 서버가 생성**(UUID/타임스탬프) — 사용자가 보낸 파일명·경로를 저장 경로에 사용 금지 (근거: 경로 트래버설 공격의 원천 차단). 원본 파일명은 DB 메타에만 보관.
-- 저장 경로는 `uploads/{module}/{type}/` 구조로 서버가 정적으로 결정. 검증: 확장자 화이트리스트 + MIME + 크기 제한.
+- 저장 경로는 `uploads/{module}/{type}/` 구조로 서버가 정적으로 결정. 검증: 확장자 화이트리스트 + MIME + 크기 제한. **MIME은 요청의 `Content-Type`이 아니라 파일 내용(매직 바이트)으로 판정한다** — 둘 다 보낸 사람이 정한 값이다 (2026-10-16 실측: `.png` + `image/png`로 위장한 HTML 통과 — `features/upload-security.md` 3-1절).
 - **파일과 DB 메타는 항상 쌍**: 원본 파일명, 저장 경로, 크기, 소속(module/reference_id), `created_by`를 기록한다 — 어느 하나만 있으면 고아 파일/깨진 링크가 된다. 트랜잭션 롤백 시 저장된 파일도 삭제(4절).
-- 다운로드는 **권한 검사 후** DB에 기록된 경로로만 제공 (요청 파라미터의 경로 사용 금지). 미리보기는 `disposition=inline` 분기.
+- 다운로드는 **권한 검사 후** DB에 기록된 경로로만 제공 (요청 파라미터의 경로 사용 금지). 미리보기는 `disposition=inline` 분기 — **inline은 래스터 이미지만**, 응답에 `nosniff` + CSP `sandbox`를 붙인다. 같은 출처에서 inline으로 열린 SVG는 스크립트가 실행돼 우리 쿠키를 읽는다 (2026-10-16 실측 — `features/upload-security.md` 3-3절).
 - 클라이언트 FormData는 텍스트 필드를 먼저, 파일(`files`)을 마지막에 append — multipart 파서가 필드를 파일보다 먼저 읽어야 하는 제약. 키 케이싱은 서버와 일치.
 - 업로드 폴더는 git 비추적(`.gitignore`), 컨테이너에서는 볼륨(docker.md 4절), 백업 대상(ops.md 6절).
 - **크기 상한은 프록시 > 앱 순서로 맞춘다** — 프록시 상한이 더 작으면 앱에 닿기 전에 nginx가 HTML 413을 돌려줘 화면에 우리 에러 메시지가 안 나온다 (2026-10-14 실측: nginx 기본 1MB → 2MB 업로드 413). 스캐폴드 nginx 템플릿은 20MB, 앱(multer `limits.fileSize`)은 그보다 작게 (multer 기본은 무제한).

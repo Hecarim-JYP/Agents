@@ -53,7 +53,7 @@
 ## 7. 아이콘·폰트
 
 - 아이콘: **lucide-react** 표준 (shadcn 기본 짝). 프로젝트 내 아이콘 라이브러리 혼용 금지.
-- 폰트: 한글 UI는 **Pretendard**(또는 시스템 폰트 스택) 기본. 프로젝트 시작 시 확정해 CLAUDE.md에 기록.
+- 폰트: 한글 UI는 **Pretendard**(또는 시스템 폰트 스택) 기본. 프로젝트 시작 시 확정해 CLAUDE.md에 기록. 로드는 npm 패키지 번들을 기본으로 한다 — CDN에서 받으면 CSP에 그 출처를 추가해야 한다 (features/security-headers.md 3-2절).
 
 ## 8. 셋업 레시피 (Vite React — 스캐폴드가 수행)
 

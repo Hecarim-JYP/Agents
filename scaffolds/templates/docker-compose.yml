@@ -39,6 +39,9 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:?COOKIE_SECURE 미설정}
       # 알림 메일 링크의 기준 주소 — 알림 메일 프로젝트만 (features/notification.md 3-3절)
       APP_BASE_URL: ${APP_BASE_URL:-}
+      # 인증 코드 HMAC 키 / 2단계 인증 비밀 암호화 키 — 해당 기능 프로젝트만 (features/account-lifecycle.md 3-4절, mfa.md 3-4절)
+      TOKEN_HMAC_KEY: ${TOKEN_HMAC_KEY:-}
+      MFA_ENC_KEY: ${MFA_ENC_KEY:-}
     stop_grace_period: 30s               # 앱 종료 대기(20초)보다 길게 — 짧으면 정리 도중 SIGKILL (features/graceful-shutdown.md 2절)
     depends_on:
       db:
