@@ -89,7 +89,7 @@ export const mask = {
 | 엑셀 다운로드 | `DOWNLOAD` | 추출 행의 ID(최대 1,000개까지 목록, 그 이상은 `subject_count`만) + 사유 |
 | 등록·수정·삭제 | `CREATE`·`UPDATE`·`DELETE` | 1건 |
 
-- IP는 **프록시 뒤 실제 클라이언트 IP** — Express `app.set('trust proxy', 1)` / Spring `server.forward-headers-strategy` (docker.md 7절). 설정이 없으면 모든 기록의 IP가 프록시 주소가 된다.
+- IP는 **프록시 뒤 실제 클라이언트 IP** — Express `app.set('trust proxy', 1)` / Spring `server.forward-headers-strategy` (docker.md 7절). 설정이 없으면 모든 기록의 IP가 프록시 주소가 된다. 프록시가 `X-Forwarded-For`를 덮어써야 위조 IP가 기록되지 않는다 (rate-limit.md 3-1절).
 - 개인정보를 담은 응답을 **보내기 전에** 기록하고, 기록이 실패하면 500으로 끝낸다(2절).
 
 ### 3-4. 위·변조 방지 — 별도 DB + 권한

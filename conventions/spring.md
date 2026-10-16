@@ -145,4 +145,4 @@ checkstyle {
 
 - ⚠ **줄바꿈 (Windows 함정, 2026-07-14 실측)**: Spotless의 기본 정책은 `GIT_ATTRIBUTES`라 **`.gitattributes`가 없으면 OS 기본(Windows=CRLF)을 기대**해, LF로 작성한 정상 코드가 `spotlessCheck`에서 실패한다. 저장소에 **`.gitattributes`(`* text=auto eol=lf`)를 두거나** 위처럼 `lineEndings = 'UNIX'`를 명시한다 (둘 다 두는 것을 권장).
 - 포맷 위반은 `./gradlew spotlessApply`로 자동 수정한다 — 검사(`spotlessCheck`)는 CI·훅이 돌린다.
-- 리버스 프록시 뒤에서는 `server.forward-headers-strategy: framework` 설정 — Express `trust proxy`의 대응 (docker.md 7절).
+- 리버스 프록시 뒤에서는 `server.forward-headers-strategy: native` 설정 — Express `trust proxy`의 대응 (docker.md 7절). **`framework`(ForwardedHeaderFilter)는 `X-Forwarded-For`의 맨 왼쪽 값, 즉 클라이언트가 보낸 값을 클라이언트 IP로 쓴다** (spring-web 6.2 소스 확인, 2026-10-16 정정). `native`(Tomcat RemoteIpValve)도 사설 대역 IP를 프록시로 보고 건너뛰므로, 어느 쪽이든 **프록시가 `X-Forwarded-For`를 덮어쓰는 것이 전제**다 (features/rate-limit.md 3-1절).

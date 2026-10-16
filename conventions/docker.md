@@ -203,7 +203,7 @@ services:
 
 - 어느 프록시든 구성 형태는 동일하다 — 라우팅 규약(아래 표)이 같고 정적 서빙은 client 담당(2-3절). 프록시 교체(예: 외부 노출 전환으로 nginx→Caddy)가 proxy 서비스·설정 파일 교체로 끝나도록 다른 곳에 주소를 하드코딩하지 않는다. 서버 1대 = 프로젝트 1개 전제 덕에 도메인이 없어도 포트 구분(8100번대 블록 등)은 필요 없다 — HTTP 포트 하나면 된다.
 - **DB 포트 노출 정책**: 운영서버는 DB 포트를 호스트에 노출하지 않는다(관리 접속은 SSH 터널). 개발서버는 노출하되 사내망/VPN 범위로 제한. 로컬은 자유(4-3절).
-- HTTPS 종단은 프록시에서 처리하고 앱은 내부 HTTP로 받는다 — Express는 `app.set('trust proxy', 1)`로 `X-Forwarded-*`를 신뢰 설정해야 클라이언트 IP·프로토콜 판별이 정상 동작한다.
+- HTTPS 종단은 프록시에서 처리하고 앱은 내부 HTTP로 받는다 — Express는 `app.set('trust proxy', 1)`로 `X-Forwarded-*`를 신뢰 설정해야 클라이언트 IP·프로토콜 판별이 정상 동작한다. **값은 `true`가 아니라 `1`** — `true`면 클라이언트가 보낸 `X-Forwarded-For`를 그대로 믿는다. 프록시는 `X-Forwarded-For`를 이어 붙이지 않고 접속 IP로 덮어쓴다(nginx 템플릿 `$remote_addr`, Caddy 기본 동작) — 이어 붙이면 Spring이 위조 IP를 채택한다 (2026-10-16 실측·원문 소스 — `features/rate-limit.md` 3-1절).
 - **역할 분담 (2026-07-14 확정)**: **프록시 = HTTPS 종단 + 라우팅만**, **정적 서빙 = client(nginx) 컨테이너**(2-3절). 프록시가 같은 출처에서 `/api/*`는 server로, 그 외는 client로 넘기므로 CORS가 원천 해소된다.
 - **프록시 서비스와 그 설정 파일은 스캐폴드 기본 구성이다 (STRICT)** — 없으면 배포 모드 기동 시 외부 접근 경로가 아예 없다 (근거: 규칙만 있고 스캐폴드에 프록시가 빠져 배포 기동에서 접근 불가·CORS 차단이 발생한 사례).
 - 템플릿: **`~/.claude/jyp/scaffolds/templates/nginx-proxy.conf`**(기본) / **`Caddyfile`**(Caddy 채택 시) — compose 3종도 같은 폴더. 라우팅 규약(두 템플릿 동일):

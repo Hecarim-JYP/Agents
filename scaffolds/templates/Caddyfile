@@ -2,6 +2,8 @@
 # HTTPS 종단 + 라우팅만 담당한다. 사내망 전용 기본은 nginx-proxy.conf.
 # 정적 파일은 client(nginx) 컨테이너가 서빙한다 — 2026-07-14 확정.
 # SITE_ADDRESS: 도메인이면 자동 HTTPS, 사내 도메인 미확보면 ":80" (체크리스트 15)
+# X-Forwarded-For: Caddy는 기본으로 클라이언트가 보낸 값을 버리고 접속 IP로 새로 쓴다 — 별도 설정 불필요
+#   (features/rate-limit.md 3-1절, 2026-10-16 Caddy 2.6.2 실측)
 #
 # 아래는 Node/Express(내부 포트 3000) 기준. Spring Boot면 두 곳을 바꾼다 (2026-07-14 검증):
 #   - reverse_proxy server:8080
