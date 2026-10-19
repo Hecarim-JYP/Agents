@@ -210,3 +210,95 @@ JWT 서명 키를 .env.example·compose에 연결 + 운영 기능 카탈로그 4
 ■ nginx 템플릿 IPv6 리슨 제거
 - listen [::]:8080 → IPv6를 끈 호스트에서 nginx 기동 실패(실측), 기본 구성에서 이득 없음 → IPv4만 (docker.md 2-3절 STRICT)
 ```
+
+---
+---
+
+# 3부 — 전체 검증 (스택 버전·스캐폴드·훅·템플릿)
+
+> 사용자 요청: "전체 검증 한 번 돌려봐 — 어제 new project 해봤는데 스프링 버전 3 얘기하던데 전부 다 확인해봐".
+> 방법: 문서·템플릿의 버전 표기를 **Maven Central·npm·Docker Hub의 현행과 대조**하고, **최신 버전으로 실제 프로젝트를 만들어** 문서 코드·템플릿·훅을 그대로 돌렸다. 핵심: **① "Spring 3"의 원인 — Spring 빌드 템플릿 부재 ② 스캐폴드가 지금 그대로는 깨진다(ESLint 설치 ERESOLVE) ③ 순환 의존 린트와 훅 타입 검사가 조용히 무력이었다**
+
+## 12. "Spring 3"의 원인과 정정 (fix)
+
+- 해당 세션 기록은 이 환경에서 볼 수 없어 원인은 재현으로 좁혔다. `spring.md`는 이미 Boot 4.x를 명시하지만 **스캐폴드가 Initializr 산출물에만 의존하고 대체 경로가 없었다** — Initializr에 접근하지 못하면 `build.gradle`을 기억(학습 데이터 기본값 = Boot 3.x)으로 쓰게 된다(이 환경도 start.spring.io가 차단). 문서에도 3.x 시절 문구가 남아 있었다.
+- 사실 확인(Maven Central, 2026-10-19): **Boot 3.x의 마지막 OSS 릴리스는 3.5.16(2026-06-25)**, 현행 4.0.8·4.1.1(2026-08-20), 4.2.0-M2. Boot 4 = Framework 7.0.9 · Security 7.1 · Jackson 3.1 · JUnit 6.0 · Hibernate 7.4 · Tomcat 11.
+
+| 항목 | 기존 | 변경 (근거) |
+|---|---|---|
+| 빌드 파일 | Initializr 산출물만 | **`scaffolds/templates/build.gradle`·`checkstyle.xml` 신설** — Boot 4.1.1·Gradle 9.8.2 실빌드 검증, Initializr를 못 쓸 때 이걸로 시작하고 버전을 최신 GA로 갱신. spring.md 0절에 **"Boot 3.x로 시작하지 않는다(STRICT)"** |
+| `@MockBean` (testing·integration) | 안내 | **`@MockitoBean`** — Boot 4에서 `@MockBean`은 제거(실측: 패키지 없음 컴파일 오류) |
+| JUnit 5 (spring·testing·scaffold·profile) | 표기 | JUnit Jupiter(Boot 4 관리 — 6.x), `@WebMvcTest`는 `spring-boot-starter-webmvc-test` |
+| jsr310 모듈 | "기본" | Jackson 3 내장 — 따로 넣지 않는다(실측: `LocalDate` ISO 직렬화) |
+| MyBatis | "Boot 4.0.x 고정(4.1 미지원)" | **해제** — 스타터 4.1.0이 2026-07-16 출시, Boot 4.1.1에서 전체 기동·실DB 조회(실측). 스타터 대응 버전을 맞춘다 |
+| QueryDSL | 좌표 없음 | 원 저장소 5.1.0(2024-01) 이후 출시 없음 → 포크 `io.github.openfeign.querydsl` 7.x (실측: Boot 4.1.1·Hibernate 7.4 조회 정상) |
+| Spotless 6.25.0 / Checkstyle 10.17.0 | spring.md에 고정 | 템플릿으로 이동 — 8.10.4(6.25.0은 Gradle 11에서 제거될 API 경고)·14.3.0 |
+| "Checkstyle이 순환 의존 검사" | spring.md 7절 | **틀린 기술** — Checkstyle에 그런 검사가 없다. ArchUnit `ArchitectureTest` 추가(실측: 순환 → `check` 실패) |
+| 예외 처리 예시 (spring.md 4절) | NotFound + Exception 핸들러 | **버전 무관 결함** — 그대로 쓰면 검증 실패·깨진 JSON이 500. 검증 400(snake_case `field`)·본문 400·업로드 413·프레임워크 예외는 자기 상태(404·405) 코드로 교체(실측) |
+
+## 13. Boot 4에서 그대로인 것 (실측 2026-10-19, Boot 4.1.1 · Gradle 9.8.2 · Java 21)
+
+snake_case 전역 설정·`@JsonInclude(NON_NULL)` / 요청 ID 필터·MDC / 커밋 후 리스너 + `REQUIRES_NEW` 정상 기동, 기본 전파면 `IllegalStateException`으로 기동 실패(Framework 7.0.9) / `server.shutdown` 미지정이어도 graceful / `forward-headers-strategy` framework = XFF 맨 왼쪽(위조 가능)·native = 마지막 공인 IP / `@MockBean` 컴파일 오류 — 각 레시피에 Boot 4 재확인을 병기했다.
+
+## 14. Node 최신 메이저 재검증 (실측 2026-10-19)
+
+레시피 실측은 Express 4.22·express-rate-limit 7.5·nodemailer 6.10 등으로 했지만 **지금 `npm i`는 Express 5.3·express-rate-limit 8.7·zod 4.6·multer 2.4·nodemailer 10.1·mailauth 8.0·file-type 22·pino 10·bcrypt 6·redis 6·rate-limit-redis 6·vitest 5를 설치한다.** 레시피 코드를 그대로 돌린 결과 **모두 문서대로** 동작했다: 본문 파싱 400·용량 413(`err.type` 값 동일)·zod 4 `issues`·로그인 한도 429·Redis 저장소 한도·웹훅 파서 순서·DKIM/SPF/DMARC 6개 상황·원클릭 헤더 서명 범위(nodemailer 10도 기본 서명에서 `List-Unsubscribe-Post` 누락)·`fileTypeFromBuffer`·pino `mixin`·bcrypt `'!'` 해시·sharp 픽셀 상한·autocannon 결과 필드·Express 5 라우트 템플릿/`req.baseUrl`/trust proxy. 차이 하나 — **Express 5는 async 예외를 `asyncHandler` 없이도 errorHandler로 넘긴다**(express.md·error-alert.md에 병기).
+
+## 15. 스캐폴드 결함 (실측) — 지금 그대로는 새 프로젝트가 깨진다
+
+| 결함 | 증상 | 처방 |
+|---|---|---|
+| **ESLint 설치 ERESOLVE** | 최신 Vite 템플릿(create-vite 9.3)이 **TypeScript ~7.0**을 넣는데 typescript-eslint 8.72는 `typescript <6.1.0` — 스캐폴드 절차의 `npm i -D …`가 실패 | TS 프로젝트는 `typescript@~6.0.3` 먼저 고정(default.md 린트 절·템플릿 헤더). 고정 후 설치·`npm run build`·린트 통과 |
+| **`import/no-cycle` 무력** | TS 템플릿 2종에서 순환을 **0건** 검출(파서·리졸버 설정 없음), JS 클라이언트는 `@/` 별칭 순환 누락. 2026-07-17 검증의 "client 7건 전부 검출"은 규칙 8개 중 순환을 뺀 7개였다 | 템플릿 4종에 `import/parsers` + `eslint-import-resolver-typescript` — 상대경로·별칭 순환 모두 검출, 오탐 없음, 나머지 규칙 전부 재검출 |
+| **훅 타입 검사 무력** | Vite의 루트 `tsconfig.json`은 `files: []` + `references` — 훅의 `tsc --noEmit`이 **아무 파일도 검사하지 않아** 타입 오류가 exit 0 | `post-edit-check.mjs`: 참조형이면 `tsc -b --noEmit` — 타입 오류 exit 2, 정상 exit 0(참조형·단일 tsconfig 모두) |
+| `baseUrl` 안내 (design.md 8절) | TypeScript 6에서 `error TS5101`로 `tsc -b` 실패 | `paths`만 — 별칭·린트 리졸버 그대로 동작(실측) |
+| Vite 템플릿의 oxlint | `"lint": "oxlint"`가 기본 — ESLint 템플릿과 이중 | 스캐폴드가 oxlint 제거 + `lint`를 ESLint로 |
+| Stop 훅 Gradle 피드백 | `--quiet`라 실패 테스트 이름 없이 "보고서를 보라"만 | 템플릿 `testLogging`(quiet 수준 포함) — `FailTest > fails() FAILED` + 단언 내용이 피드백에 나온다 |
+
+## 16. 이미지 태그
+
+| 템플릿 | 기존 | 변경 (근거) |
+|---|---|---|
+| nginx (정적 Dockerfile·프록시) | `nginx-unprivileged:1.27-alpine` | **1.30-alpine** — 1.27 태그는 2025-06-23 이후 갱신 없음(보안 패치 없음). 1.30.6에서 템플릿 2종 재검증: 문법·SPA fallback·gzip(25,892→1,082B)·XFF 덮어쓰기·보안 헤더·앱 정지 503·재기동 후 재해석. 기본값(gzip 꺼짐·UID 101·wget) 동일 |
+| Flyway (deploy migrate) | `flyway/flyway:10` | **12** — 10은 MariaDB 11.4를 "지원 검증 안 된 버전(최신 지원 11.2)"으로 경고, 12.11은 경고 없이 적용(실측) |
+| 유지 | `node:22-slim`·`mariadb:11.4`·`eclipse-temurin:21`·`caddy:2-alpine` | 모두 이번 주 갱신 중(지원 계열) |
+
+**변경 파일**: `scaffolds/templates/build.gradle`(신규)·`checkstyle.xml`(신규)·`eslint.config.*.mjs` 4종·`docker-compose.deploy.yml`, `hooks/post-edit-check.mjs`, `scaffolds/default.md`, `profiles/project-default.md`, `conventions/spring.md`·`testing.md`·`integration.md`·`express.md`·`design.md`·`docker.md`, `features/error-pages.md`·`error-alert.md`·`domain-event.md`·`graceful-shutdown.md`·`static-assets.md`·`multi-instance.md`·`upload-security.md`·`load-test.md`, `docs/OVERVIEW.md`(1.10), `CLAUDE.md`(검증 규칙 3줄)
+
+## 검증 (3부)
+
+| 항목 | 결과 |
+|---|---|
+| Spring 템플릿 그대로 새 프로젝트 `./gradlew check` | 정상 코드 통과 / 패키지 순환 추가 → ArchUnit 실패 / Checkstyle 위반 3종 검출 |
+| 훅 (실제 프로젝트에 JSON stdin, BOM 없음) | Node 수정: 정상 0·린트 위반 2·타입 오류 2 / Java 수정: 정상 0·포맷 위반 2·컴파일 오류 2 / Stop: 통과 0·실패 2(Vitest·Gradle 모두 실패 테스트 이름 포함)·마커 없음 0 |
+| ESLint 템플릿 4종 | 규칙별 위반 검출 + 정상 코드 오탐 없음 (최신 Vite TS·JS 앱, Node TS·JS) |
+| 참조 검사 | `check-refs.mjs` 통과(문서 64개/참조 567건), 확장(73개/584건) 통과 |
+| compose 템플릿 | `verify-templates.sh` 통과 |
+| 스키마 26종 | 새 DB에 전부 — MariaDB 10.11·MySQL 8.0.46 모두 39개 테이블, 오류 0 |
+| 인코딩 | `install.ps1` BOM 있음, `verify-templates.ps1` BOM + CRLF, 변경 파일 BOM·CRLF 없음 |
+| `install.sh` 임시 HOME | 새 템플릿 2종·고친 훅 설치, 설치본 = 저장소, 훅 등록 |
+| **실측 못 한 것** | `shadcn init`(레지스트리 ui.shadcn.com 차단) · start.spring.io 직접 생성(차단 — 템플릿으로 대체 검증) · Spring Docker 이미지 빌드(빌드 컨테이너에 네트워크 없음) · Next.js · `install.ps1`·`verify-templates.ps1` 실행(PowerShell 없음) · 사용자의 해당 세션 기록 |
+| 환경 | 이 세션 컨테이너가 중간에 재시작되며 로컬 MariaDB 데이터 파일이 사라져 테스트 DB를 새 데이터 디렉터리로 다시 만들었다(측정 대상과 무관) |
+
+---
+
+## 커밋 코멘트 (3부)
+
+```
+@@ 2026-10-19 (3부) @@
+전체 검증 — Spring 빌드 템플릿 신설(Boot 3 유입 차단) + 스캐폴드 깨짐 3건 정정 + 낡은 버전 고정값 갱신
+
+■ Spring (Boot 4.1.1 · Gradle 9.8.2 실빌드)
+- templates/build.gradle·checkstyle.xml 신설 — Initializr를 못 쓰면 기억(Boot 3.x) 대신 이걸로
+- @MockBean → @MockitoBean, JUnit 6, Jackson 3, MyBatis 4.0.x 고정 해제, QueryDSL 포크
+- 예외 처리 예시: 검증·본문 오류가 500이던 결함 정정, Checkstyle 순환 검사 오기술 → ArchUnit
+
+■ 스캐폴드 (최신 Vite·npm 그대로 재현)
+- TypeScript 7 → ESLint 설치 ERESOLVE: TS 6.0 고정
+- import/no-cycle가 TS에서 0건: 파서·리졸버 설정 / 훅 타입 검사 무력: 참조형 tsconfig는 tsc -b
+- baseUrl(TS5101) 안내 제거, Vite oxlint 제거 안내, Gradle 실패 테스트 로그
+
+■ 이미지: nginx 1.27 → 1.30, Flyway 10 → 12 (실기동 재검증)
+■ Node 최신 메이저(Express 5·zod 4·nodemailer 10 등)에서 레시피 코드 재검증 — 전부 문서대로
+```
+
