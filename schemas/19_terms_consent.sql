@@ -13,7 +13,7 @@
 
 CREATE TABLE IF NOT EXISTS terms_document (
     terms_document_id  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    terms_type         VARCHAR(30)  NOT NULL,          -- TERMS_OF_SERVICE / PRIVACY_COLLECT / PRIVACY_OPTIONAL / MARKETING / THIRD_PARTY 등
+    terms_type         VARCHAR(30)  NOT NULL,          -- TERMS_OF_SERVICE / PRIVACY_COLLECT / PRIVACY_OPTIONAL / MARKETING_{EMAIL|SMS|PUSH|NIGHT} / THIRD_PARTY 등
     version            VARCHAR(20)  NOT NULL,          -- 예: 2026-10-19
     is_required        TINYINT(1)   NOT NULL,          -- 필수 동의(서비스 이용 조건)인지 — 선택 항목 미동의로 서비스를 거부하지 않는다
     title              VARCHAR(200) NOT NULL,
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS user_consent (
     terms_document_id  BIGINT UNSIGNED NOT NULL,       -- 동의한 문서 버전
     terms_type         VARCHAR(30)  NOT NULL,          -- 최신 상태 조회용 (terms_document와 같은 값)
     agreed             TINYINT(1)   NOT NULL,          -- 1 동의 / 0 거부·철회
-    channel            VARCHAR(20)  NOT NULL,          -- SIGNUP / SETTINGS / RECONSENT
+    channel            VARCHAR(20)  NOT NULL,          -- SIGNUP / SETTINGS / RECONSENT / UNSUBSCRIBE(수신거부 링크 — marketing-message.md)
     ip_address         VARCHAR(45)  NULL,              -- 프록시 뒤 실제 IP (rate-limit.md 3-1절)
     user_agent         VARCHAR(300) NULL,
     created_at         DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),   -- 같은 초 안의 동의·철회 순서 보존
