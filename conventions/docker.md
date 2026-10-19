@@ -93,7 +93,7 @@ HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:8080/ >/d
 
 - ⚠ **베이스가 `nginx-unprivileged`인 이유는 2절 non-root STRICT다** — 공식 `nginx` 이미지는 80을 열기 위해 마스터를 root로 띄우고, 리눅스는 1024 미만 포트를 root에게만 허용하므로 **non-root와 80은 양립할 수 없다**. 그래서 정적 컨테이너의 내부 포트는 8080이다(2절 포트 상수). `USER 101`은 베이스에 이미 설정돼 있지만 명시한다 — 이름(`nginx`)이 아니라 숫자 UID로 쓰는 이유는 K8s의 `runAsNonRoot` 같은 검사가 이름을 해석하지 못해 root로 간주하기 때문이다.
 - nginx.conf에는 **SPA fallback(`try_files ... /index.html`)을 반드시 포함**한다 — 없으면 새로고침·딥링크가 404가 된다. 템플릿: `~/.claude/jyp/scaffolds/templates/nginx.conf`.
-- nginx.conf 템플릿은 `listen [::]:8080`도 함께 둔다 — IPv6로 들어오는 접속까지 받기 위함이다. 헬스체크는 2절 규칙대로 `127.0.0.1`로 고정하므로 이 설정에 의존하지 않는다 (두 처방은 목적이 다르다: 주소 고정은 헬스체크의 결정성, `[::]` 리슨은 트래픽 수용).
+- **nginx 템플릿(nginx.conf·nginx-proxy.conf)은 `listen 8080`(IPv4)만 둔다 — `listen [::]:8080`을 넣지 않는다 (STRICT, 2026-10-19 확정)**. 근거: 커널에서 IPv6를 끈 호스트(`ipv6.disable=1`)에서는 `socket() [::]:8080 failed (97: Address family not supported by protocol)`로 **nginx가 기동하지 못해 서비스 전체가 내려간다**(실측). 반면 이득은 없다 — 기본 compose 네트워크는 IPv6가 꺼져 있고, 프록시 DNS는 `ipv6=off`, 호스트 공개 포트는 IPv6 사용자의 요청도 컨테이너 IPv4로 넘기며, 헬스체크는 2절 규칙대로 `127.0.0.1`로 고정이라 리슨 설정에 의존하지 않는다. compose 네트워크에 IPv6를 켜서 IPv6로 직접 받는 구성을 택할 때만 그 프로젝트에서 추가하고 CLAUDE.md에 기록한다.
 
 ## 3. 설정 주입 (STRICT)
 
