@@ -33,7 +33,7 @@ src/main/resources/
 ```
 
 - 흐름은 단방향(controller → service → repository — patterns.md 1절). 네이밍: `{Module}Controller` / `{Module}Service` / 데이터 접근은 방식에 따라 `{Module}Repository`(JdbcClient/JPA) 또는 `{Module}Mapper`(MyBatis).
-- 프로파일: `application.yml`(공통) + `application-dev.yml`/`application-prod.yml`. 시크릿은 yml에 쓰지 않고 환경변수 참조(`${DB_PASSWORD}`)로만 — 하드코딩 폴백(`${DB_PASSWORD:1234}`) 금지 (patterns.md 4절).
+- 프로파일: `application.yml`(공통) + `application-dev.yml`/`application-prod.yml`. 시크릿은 yml에 쓰지 않고 환경변수 참조(`${DB_PASSWORD}`, JWT 서명 키는 `${JWT_SECRET}`)로만 — 하드코딩 폴백(`${DB_PASSWORD:1234}`) 금지 (patterns.md 4절).
 
 ## 2. Controller — 봉투 구현 (MANDATORY)
 

@@ -37,6 +37,8 @@ services:
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
       # refresh 쿠키 Secure — HTTP 사내망이면 false (features/session-control.md 3-2절)
       COOKIE_SECURE: ${COOKIE_SECURE:?COOKIE_SECURE 미설정}
+      # access 토큰(JWT) 서명 키 — 인증 소스와 무관하게 우리 토큰을 발급하므로 필수 (auth.md 0·2절)
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET 미설정}
       # 알림 메일 링크의 기준 주소 — 알림 메일 프로젝트만 (features/notification.md 3-3절)
       APP_BASE_URL: ${APP_BASE_URL:-}
       # 인증 코드 HMAC 키 / 2단계 인증 비밀 암호화 키 — 해당 기능 프로젝트만 (features/account-lifecycle.md 3-4절, mfa.md 3-4절)

@@ -10,7 +10,7 @@
    3. 프로필 미적용 신호(대외 서비스·비표준 스택·규제 요건)에 해당하면 **프로필을 버리고 체크리스트 전체**를 확인한다.
    4. 확정값은 전부 CLAUDE.md "프로젝트 참고사항"에 기록한다 — 프로필을 안 읽은 사람도 이 프로젝트의 결정을 알 수 있어야 한다.
 2. **생성**: 아래 기본 구조를 만들고, 스택별 조정표에 따라 변형한다. **compose·프록시·nginx 설정은 `~/.claude/jyp/scaffolds/templates/`의 파일을 복사해 프로젝트에 맞게 조정한다** — 즉흥 작성 금지 (docker.md 규칙이 이미 반영된 파일이다).
-3. **first-run 준비**: `.env.example`에서 **`.env`를 자동 생성**하고 결정된 값(DB 포트, 노출 포트 등)을 채운다 — compose 변수 치환(`${DB_NAME}`)은 `.env`가 없으면 빈 값으로 기동돼 첫 실행이 깨진다. `.env`는 `.gitignore` 대상임을 재확인.
+3. **first-run 준비**: `.env.example`에서 **`.env`를 자동 생성**하고 결정된 값(DB 포트, 노출 포트 등)을 채운다 — compose 변수 치환(`${DB_NAME}`)은 `.env`가 없으면 빈 값으로 기동돼 첫 실행이 깨진다. `.env`는 `.gitignore` 대상임을 재확인. **`JWT_SECRET`은 생성 시 랜덤값(48바이트 base64)으로 채운다** — `.env.example`에는 값을 넣지 않는다(저장소에 서명 키가 남는다).
    - ⚠ **`.env`는 BOM 없이 쓴다 (Windows 함정, 2026-07-14 실측)**: PowerShell의 `Set-Content -Encoding utf8`(5.1)은 BOM을 붙이는데, BOM이 있으면 **compose가 첫 줄의 키를 인식하지 못한다**. `[System.IO.File]::WriteAllText(..., [System.Text.UTF8Encoding]::new($false))` 또는 `Out-File -Encoding ascii`를 쓴다.
 4. **초기화**: `git init` 후 첫 커밋 (`chore: 프로젝트 초기 구조 생성`)
 5. **보고**: 생성된 구조를 트리로 보여주고, 다음 단계(의존성 설치, `docker compose up` 등)를 안내한다. **노출 포트가 다른 로컬 프로젝트와 충돌할 수 있음을 함께 고지** (충돌 시 `.env`의 포트 변수만 변경).
@@ -220,6 +220,8 @@ INTERNAL_API_URL=
 INTERNAL_API_KEY=
 # refresh 쿠키 Secure — HTTPS 운영이면 true. HTTP 사내망에서 true면 쿠키가 저장되지 않아 새로고침마다 로그아웃 (features/session-control.md 3-2절)
 COOKIE_SECURE=false
+# access 토큰(JWT) 서명 키 — 필수. 32바이트 이상 랜덤, 개발·운영 서버는 서로 다른 값 (auth.md 2절). 생성: openssl rand -base64 48
+JWT_SECRET=
 # 사용자가 접속하는 주소 — 메일 알림 링크 등 (features/notification.md 3-3절, 알림 메일을 보내는 프로젝트만)
 APP_BASE_URL=
 # 인증 코드 HMAC 키 — 자체 가입·재설정 프로젝트만 (features/account-lifecycle.md 3-4절). 생성: openssl rand -base64 32
