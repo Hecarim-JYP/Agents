@@ -40,7 +40,7 @@ window.addEventListener('vite:preloadError', (event) => {
 
 ### 3-2. 압축 — 프록시 한 곳에서
 
-- **베이스 이미지(`nginx-unprivileged:1.27`)의 nginx.conf는 `#gzip on;`으로 꺼져 있다**(실측) — 템플릿이 켜지 않으면 JS·JSON이 압축 없이 나간다.
+- **베이스 이미지(`nginx-unprivileged:1.27`·`1.30`)의 nginx.conf는 `#gzip on;`으로 꺼져 있다**(실측) — 템플릿이 켜지 않으면 JS·JSON이 압축 없이 나간다.
 - 실측 (최종 템플릿): nginx — JS 143,738 → **54,312바이트**, 목록 JSON 10,100 → **589바이트** / Caddy `encode zstd gzip` — JS 48,367바이트(gzip), JSON 328바이트(zstd).
 - ⚠ nginx `gzip`은 **상태 200·403·404 응답만** 압축한다 — 201 응답은 압축되지 않는다(실측). 큰 목록은 GET 200으로 내려준다.
 - `gzip_vary on` — 압축본과 원본을 구분해 캐시하라고 중간 캐시·CDN에 알린다(템플릿).

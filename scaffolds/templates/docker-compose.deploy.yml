@@ -10,7 +10,7 @@
 services:
   proxy:
     # 사내망 전용 기본: nginx-unprivileged (체크리스트 15에서 선택 — docker.md 7절)
-    image: nginxinc/nginx-unprivileged:1.27-alpine
+    image: nginxinc/nginx-unprivileged:1.30-alpine   # 안정판(짝수) 계열 — 1.27은 2025-06 이후 갱신 없음 (2026-10-19 확인)
     ports:
       - "${HTTP_PORT:?HTTP_PORT 미설정}:8080"   # 외부에 열리는 포트는 프록시뿐 (docker.md 7절)
     volumes:
@@ -51,7 +51,7 @@ services:
   # 실행: docker compose run --rm migrate
   migrate:
     profiles: ["tools"]                 # 기본 up 대상에서 제외 — 명시적으로만 실행
-    image: flyway/flyway:10             # JVM/Flyway 프로젝트
+    image: flyway/flyway:12             # JVM/Flyway 프로젝트 — 10은 MariaDB 11.4를 "지원 검증 안 된 버전"으로 경고(최신 지원 11.2), 12는 경고 없음 (2026-10-19 실측)
     command: >
       -url=jdbc:mariadb://db:3306/${DB_NAME}
       -user=${DB_USER} -password=${DB_PASSWORD}

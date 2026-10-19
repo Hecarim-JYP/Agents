@@ -83,7 +83,8 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
+# 안정판(짝수) 계열 — 1.27은 2025-06 이후 갱신 없음 (Dockerfile 주석은 줄 끝에 둘 수 없다 — 별도 줄)
+FROM nginxinc/nginx-unprivileged:1.30-alpine AS runtime
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 USER 101
