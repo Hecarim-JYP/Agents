@@ -90,7 +90,7 @@ console.log({ rps: result.requests.average, p50: result.latency.p50, p99: result
 |---|---|---|
 | 풀 크기 | mysql2 `connectionLimit`(기본 10) — 설정값으로 | HikariCP `maximum-pool-size`(기본 10 — 문서 기준, 이 레시피에서 미실측) |
 | 비밀번호 해시 | 네이티브 `bcrypt` (실측) | `BCryptPasswordEncoder`는 요청 스레드에서 돈다 — 톰캣 스레드 수가 동시 해시 상한 (미검증) |
-| 부하 도구 | autocannon 7.x (실측) | 동일하게 외부에서 |
+| 부하 도구 | autocannon 7.x (실측 — 8.0에서 같은 API·결과 필드 재확인 2026-10-19) | 동일하게 외부에서 |
 
 ## 6. 검증 포인트
 

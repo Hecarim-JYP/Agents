@@ -18,7 +18,7 @@
 | **인증 소스** — (a) 자체 로그인 / (b) 사내 인증 위임 / (c) SSO | 프로젝트마다 다르고, user 테이블·로그인 흐름이 통째로 갈린다 (auth.md 0절) |
 | **사내 API서버 연동 여부** — 있으면 대상·주소·인증 방식, **쓰기 연동 여부** | 연동 대상이 프로젝트마다 다르다 (integration.md). 쓰기 연동이면 outbox + 수신 측 멱등 협의 (features/outbox.md) |
 | **특수 요구** — 멀티테넌트(다중 법인) / 다국어 / 정기 배치 / 결재(사내 전자결재 연동 또는 자체) 중 해당되는 것 | 모두 소급 비용이 크다. 없으면 "없음"으로 넘어간다 (결재: 체크리스트 26) |
-| **Spring 데이터 접근** (백엔드=Spring일 때만) — (a) JdbcClient / (b) JPA(+QueryDSL) / (c) MyBatis | 리포지토리 계층·의존성·Boot 버전 제약이 갈린다 (spring.md 0절·체크리스트 24). 기본 (a) JdbcClient, MyBatis 선택 시 Boot 4.0.x 고정 |
+| **Spring 데이터 접근** (백엔드=Spring일 때만) — (a) JdbcClient / (b) JPA(+QueryDSL) / (c) MyBatis | 리포지토리 계층·의존성·Boot 버전 제약이 갈린다 (spring.md 0절·체크리스트 24). 기본 (a) JdbcClient, MyBatis 선택 시 스타터의 Boot 대응 버전 확인(4.0.x↔Boot 4.0, 4.1.x↔Boot 4.1) |
 
 ## [고정] — 사내 표준값 (묻지 않는다)
 
@@ -41,7 +41,7 @@
 - **가동 모니터링: 사내 인프라팀 위임** — 헬스 URL(`/health`)과 연락처를 전달하고 CLAUDE.md에 기록
 
 **품질**
-- 테스트: 스택 표준 도구(Vitest / JUnit 5), **테스트 DB 사용**(compose `db-test` + CI `services:`)
+- 테스트: 스택 표준 도구(Vitest / JUnit Jupiter), **테스트 DB 사용**(compose `db-test` + CI `services:`)
 - 테스트 위치: `tests/` 미러링
 - 개인정보(체크리스트 27): **처리함(일반)** — 화면 마스킹 + 접속기록 별도 DB (personal-data.md 2절). 고유식별정보·민감정보를 다루면 아래 "프로필 미적용 신호"에 해당한다
 - 외부 노출 ID(체크리스트 28): **적용 안 함** — 사내 시스템은 내부 PK 그대로 (대외 서비스는 프로필 미적용 → features/public-id.md)
@@ -50,7 +50,7 @@
 - 결제(체크리스트 31): **없음** — 사내 시스템은 PG 결제를 받지 않는다 (있으면 프로필 미적용 → features/payment.md)
 - 외부 공개 API(체크리스트 32): **없음** — 사내 API 연동(integration.md)과 다르다. 연동사에게 API를 열면 features/public-api.md
 - 운영 DB 식별자(체크리스트 25): 생성 시 묻지 않는다 — 배포 호스트가 정해지면 CLAUDE.md에 기록, 미기록이면 `/live-test`가 첫 실행 때 묻는다 (testing.md 6-1절)
-- **린트·포맷 자동 강제**: ESLint(TS/React) / Spotless·Checkstyle(Java) — 스캐폴드 템플릿 적용
+- **린트·포맷 자동 강제**: ESLint(TS/React) / Spotless·Checkstyle·ArchUnit(Java) — 스캐폴드 템플릿 적용
 - 예상 규모: 사내 업무 시스템(동시 수십 명, 연 수만 건) — **단일 인스턴스 전제**
 
 ## 프로필 미적용 신호

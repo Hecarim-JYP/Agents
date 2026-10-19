@@ -1,6 +1,6 @@
 # JYP Agents 전체 기능 통합 가이드
 
-> 최종 수정: 2026-10-19 | 버전: 1.9 | 대상 독자: 이 저장소를 처음 보는 개발자, 그리고 전체 구조를 한눈에 복기하려는 관리자(박진영)
+> 최종 수정: 2026-10-19 | 버전: 1.10 | 대상 독자: 이 저장소를 처음 보는 개발자, 그리고 전체 구조를 한눈에 복기하려는 관리자(박진영)
 
 ## 1. 개요
 
@@ -85,7 +85,7 @@ agents/dev-claude.md ──"읽어라"──┘                └──참조�
 skills/new-project ──"SSOT는 여기"──> scaffolds/default.md ──"기본 답안"──> profiles/project-default.md
                                               └──"복사해서 시작"──> scaffolds/templates/*
 conventions/database.md ──"복사해서 시작"──> schemas/*.sql
-conventions/*.md ──"도구로 강제"──> scaffolds/templates/eslint.config.* (CI·훅이 실행)
+conventions/*.md ──"도구로 강제"──> scaffolds/templates/eslint.config.* · build.gradle·checkstyle.xml (CI·훅이 실행)
 ```
 
 - `dev-claude.md`는 규칙을 한 줄도 직접 담지 않는다 — `dev-rules.md`를 읽으라는 지시만 있다.
@@ -215,7 +215,7 @@ doc-claude 규칙의 프로젝트 import용 축약판 — 템플릿 준수, 추�
 
 도메인 이벤트·outbox·중복 제출 방지처럼 **기능과 무관하게 반복해서 만드는 운영 기능**의 표준 설계 모음이다. [catalog.md](../conventions/features/catalog.md)가 인덱스(`[공통]`/`[사내]`/`[대외]` 태그, 현황, 차수)이고, 기능마다 레시피 한 파일(언제 쓰나 / 결정 항목 / 표준 설계 / 함정 / 스택별 구현 / 검증 포인트)이다. 이미 컨벤션이 다루는 기능은 카탈로그에서 해당 절로 링크만 한다. 레시피가 있는 기능은 즉흥 설계를 금지한다(dev-rules).
 
-- **도구로 강제되는 규칙**은 스캐폴드의 린트 설정(`scaffolds/templates/eslint.config.*.mjs`, Spotless/Checkstyle)이 CI·훅에서 검사한다 — 문서를 다 읽지 않아도 위반이 빨간불로 드러난다.
+- **도구로 강제되는 규칙**은 스캐폴드의 린트 설정(`scaffolds/templates/eslint.config.*.mjs`, `build.gradle`의 Spotless/Checkstyle·ArchUnit)이 CI·훅에서 검사한다 — 문서를 다 읽지 않아도 위반이 빨간불로 드러난다.
 ### 4-5. 스캐폴드 (scaffolds/ + profiles/)
 
 `/new-project`의 절차 SSOT. 세 층으로 구성된다 — 내용은 각 파일이 단일 출처다.
@@ -224,7 +224,7 @@ doc-claude 규칙의 프로젝트 import용 축약판 — 템플릿 준수, 추�
 |---|---|
 | [profiles/project-default.md](../profiles/project-default.md) | **사내 표준 프로필** — 결정 항목의 기본 답안. 매번 묻는 것은 **[확인] 항목**(프로젝트명·목적 / 언어 / 인증 소스 / 사내 API 연동 / 특수 요구 + Spring이면 데이터 접근)뿐이고 나머지는 [고정]으로 적용한다. 프로젝트마다 같은 예외를 반복하면 프로필을 고친다 |
 | [scaffolds/default.md](../scaffolds/default.md) | 절차(확인 → 생성 → `.env` 자동 생성 → git init → 보고) · **시작 결정 체크리스트 32항목**(프로필의 근거이자 미적용 시 전체 목록) · 기본/모노레포 구조 · 기초 테이블 · 스택별 조정표 · **린트 강제** · 초기 파일 전문(README·CLAUDE.md·.env.example·test.yml·release.yml) |
-| [scaffolds/templates/](../scaffolds/templates/) | **실물 파일 템플릿** — docker-compose 3종(base/dev/deploy) · nginx-proxy.conf · Caddyfile · nginx.conf · ESLint 설정 4종(client/server × TS/JS). docker.md 규칙(`${VAR:?}` 폴백 금지 · base 최소 · migrate/batch는 `profiles: tools`)이 이미 반영돼 있어 즉흥 작성을 금지한다. 검증: `scripts/verify-templates.ps1`(Windows)·`scripts/verify-templates.sh`(Mac/Linux) (임시 폴더에 조립 후 두 모드의 `docker compose config` 실행) · `scripts/check-refs.mjs` (문서 간 절 참조 무결성 — 2026-07-17 신설, **CI가 push/PR마다 자동 실행** — 2026-07-22) |
+| [scaffolds/templates/](../scaffolds/templates/) | **실물 파일 템플릿** — docker-compose 3종(base/dev/deploy) · nginx-proxy.conf · Caddyfile · nginx.conf · ESLint 설정 4종(client/server × TS/JS) · Spring `build.gradle`(Boot 4 — Initializr를 못 쓸 때)·`checkstyle.xml`. docker.md 규칙(`${VAR:?}` 폴백 금지 · base 최소 · migrate/batch는 `profiles: tools`)이 이미 반영돼 있어 즉흥 작성을 금지한다. 검증: `scripts/verify-templates.ps1`(Windows)·`scripts/verify-templates.sh`(Mac/Linux) (임시 폴더에 조립 후 두 모드의 `docker compose config` 실행) · `scripts/check-refs.mjs` (문서 간 절 참조 무결성 — 2026-07-17 신설, **CI가 push/PR마다 자동 실행** — 2026-07-22) |
 
 - 주의: 파일 있는 폴더에 생성 금지, 요청 없는 샘플 코드 금지(단, CLI 데모 잔재 제거는 필수), 백로그는 첫 발견 시점에 생성.
 

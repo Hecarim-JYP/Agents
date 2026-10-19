@@ -24,7 +24,7 @@
 ### 3-1. 형식 판정 — 내용으로
 
 ```js
-import { fileTypeFromBuffer } from 'file-type';                 // ESM 전용 (19.x)
+import { fileTypeFromBuffer } from 'file-type';                 // ESM 전용 (19.x 실측, 22.x에서 같은 API 재확인 2026-10-19)
 
 /** 기능별 허용 형식 — 판정은 파일 내용(매직 바이트)으로, 확장자·Content-Type은 보지 않는다 */
 const ALLOWED_MIME = {

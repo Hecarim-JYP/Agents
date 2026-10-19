@@ -60,7 +60,7 @@
 "Tailwind + shadcn 셋업"은 아래 산출물이 전부 갖춰져야 완료다 — 조정표 한 줄로 얼버무리지 않는다 (근거: 레시피 없이는 매 프로젝트 수동 셋업에서 항목이 누락된다). 도구 버전별 세부 명령은 shadcn 공식 문서(`ui.shadcn.com/docs/installation/vite`)가 우선 — 아래는 완료 판정 체크리스트다.
 
 1. **Tailwind 설치·배선**: `tailwindcss` 설치 + Vite 플러그인 등록, `index.css`에 Tailwind 지시문.
-2. **`@` alias**: **TS면 `tsconfig.json` / JS면 `jsconfig.json`**(`baseUrl`/`paths`)과 `vite.config.*`(`resolve.alias`) **양쪽** 설정 — 한쪽만 하면 에디터 또는 빌드가 깨진다 (언어는 체크리스트 1에서 확인 — react.md 0절).
+2. **`@` alias**: **TS면 `tsconfig.json`·`tsconfig.app.json` / JS면 `jsconfig.json`**(`paths`만 — `"@/*": ["./src/*"]`)과 `vite.config.*`(`resolve.alias`) **양쪽** 설정. ⚠ **`baseUrl`은 넣지 않는다** — TypeScript 6.0부터 폐기되어 `error TS5101`로 `tsc -b`(빌드)가 실패한다(2026-10-19 실측). `paths`는 `baseUrl` 없이 tsconfig 위치 기준으로 동작하고 ESLint 리졸버도 그대로 따라간다(실측) — 한쪽만 하면 에디터 또는 빌드가 깨진다 (언어는 체크리스트 1에서 확인 — react.md 0절).
 3. **shadcn init**: `npx shadcn@latest init` → `components.json` 생성. ⚠ JavaScript 프로젝트면 `components.json`의 `"tsx": false` 확인 — 기본값 true라 JS 프로젝트에 .tsx가 생성된다.
 4. **시맨틱 토큰**: init이 만든 `:root`/`.dark` CSS 변수 블록을 `index.css`에 유지하고, 브랜드 색(2절)을 여기서 조정.
 5. **`cn()` 유틸**: `src/lib/utils`(clsx + tailwind-merge) 생성 확인 — 커스텀 컴포넌트도 이것만 사용 (1절).

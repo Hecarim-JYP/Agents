@@ -51,6 +51,7 @@ router.get('/endpoint', asyncHandler(async (req, res) => {
 ```
 
 - 모든 라우트는 `asyncHandler`로 감싼다. 직접 try-catch 금지 (예외: SSE처럼 스트림을 직접 관리하는 특수 라우트만 — 예외는 CLAUDE.md에 사유와 함께 기록).
+  - 버전: `npm i express`는 **Express 5**를 설치한다(2026-10-19 기준 5.3). Express 5는 async 예외를 errorHandler로 자동 전달하므로 `asyncHandler`가 없어도 예외가 새지 않는다(실측) — 감싸기는 Express 4 호환과 일관성을 위해 유지해도 무해하다. 이 저장소의 Express 레시피 코드(에러 매핑·본문 파싱 400/413·빈도 제한·웹훅 원본 바이트·trust proxy)는 **Express 4.22와 5.3 모두에서 같은 결과**를 확인했다(2026-10-19).
 - 응답은 공용 응답 헬퍼로만. **봉투·에러 키 계약은 api.md 5절(스택 무관)이 정의한다** — 이 헬퍼와 중앙 errorHandler가 그 계약의 Express 구현이다. 혼용 금지, 확정 계약은 CLAUDE.md에 기록.
 
 ## 3. Service — 경계 검증 = zod (STRICT)

@@ -87,7 +87,7 @@ export const invalidateEverywhere = (key) => redis.publish('cache:invalidate', k
 
 | 구성 | Express | Spring |
 |---|---|---|
-| 빈도 제한 저장소 | `rate-limit-redis` 4.x + `redis` 4.x (실측) | Bucket4j + Redis 백엔드 (이 레시피에서 미검증) |
+| 빈도 제한 저장소 | `rate-limit-redis` 4.x + `redis` 4.x (실측 — 최신 6.x + 6.x에서 같은 코드로 한도 동작 재확인 2026-10-19) | Bucket4j + Redis 백엔드 (이 레시피에서 미검증) |
 | 캐시 무효화 | `redis` pub/sub (실측) | Spring Data Redis `RedisMessageListenerContainer` (미검증) |
 | 세션 | 무상태 토큰 + DB 세션(session-control.md) — 변경 없음 | 동일 |
 

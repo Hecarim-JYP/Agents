@@ -64,7 +64,7 @@ UPDATE error_event SET last_alerted_at = NOW()
 ### 3-3. 프로세스 수준 에러
 
 - Node의 `uncaughtException`·`unhandledRejection`은 **로그(요청 ID 포함) 후 프로세스를 종료**한다 — 상태를 알 수 없는 프로세스를 계속 쓰지 않는다. 컨테이너 `restart: unless-stopped`가 다시 띄우고, 반복 재시작은 가동 감시가 잡는다. 이 시점에 DB 기록·알림을 시도하지 않는다(종료 중이라 끝나지 않는다).
-- Express 4의 async 핸들러 예외는 `asyncHandler` 없이는 중앙 핸들러로 오지 않고 unhandledRejection이 된다 (express.md 2절).
+- Express 4의 async 핸들러 예외는 `asyncHandler` 없이는 중앙 핸들러로 오지 않고 unhandledRejection이 된다 (express.md 2절). **Express 5(현재 `npm i express` 기본)는 async 예외를 중앙 핸들러로 자동 전달한다**(실측 2026-10-19, Express 5.3: `asyncHandler` 없이 throw → errorHandler 500 응답, 프로세스 유지). 지문 규칙(3-1절의 라우트 템플릿 `/:id`·빈 `req.baseUrl`)도 Express 5에서 같다(실측).
 
 ## 4. 함정 (STRICT)
 

@@ -44,7 +44,7 @@
 | 21 | **테스트 DB 사용 여부** — 있으면 실제 DB로 서비스·쿼리 검증(동시성·제약까지), 없으면 쿼리 목킹 | (a) 사용 — compose에 `db-test` + CI에도 구성 | testing.md 0절 |
 | 22 | **예상 규모** — 동시 사용자 수, 주요 테이블의 연간 증가 건수 | 사내 업무 시스템(동시 수십 명, 연 수만 건) — 단일 인스턴스 | patterns.md 0-3절 — 페이징 상한·인덱스·배치·다중화 필요성의 근거. 규모가 이를 크게 넘으면 다중 인스턴스 전제로 재검토 (features/multi-instance.md) |
 | 23 | **배포 호스트 구성** — 운영·개발서버가 물리적으로 분리인가, **한 PC에 공존**인가 | 분리 (각 서버 1대) | docker.md 7-2절 — 공존이면 `COMPOSE_PROJECT_NAME`·디렉토리·DB 자격·프록시 포트를 스택별로 분리 (미분리 시 볼륨이 겹쳐 개발이 운영 DB를 붙잡는다) |
-| 24 | **Spring 데이터 접근 — 백엔드=Spring일 때 반드시 묻는다**: (a) JdbcClient / (b) JPA(+QueryDSL) / (c) MyBatis | (a) JdbcClient (순수 SQL·Boot 버전 자유) | spring.md 0절 — 리포지토리 계층·의존성·Boot 버전 제약이 갈린다. MyBatis 채택 시 Boot 4.0.x 고정, JPA 채택 시 N+1·지연로딩 정책을 CLAUDE.md에 함께 기록 |
+| 24 | **Spring 데이터 접근 — 백엔드=Spring일 때 반드시 묻는다**: (a) JdbcClient / (b) JPA(+QueryDSL) / (c) MyBatis | (a) JdbcClient (순수 SQL·Boot 버전 자유) | spring.md 0절 — 리포지토리 계층·의존성·Boot 버전 제약이 갈린다. MyBatis 채택 시 스타터의 Boot 대응 버전(4.0.x↔Boot 4.0, 4.1.x↔Boot 4.1)을 맞춰 기록, JPA 채택 시 N+1·지연로딩 정책과 QueryDSL 포크(`io.github.openfeign.querydsl`)를 CLAUDE.md에 함께 기록 |
 | 25 | **운영 DB 식별자** — 호스트·포트·DB명 | 생성 시 묻지 않는다 — 배포 호스트가 정해지면 기록. 미기록이면 `/live-test`가 첫 실행 때 묻고 기록 | testing.md 6-1절 — 개발 DB 쓰기를 허용하는 실동작 검증이 운영 DB를 가려내는 유일한 기준. 없으면 검증이 진행되지 않는다 |
 | 26 | **결재 필요 여부·방식** — 결재 대상 문서가 있으면: (a) 사내 전자결재 연동 / (b) 자체 결재 | 결재 없음. 필요하면 **(a) 사내 전자결재가 있으면 연동 우선** — 결재함이 둘이 되면 결재자가 한쪽을 놓친다 | approval.md 2절 — 테이블·화면·연동이 통째로 갈린다 |
 | 27 | **개인정보 처리 여부·등급** — 고유식별정보·민감정보 포함 여부, 정보주체 규모 | 처리함(일반) — 화면 마스킹 + 접속기록 **별도 DB**(`{DB_NAME}_log`, 앱 계정 SELECT·INSERT만). **고유식별정보·카드·계좌번호를 저장하면 앱 계층 암호화 + 블라인드 인덱스**(키는 환경변수) — 저장하지 않는 것이 기본 | personal-data.md 2절·features/field-encryption.md 2절 — 접속기록 DB·계정 권한은 인프라 구성, 평문으로 쌓은 뒤 암호화로 바꾸면 전 행 재기록·검색 쿼리가 함께 바뀐다 |
@@ -117,9 +117,9 @@
 | 스택 | 조정 내용 |
 |---|---|
 | Python | `pyproject.toml` 추가, `src/<패키지명>/` 레이아웃, `src/<패키지명>/__init__.py`. 테스트: **pytest** |
-| Node/Express 서버 | **언어는 체크리스트 1에서 확인** — `package.json`(`"type": "module"`). TS면 `tsconfig.json`(`strict: true`) + 개발 `tsx watch` / 배포 `tsc` 빌드, JS면 개발 `node --watch` / 빌드 없음. 계층 구조는 `conventions/express.md` 1절, 경계 검증은 **zod**. 테스트: **Vitest + supertest** — 의존성 설치 + `"test"` 스크립트 등록까지 스캐폴드가 한다. DB 사용 시 **마이그레이션 러너**(`npm run migrate` — migration.md 5절) 포함 |
-| Spring Boot 서버 | **Java 21 + Gradle** — 구조·패턴은 `conventions/spring.md`. Spring Initializr 산출물로 시작(web, validation, actuator, flyway + DB 드라이버). **데이터 접근 의존성은 체크리스트 24 선택에 따른다**: JdbcClient=`spring-boot-starter-jdbc`(별도 ORM 없음) / JPA=`spring-boot-starter-data-jpa`(+ QueryDSL) / MyBatis=`mybatis-spring-boot-starter`(⚠ Boot 4.0.x 고정). **Gradle wrapper jar 확보 필수**(오프라인 생성 불가 — Initializr 산출물 사용) + `git update-index --chmod=+x gradlew`(Windows 실행 비트 유실 — spring.md 0절). 마이그레이션: **Flyway**(`spring.flyway.enabled=false` + 별도 단계). 테스트: **JUnit 5**, `./gradlew test`. **자동 강제: Spotless + Checkstyle을 `check`에 연결**(spring.md 7절) |
-| React/Next.js | **언어는 체크리스트 1에서 확인** — TS면 Vite `react-ts` 템플릿 / Next.js `create-next-app --typescript` + `strict: true` 고정, JS면 Vite `react` 템플릿 / `create-next-app`(TS 미지정). **CLI 산출물 위에 얹은 뒤 데모 잔재를 정리한다**: 데모 App/CSS/로고 에셋 제거, `index.html`의 `<title>`·메타를 프로젝트명으로 치환, favicon 결정. 스타일링: **Tailwind + shadcn/ui — `design.md` 8절 셋업 레시피의 체크리스트 전 항목 수행**(JS 프로젝트면 `components.json`의 `tsx: false` 포함). 테스트: **Vitest + Testing Library** — ⚠ Vite 템플릿에는 test 스크립트가 없다: 의존성 설치 + `"test": "vitest run --passWithNoTests"` 등록까지 해야 CI `npm test`가 깨지지 않는다 |
+| Node/Express 서버 | **언어는 체크리스트 1에서 확인** — `package.json`(`"type": "module"`). TS면 `tsconfig.json`(`strict: true`) + 개발 `tsx watch` / 배포 `tsc` 빌드 — **TypeScript는 `typescript@~6.0.3`으로 고정**(린트 절 — `npm i -D typescript`는 7.x를 설치해 ESLint 설치가 ERESOLVE로 깨진다), JS면 개발 `node --watch` / 빌드 없음. 계층 구조는 `conventions/express.md` 1절, 경계 검증은 **zod**. 테스트: **Vitest + supertest** — 의존성 설치 + `"test"` 스크립트 등록까지 스캐폴드가 한다. DB 사용 시 **마이그레이션 러너**(`npm run migrate` — migration.md 5절) 포함 |
+| Spring Boot 서버 | **Java 21 + Spring Boot 4.x + Gradle 9.x — Boot 3.x로 시작하지 않는다**(spring.md 0절 STRICT). 구조·패턴은 `conventions/spring.md`. Spring Initializr 산출물로 시작(webmvc, validation, actuator, flyway + DB 드라이버) — **Initializr에 접근할 수 없으면 `~/.claude/jyp/scaffolds/templates/build.gradle`을 복사**하고 버전을 Maven Central 최신 GA로 갱신한다(기억으로 쓰지 않는다 — 학습 데이터 기본값이 Boot 3.x다). `config/checkstyle/checkstyle.xml`은 템플릿 `checkstyle.xml`, `config/header.txt`(파일 헤더 주석)도 함께. **데이터 접근 의존성은 체크리스트 24 선택에 따른다**: JdbcClient=`spring-boot-starter-jdbc`(별도 ORM 없음) / JPA=`spring-boot-starter-data-jpa`(+ QueryDSL 포크 `io.github.openfeign.querydsl`) / MyBatis=`mybatis-spring-boot-starter`(⚠ Boot 대응 버전 — 4.0.x↔4.0, 4.1.x↔4.1). **Gradle wrapper jar 확보 필수**(Initializr 산출물, 또는 로컬 Gradle로 `gradle wrapper --gradle-version 9.x`, 둘 다 없으면 spring.md 0절 컨테이너 방식) + `git update-index --chmod=+x gradlew`(Windows 실행 비트 유실 — spring.md 0절). 마이그레이션: **Flyway**(`spring.flyway.enabled=false` + 별도 단계). 테스트: **JUnit Jupiter(Boot 4 관리) + `@MockitoBean`**, `./gradlew test` + **패키지 순환 검사 `ArchitectureTest`(ArchUnit — spring.md 7절)**. **자동 강제: Spotless + Checkstyle을 `check`에 연결**(템플릿에 포함) |
+| React/Next.js | **언어는 체크리스트 1에서 확인** — TS면 Vite `react-ts` 템플릿 / Next.js `create-next-app --typescript` + `strict: true` 고정, JS면 Vite `react` 템플릿 / `create-next-app`(TS 미지정). **CLI 산출물 위에 얹은 뒤 데모 잔재를 정리한다**: ⚠ 최신 Vite 템플릿(create-vite 9.x, 2026-10-19 확인)은 **린트가 oxlint(`"lint": "oxlint"`)이고 TypeScript가 `~7.0`이다** — `oxlint` 의존성을 지우고 `lint` 스크립트를 ESLint로 바꾸며(린트 절), **TS는 `~6.0.3`으로 내린다**(TS 7이면 ESLint 설치가 ERESOLVE). 데모 App/CSS/로고 에셋 제거, `index.html`의 `<title>`·메타를 프로젝트명으로 치환, favicon 결정. 스타일링: **Tailwind + shadcn/ui — `design.md` 8절 셋업 레시피의 체크리스트 전 항목 수행**(JS 프로젝트면 `components.json`의 `tsx: false` 포함). 테스트: **Vitest + Testing Library** — ⚠ Vite 템플릿에는 test 스크립트가 없다: 의존성 설치 + `"test": "vitest run --passWithNoTests"` 등록까지 해야 CI `npm test`가 깨지지 않는다 |
 | 기타 | 해당 언어 커뮤니티의 표준 레이아웃을 조사해서 따르고, CLAUDE.md/docs/는 항상 추가. 테스트 도구는 해당 언어 표준 채택 |
 
 ## 린트·포맷 (자동 강제 — MANDATORY)
@@ -127,14 +127,17 @@
 **컨벤션 중 도구로 강제할 수 있는 것은 도구가 강제한다.** 문서로만 두면 코드가 커질수록 지켜지지 않는다 — 린트 설정은 스캐폴드 단계에서 반드시 포함한다.
 
 - **React/Node**: 언어(체크리스트 1)에 맞는 템플릿을 각 디렉토리에 `eslint.config.mjs`로 복사하고 `"lint": "eslint ."` 스크립트를 등록한다 — **TS면** `~/.claude/jyp/scaffolds/templates/eslint.config.client.mjs` / `eslint.config.server.mjs`, **JS면** `eslint.config.client-js.mjs` / `eslint.config.server-js.mjs`(TS 전용 규칙인 `any` 금지만 빠지고 나머지 강제는 동일 — 2026-07-17 검증). 강제되는 규칙: `any` 금지, 순환 의존, `=== 200` 비교, hex·팔레트 색상, 네이티브 alert/confirm, 토큰 스토리지 저장, axios 직접 import, `process.env || 폴백`, `console.error(err)` 한 줄, SQL 템플릿 리터럴 보간.
-  - 설치 (⚠ **eslint와 `@eslint/js`의 메이저를 맞춘다** — 최신 `@eslint/js`는 eslint 10을 요구해 `ERESOLVE`로 설치가 깨진다. 2026-07-14 실측):
+  - 설치 (⚠ **eslint와 `@eslint/js`의 메이저를 맞춘다** — 최신 `@eslint/js`는 eslint 10을 요구해 `ERESOLVE`로 설치가 깨진다. 2026-07-14 실측. ⚠ **TS 프로젝트는 TypeScript를 6.0.x로 먼저 고정한다** — typescript-eslint(8.72)가 TS 7을 지원하지 않아(peer `<6.1.0`) 최신 Vite 템플릿·`npm i -D typescript` 그대로면 `ERESOLVE`. 2026-10-19 실측):
     ```bash
-    # client
-    npm i -D eslint@9 @eslint/js@9 typescript-eslint eslint-plugin-react-hooks eslint-plugin-import globals
-    # server
-    npm i -D eslint@9 @eslint/js@9 typescript-eslint eslint-plugin-import globals
+    # TS 프로젝트만 — 먼저 실행
+    npm i -D typescript@~6.0.3
+    # client (JS면 typescript-eslint 제외)
+    npm i -D eslint@9 @eslint/js@9 typescript-eslint eslint-plugin-react-hooks eslint-plugin-import globals eslint-import-resolver-typescript
+    # server (JS면 typescript-eslint 제외)
+    npm i -D eslint@9 @eslint/js@9 typescript-eslint eslint-plugin-import globals eslint-import-resolver-typescript
     ```
-- **Java/Spring**: Spotless(google-java-format) + Checkstyle을 `check`에 연결 (spring.md 7절). ⚠ **`.gitattributes`(`* text=auto eol=lf`)를 반드시 함께 생성**한다 — 없으면 Windows에서 CRLF를 기대해 정상 코드가 `spotlessCheck`에서 실패한다 (2026-07-14 실측).
+  - **`eslint-import-resolver-typescript`가 있어야 순환 의존 규칙이 동작한다** — 템플릿의 `settings`(TS 파서·리졸버)가 없던 이전 판은 TS에서 **순환을 하나도 잡지 못했고**(JS는 `@/` 별칭 순환을 놓쳤다), 2026-07-17 검증도 이 규칙은 빠져 있었다. 2026-10-19 수정 후 4종 모두 상대경로·`@/` 별칭 순환 검출, 오탐 없음(실측).
+- **Java/Spring**: Spotless(google-java-format) + Checkstyle을 `check`에 연결, 패키지 순환은 ArchUnit `ArchitectureTest` — 설정은 `~/.claude/jyp/scaffolds/templates/build.gradle`·`checkstyle.xml` (spring.md 7절). ⚠ **`.gitattributes`(`* text=auto eol=lf`)를 반드시 함께 생성**한다 — 없으면 Windows에서 CRLF를 기대해 정상 코드가 `spotlessCheck`에서 실패한다 (2026-07-14 실측).
 - **CI와 훅이 이 스크립트를 실행한다** — 린트가 없으면 훅이 조용히 통과해 자동 검증 층이 사라진다.
 
 ## 초기 파일 내용
