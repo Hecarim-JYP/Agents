@@ -57,7 +57,13 @@ if (isJavaFile) {
   const scripts = pkg.scripts || {};
   if (scripts.lint) run('lint', 'npm run -s lint');
   if (scripts.typecheck) run('typecheck', 'npm run -s typecheck');
-  else if (existsSync(path.join(root, 'tsconfig.json'))) run('typecheck', 'npx tsc --noEmit');
+  else if (existsSync(path.join(root, 'tsconfig.json'))) {
+    // Vite 템플릿처럼 루트 tsconfig가 files: [] + references(참조형)면 `tsc --noEmit`은 아무 파일도 검사하지 않는다
+    // — 타입 오류가 있어도 통과한다(2026-10-19 실측). 참조형이면 빌드 모드(-b)로 참조 프로젝트까지 검사한다
+    let tsconfig = '';
+    try { tsconfig = readFileSync(path.join(root, 'tsconfig.json'), 'utf8'); } catch {}
+    run('typecheck', /"references"\s*:/.test(tsconfig) ? 'npx tsc -b --noEmit' : 'npx tsc --noEmit');
+  }
 }
 
 if (failures.length) {
