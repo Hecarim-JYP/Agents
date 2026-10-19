@@ -54,4 +54,4 @@ src/external/{system}/     # Express — 예: src/external/hqApi/hqApiClient.ts
 | 타임아웃 | 인스턴스 `timeout` 옵션 | requestFactory의 connect/read timeout |
 | 에러 변환 | catch → `ExternalApiError` throw → errorHandler | 커스텀 예외 → `@RestControllerAdvice` |
 | 응답 검증 | zod 스키마 | record DTO + 필수 필드 검증 |
-| 테스트 mock | Vitest `vi.mock` (또는 msw) | `MockRestServiceServer` / `@MockBean` |
+| 테스트 mock | Vitest `vi.mock` (또는 msw) | `MockRestServiceServer` / `@MockitoBean`(Boot 4 — `@MockBean` 제거) |

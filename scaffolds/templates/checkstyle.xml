@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN" "https://checkstyle.org/dtds/configuration_1_3.dtd">
+<!--
+  server/config/checkstyle/checkstyle.xml — build.gradle 템플릿의 checkstyle이 읽는다 (spring.md 7절)
+  포맷(들여쓰기·줄바꿈)은 Spotless(google-java-format)가 맡으므로 여기서는 검사하지 않는다 — 두 도구가 서로 다른 답을 내지 않게.
+  패키지 순환 의존은 Checkstyle에 검사가 없다 — ArchUnit 테스트(spring.md 7절)가 맡는다.
+-->
+<module name="Checker">
+  <module name="TreeWalker">
+    <!-- 미사용·와일드카드 import -->
+    <module name="UnusedImports"/>
+    <module name="AvoidStarImport"/>
+    <!-- 네이밍 (general.md·spring.md 1절) -->
+    <module name="TypeName"/>
+    <module name="MethodName"/>
+    <module name="MemberName"/>
+    <module name="LocalVariableName"/>
+    <!-- 상수는 대문자 스네이크 — 단 관례인 로거 필드(private static final Logger log)는 허용 (spring.md 4절 코드) -->
+    <module name="ConstantName">
+      <property name="format" value="^(log|logger)$|^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$"/>
+    </module>
+    <!-- 빈 catch로 예외를 삼키지 않는다 (patterns.md 3절) -->
+    <module name="EmptyCatchBlock"/>
+  </module>
+</module>

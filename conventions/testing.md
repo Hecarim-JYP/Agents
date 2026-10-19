@@ -8,7 +8,7 @@
 
 | | (a) 테스트 DB 사용 (권장) | (b) 테스트 DB 없음 |
 |---|---|---|
-| 서비스 테스트 | **실제 테스트 DB에 연결해 검증** — 쿼리·트랜잭션·제약까지 함께 검증된다 | 쿼리 계층을 **목킹**(Vitest `vi.mock` / Spring `@MockBean`)하고 서비스 로직만 검증 |
+| 서비스 테스트 | **실제 테스트 DB에 연결해 검증** — 쿼리·트랜잭션·제약까지 함께 검증된다 | 쿼리 계층을 **목킹**(Vitest `vi.mock` / Spring `@MockitoBean` — Boot 4에서 `@MockBean`은 제거, spring.md 7절)하고 서비스 로직만 검증 |
 | 쿼리 테스트 | 가능 — 동시성(낙관적 락·조건부 UPDATE, sql.md 8절)과 UNIQUE 제약은 **실제 DB에서만 검증된다** | 불가 — 이 영역은 테스트로 못 잡는다는 한계를 CLAUDE.md에 명시 |
 | 구성 | dev override의 `db-test` 서비스(스캐폴드 템플릿에 포함 — 데이터는 tmpfs라 기동 시 초기화) + `.env`의 `TEST_DB_*`. 각 테스트는 트랜잭션 롤백 또는 데이터 초기화로 **서로 독립**하게 (2절) | 추가 구성 없음 |
 
@@ -34,7 +34,7 @@
 |---|---|
 | TypeScript/JavaScript (클라·서버 공통) | **Vitest** (Vite 생태계, 설정 최소) |
 | API 통합 테스트 (TS) | Vitest + **supertest** (서버 기동 없이 앱 객체 직접 호출) |
-| **Java/Spring** | **JUnit 5** — API 계약은 `@WebMvcTest`/`MockMvc`, 서비스 도메인 로직은 컨텍스트 없는 순수 단위 테스트. 실행은 `./gradlew test` (spring.md 7절). 메서드명은 4절의 Java 예외 참조 |
+| **Java/Spring** | **JUnit Jupiter(Boot 4 관리 — 6.x)** — API 계약은 `@WebMvcTest`/`MockMvc`, 서비스 도메인 로직은 컨텍스트 없는 순수 단위 테스트. 실행은 `./gradlew test` (spring.md 7절). 메서드명은 4절의 Java 예외 참조 |
 | React 컴포넌트 | Testing Library — 핵심 인터랙션(권한 게이트, 폼 검증)만 |
 | Python | **pytest** |
 

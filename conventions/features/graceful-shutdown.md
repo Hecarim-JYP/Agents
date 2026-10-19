@@ -40,7 +40,7 @@ SIGTERM 수신
 | **셸 형식 CMD** (`CMD node dist/index.js`) | `/bin/sh`가 PID 1이 되어 **앱에 신호를 전달하지 않는다** (실측) | exec 형식 `CMD ["node", "dist/index.js"]` — docker.md 2-1절 템플릿 유지 |
 | **`npm start`를 CMD로** | npm이 SIGTERM에 먼저 종료되고, 앱은 **핸들러가 돌기 전에** 함께 강제 종료된다 (실측: 앱 핸들러 로그 없음) | 운영 CMD는 `node`를 직접 실행 |
 | keep-alive 연결 | `server.close()`는 새 연결만 막는다 — 처리 중이던 연결이 응답 후 유휴 상태로 남아 종료가 수 초 늘어진다 (실측: 3초 지연) | 5절 `closeConnectionOnShutdown` — 응답 직후 유휴 연결 닫기 (실측: 응답과 동시에 종료) |
-| **Spring Boot 3.3 이하 기본값** | `server.shutdown` 기본이 `IMMEDIATE` — 처리 중 요청을 기다리지 않는다 (3.4부터 `GRACEFUL`) | 버전과 무관하게 `server.shutdown: graceful` 명시 (근거: spring-boot-autoconfigure 3.3.13·3.5.6 `ServerProperties` 소스 확인) |
+| **Spring Boot 3.3 이하 기본값** | `server.shutdown` 기본이 `IMMEDIATE` — 처리 중 요청을 기다리지 않는다 (3.4부터 `GRACEFUL`) | 버전과 무관하게 `server.shutdown: graceful` 명시 (근거: spring-boot-autoconfigure 3.3.13·3.5.6 `ServerProperties` 소스 확인. Boot 4.1.1 실측 2026-10-19: 미지정이면 graceful, `immediate` 지정 시 대기 없음 — 명시하면 버전·설정 실수와 무관해진다) |
 | **Spring 대기 상한 30초 > Docker 유예 10초** | `timeout-per-shutdown-phase` 기본 30초 — 기다리는 도중 Docker가 SIGKILL | 2절 값 체인 (앱 20초 < 컨테이너 30초) |
 | 강제 종료 타이머가 프로세스를 붙잡음 | 정리가 끝났는데도 타이머 때문에 즉시 안 끝난다 | 타이머에 `.unref()` |
 

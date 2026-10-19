@@ -92,8 +92,8 @@ export class AppErrorBoundary extends Component {
 
 | 구성 | Express | Spring |
 |---|---|---|
-| 형식 오류 매핑 | 3-1절 (`err.type`, `err.code`) | `@RestControllerAdvice`에서 `HttpMessageNotReadableException` → 400, `MaxUploadSizeExceededException` → 413 — `Exception` 전체를 500으로 잡는 핸들러보다 먼저 (이 레시피에서 미검증) |
-| 없는 API | notFoundHandler | `NoHandlerFoundException`(Boot 3.2+ `NoResourceFoundException`) → 404 봉투 (미검증) |
+| 형식 오류 매핑 | 3-1절 (`err.type`, `err.code`) — Express 5.3에서도 같은 값(실측 2026-10-19) | spring.md 4절 코드 — `MethodArgumentNotValidException` 400 · `HttpMessageNotReadableException` 400 · `MaxUploadSizeExceededException` 413 (실측 2026-10-19, Boot 4.1.1) |
+| 없는 API | notFoundHandler | 없는 경로는 `NoResourceFoundException`(프레임워크의 `ErrorResponse` 구현)으로 온다 — spring.md 4절 코드가 그 상태코드(404)로 봉투 응답, 메서드 불일치 405도 같은 경로 (실측 2026-10-19, Boot 4.1.1) |
 | 화면 오류 경계 | 프론트 공통 (3-2절) | 동일 |
 
 ## 6. 검증 포인트

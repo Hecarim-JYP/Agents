@@ -1,0 +1,82 @@
+// server/build.gradle — Spring Boot 서버 빌드 설정 (spring.md 0·7절)
+// Spring Initializr 산출물이 기본이다. Initializr에 접근할 수 없을 때만 이 파일로 시작한다 — 기억으로 쓰지 않는다
+// (근거: 학습 데이터의 기본값은 Boot 3.x — 3.x는 2026-06-25 3.5.16을 끝으로 OSS 지원이 끝났다).
+// ⚠ 생성 시 아래 버전을 Maven Central·Gradle Plugin Portal의 최신 GA로 갱신하고 CLAUDE.md에 기록한다.
+//   2026-10-19 실빌드 검증: Boot 4.1.1 · Gradle 9.8.2 · Java 21 · Spotless 8.10.4 · Checkstyle 14.3.0 · ArchUnit 1.5.1
+// 함께 만드는 파일: config/checkstyle/checkstyle.xml(템플릿), config/header.txt(파일 헤더 주석), .gitattributes(* text=auto eol=lf)
+
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.1.1'
+    id 'io.spring.dependency-management' version '1.1.7'
+    id 'com.diffplug.spotless' version '8.10.4'
+    id 'checkstyle'
+}
+
+group = '{base.package}'
+version = '0.0.1'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Boot 4는 스타터 이름이 바뀌었다 — web이 아니라 webmvc, 테스트도 기술별 스타터(webmvc-test)
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-flyway'   // 마이그레이션은 별도 단계 — spring.flyway.enabled=false (spring.md 0절)
+    implementation 'org.flywaydb:flyway-mysql'                              // MariaDB·MySQL 방언
+
+    // 데이터 접근 — 체크리스트 24 선택 하나만 남긴다
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'     // (a) JdbcClient (기본)
+    // (b) JPA + QueryDSL — 원 저장소(com.querydsl)는 2024-01 5.1.0 이후 출시가 없어 유지보수 중인 포크를 쓴다
+    // implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    // implementation 'io.github.openfeign.querydsl:querydsl-jpa:7.7'
+    // annotationProcessor 'io.github.openfeign.querydsl:querydsl-apt:7.7:jpa'
+    // annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
+    // (c) MyBatis — 스타터의 Boot 대응 버전을 맞춘다 (4.0.x ↔ Boot 4.0, 4.1.x ↔ Boot 4.1)
+    // implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:4.1.0'
+
+    runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'   // @WebMvcTest·MockMvc·JUnit Jupiter·Mockito
+    testImplementation 'com.tngtech.archunit:archunit:1.5.1'                         // 패키지 순환 의존 검사 (spring.md 7절)
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    // 실패한 테스트 이름과 단언 내용을 콘솔에 — Stop 훅이 이 출력을 그대로 Claude에게 넘긴다 (없으면 "보고서를 보라"만 남는다)
+    // 훅은 `gradlew test --quiet`로 돌기 때문에 quiet 수준에도 같은 설정을 둔다 (기본 수준 설정만으로는 --quiet에서 안 나온다 — 실측)
+    testLogging {
+        events 'failed'
+        exceptionFormat = 'full'
+        quiet {
+            events 'failed'
+            exceptionFormat = 'full'
+        }
+    }
+}
+
+// 포맷·정적 검사 — check에 묶여 CI·훅이 강제한다 (spring.md 7절)
+spotless {
+    lineEndings = 'UNIX'                         // .gitattributes가 없어도 LF 기준 (Windows CRLF 함정)
+    java {
+        googleJavaFormat()
+        removeUnusedImports()
+        licenseHeaderFile 'config/header.txt'    // 파일 헤더 주석 강제 (general.md 5절)
+    }
+}
+
+checkstyle {
+    toolVersion = '14.3.0'
+    configFile = file('config/checkstyle/checkstyle.xml')
+    maxWarnings = 0
+}
