@@ -8,7 +8,7 @@ REST API 엔드포인트 설계 표준. 응답 봉투·에러 계약은 이 문�
 - 소문자, 리소스 중심 명사. 컬렉션은 복수형: `GET /requests`, 단건은 `GET /requests/:id`. 대외 서비스는 URL·응답의 ID에 순번 PK 대신 공개 ID를 쓴다 (`features/public-id.md` — 시작 결정 체크리스트 28).
 - 계층은 소속 관계일 때만: `/requests/:id/items`. 3단계 이상 중첩 금지 — 필요하면 쿼리 파라미터로.
 - 동사는 CRUD로 표현 불가능한 액션에만 예외 허용: `POST /requests/:id/approve`.
-- 사내 시스템은 버전 프리픽스 없이 시작. 외부 공개 API가 되면 그때 `/v1` 도입.
+- 사내 시스템은 버전 프리픽스 없이 시작. 외부 공개 API가 되면 그때 `/v1` 도입 — 화면 API와 분리한 `/api/public/v1`, 키·연동사별 한도·버전 정책은 `features/public-api.md`.
 
 ## 2. HTTP 메서드·상태코드
 

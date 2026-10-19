@@ -74,6 +74,7 @@ async function insertIgnoringDuplicate(conn, keyName, insert) {
 - 메일 본문의 사용자 입력(문서 제목·의견)은 **HTML 이스케이프**한다 — 자동 이스케이프 템플릿 엔진을 쓰거나 직접 이스케이프.
 - 링크는 `APP_BASE_URL`(환경변수, 폴백 금지 — patterns.md 4절) + `link_path`로 relay가 발송 시 조립한다. 화면 알림에는 상대 경로만 저장한다(도메인이 바뀌어도 유효).
 - SMTP 주소·계정은 환경변수(`SMTP_HOST` 등). 사내 메일 서버의 분당 발송 제한이 있으면 relay의 MAIL 묶음 크기로 맞춘다.
+- 외부 수신자에게 보내면 발송 도메인의 SPF·DKIM·DMARC를 갖춘다(features/mail-domain-auth.md). **광고성 정보(이벤트·쿠폰)는 이 레시피가 아니라 features/marketing-message.md** — 수신 동의·야간 제한·"(광고)" 표기·수신거부가 법정 요건이다.
 
 ### 3-4. 화면
 

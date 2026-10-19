@@ -1,6 +1,6 @@
 # JYP Agents 전체 기능 통합 가이드
 
-> 최종 수정: 2026-10-19 | 버전: 1.8 | 대상 독자: 이 저장소를 처음 보는 개발자, 그리고 전체 구조를 한눈에 복기하려는 관리자(박진영)
+> 최종 수정: 2026-10-19 | 버전: 1.9 | 대상 독자: 이 저장소를 처음 보는 개발자, 그리고 전체 구조를 한눈에 복기하려는 관리자(박진영)
 
 ## 1. 개요
 
@@ -52,7 +52,7 @@ Agents/
 ├── skills/            # 슬래시 커맨드 6종 (new-project, work-log, deploy-check, paper-test, live-test, review)
 ├── profiles/          # 프로젝트 생성 프리셋 (project-default.md — 결정 항목의 기본 답안)
 ├── scaffolds/         # 새 프로젝트 초기 구조 스펙 (default.md + templates/ 실물 파일)
-├── schemas/           # DB 기초 테이블 표준 DDL 22종
+├── schemas/           # DB 기초 테이블 표준 DDL 26종
 ├── templates/         # 문서 템플릿 8종 (doc-claude용 6 + 개발용 2)
 ├── hooks/             # 자동 검증 훅 스크립트 2종 (post-edit-check, stop-test)
 ├── docs/              # 저장소 자체 문서 (이 파일)
@@ -223,12 +223,12 @@ doc-claude 규칙의 프로젝트 import용 축약판 — 템플릿 준수, 추�
 | 구성 | 역할 |
 |---|---|
 | [profiles/project-default.md](../profiles/project-default.md) | **사내 표준 프로필** — 결정 항목의 기본 답안. 매번 묻는 것은 **[확인] 항목**(프로젝트명·목적 / 언어 / 인증 소스 / 사내 API 연동 / 특수 요구 + Spring이면 데이터 접근)뿐이고 나머지는 [고정]으로 적용한다. 프로젝트마다 같은 예외를 반복하면 프로필을 고친다 |
-| [scaffolds/default.md](../scaffolds/default.md) | 절차(확인 → 생성 → `.env` 자동 생성 → git init → 보고) · **시작 결정 체크리스트 30항목**(프로필의 근거이자 미적용 시 전체 목록) · 기본/모노레포 구조 · 기초 테이블 · 스택별 조정표 · **린트 강제** · 초기 파일 전문(README·CLAUDE.md·.env.example·test.yml·release.yml) |
+| [scaffolds/default.md](../scaffolds/default.md) | 절차(확인 → 생성 → `.env` 자동 생성 → git init → 보고) · **시작 결정 체크리스트 32항목**(프로필의 근거이자 미적용 시 전체 목록) · 기본/모노레포 구조 · 기초 테이블 · 스택별 조정표 · **린트 강제** · 초기 파일 전문(README·CLAUDE.md·.env.example·test.yml·release.yml) |
 | [scaffolds/templates/](../scaffolds/templates/) | **실물 파일 템플릿** — docker-compose 3종(base/dev/deploy) · nginx-proxy.conf · Caddyfile · nginx.conf · ESLint 설정 4종(client/server × TS/JS). docker.md 규칙(`${VAR:?}` 폴백 금지 · base 최소 · migrate/batch는 `profiles: tools`)이 이미 반영돼 있어 즉흥 작성을 금지한다. 검증: `scripts/verify-templates.ps1`(Windows)·`scripts/verify-templates.sh`(Mac/Linux) (임시 폴더에 조립 후 두 모드의 `docker compose config` 실행) · `scripts/check-refs.mjs` (문서 간 절 참조 무결성 — 2026-07-17 신설, **CI가 push/PR마다 자동 실행** — 2026-07-22) |
 
 - 주의: 파일 있는 폴더에 생성 금지, 요청 없는 샘플 코드 금지(단, CLI 데모 잔재 제거는 필수), 백로그는 첫 발견 시점에 생성.
 
-### 4-6. 표준 스키마 (schemas/ 22종)
+### 4-6. 표준 스키마 (schemas/ 26종)
 
 database.md 규칙(PK 네이밍, 공통 컬럼, 논리 FK + 인덱스, utf8mb4)의 **살아있는 레퍼런스**이자, 새 프로젝트의 첫 마이그레이션 원본.
 
@@ -256,6 +256,10 @@ database.md 규칙(PK 네이밍, 공통 컬럼, 논리 FK + 인덱스, utf8mb4)�
 | `19_terms_consent.sql` | terms_document, user_consent | 약관 버전·동의 이력(추가 전용, UPDATE 트리거 거부 — MySQL 8은 트리거만 관리자 계정) (consent.md 3절) |
 | `20_retained_personal_data.sql` | retained_personal_data | 탈퇴 후 법정 보존 값의 분리 보관 — **별도 스키마**, 파기 예정일 (account-withdrawal.md 3절) |
 | `21_inquiry.sql` | inquiry, inquiry_message, content_report | 1:1 문의(대화·전이·담당)와 신고(1인 1건) (inquiry.md 3절) |
+| `22_webhook_inbox.sql` | webhook_inbox | 받은 웹훅 수신함 — `(source, event_id)` 중복 제거, 워커 선점 (webhook-receive.md 3절) |
+| `23_api_client.sql` | api_client, api_key | 공개 API 연동사·키(접두어 + sha256, 범위·폐기) (public-api.md 3절) |
+| `24_payment.sql` | payment, payment_cancel | PG 결제 시도·상태(조건부 전이)·부분 취소(멱등 키) (payment.md 3절) |
+| `25_privacy_request.sql` | privacy_request | 열람·정정·삭제·처리정지 요구의 접수·기한·결과 통지 (privacy-rights.md 3절) |
 
 ### 4-7. 템플릿 (templates/ 8종)
 

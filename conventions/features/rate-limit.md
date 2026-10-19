@@ -55,13 +55,14 @@ app.set('trust proxy', 1);                                  // 3-1절 — 이 �
  * 빈도 제한 미들웨어 생성 — 초과 시 429 + Retry-After + RateLimit 헤더 + 에러 봉투
  * @param {number} windowMs 창 길이(ms)
  * @param {number} limit 창 안에서 허용할 요청 수
+ * @param {object} [extra] express-rate-limit 추가 옵션 (예: skip)
  */
-const limiter = (windowMs, limit) => rateLimit({
-  windowMs, limit, standardHeaders: 'draft-7', legacyHeaders: false,
+const limiter = (windowMs, limit, extra = {}) => rateLimit({
+  windowMs, limit, standardHeaders: 'draft-7', legacyHeaders: false, ...extra,
   handler: (req, res) => res.status(429).json({ message: '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.', error: 'TOO_MANY_REQUESTS' }),
 });
 
-app.use('/api', limiter(60_000, 300));
+app.use('/api', limiter(60_000, 300, { skip: (req) => req.path.startsWith('/public/') }));   // 공개 API는 연동사별 한도 (public-api.md 3-2절)
 app.use('/api/auth/login', limiter(60_000, 10));
 app.use(['/api/auth/signup', '/api/auth/password-reset', '/api/auth/send-code'], limiter(3_600_000, 20));
 ```
