@@ -57,7 +57,7 @@
 
 | 항목 | 내용 |
 |---|---|
-| nginx 템플릿의 `listen [::]:8080;` | IPv6를 커널에서 끈 호스트(`ipv6.disable=1`)에서는 **nginx가 기동하지 못한다**(이 환경에서 실측: `socket() [::]:8080 failed (97)`). 기본 compose 네트워크는 IPv4라 이 줄의 이득은 작다 — 제거 또는 유지 결정 필요 |
+| nginx 템플릿의 `listen [::]:8080;` | IPv6를 커널에서 끈 호스트(`ipv6.disable=1`)에서는 **nginx가 기동하지 못한다**(이 환경에서 실측: `socket() [::]:8080 failed (97)`). 기본 compose 네트워크는 IPv4라 이 줄의 이득은 작다 — 제거 또는 유지 결정 필요 → **같은 날 제거 (11절)** |
 | JWT 서명 시크릿 변수 | 10-16에 보고한 그대로 — compose 템플릿·`.env.example`에 연결 지점이 없다 → **같은 날 해소 (6절)** |
 
 ---
@@ -157,7 +157,19 @@
 
 | 항목 | 내용 |
 |---|---|
-| nginx 템플릿의 `listen [::]:8080;` | 1부 5절 그대로 — 사용자에게 영향 분석을 보고하고 결정 대기 |
+| nginx 템플릿의 `listen [::]:8080;` | 1부 5절 그대로 — 사용자에게 영향 분석을 보고하고 결정 대기 → **사용자 결정으로 제거 (11절)** |
+
+## 11. nginx 템플릿에서 IPv6 리슨 제거 (fix)
+
+기존: `nginx.conf`·`nginx-proxy.conf`에 `listen [::]:8080;` — "IPv6로 들어오는 접속까지 받기 위해".
+변경: `listen 8080;`(IPv4)만 두고, `docker.md` 2-3절을 **[::] 리슨 금지(STRICT)** 로 바꿨다. IPv6 네트워크를 켜서 직접 받는 구성일 때만 프로젝트에서 추가하고 CLAUDE.md에 기록한다.
+
+| 확인 | 결과 |
+|---|---|
+| 이득이 있는 경로 | 없음 — 기본 compose 네트워크 IPv6 꺼짐, 프록시 DNS `ipv6=off`, 호스트 공개 포트는 IPv6 사용자 요청도 컨테이너 IPv4로 전달, 헬스체크는 `127.0.0.1` 고정 |
+| 손해 (커널 IPv6 없는 호스트, 로컬 nginx 1.24로 템플릿 그대로 기동) | 수정 전 두 템플릿 모두 `socket() [::]:8080 failed (97: Address family not supported by protocol)`로 **기동 실패** / 수정 후 둘 다 기동 — 정적 `/` 200, 프록시는 upstream 없음 안내 503(템플릿 동작 그대로) |
+
+**변경 파일**: `scaffolds/templates/nginx.conf`, `scaffolds/templates/nginx-proxy.conf`, `conventions/docker.md`
 
 ---
 
@@ -194,4 +206,7 @@ JWT 서명 키를 .env.example·compose에 연결 + 운영 기능 카탈로그 4
 ■ 연결
 - 체크리스트 27 보강·31(결제)·32(공개 API), rate-limit 전역 한도에서 공개 API 제외
 - 3-2차 원문 미확인(보존 3년·파기 5일·휴면) 해소
+
+■ nginx 템플릿 IPv6 리슨 제거
+- listen [::]:8080 → IPv6를 끈 호스트에서 nginx 기동 실패(실측), 기본 구성에서 이득 없음 → IPv4만 (docker.md 2-3절 STRICT)
 ```
