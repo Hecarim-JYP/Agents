@@ -206,7 +206,7 @@ services:
 - HTTPS 종단은 프록시에서 처리하고 앱은 내부 HTTP로 받는다 — Express는 `app.set('trust proxy', 1)`로 `X-Forwarded-*`를 신뢰 설정해야 클라이언트 IP·프로토콜 판별이 정상 동작한다. **값은 `true`가 아니라 `1`** — `true`면 클라이언트가 보낸 `X-Forwarded-For`를 그대로 믿는다. 프록시는 `X-Forwarded-For`를 이어 붙이지 않고 접속 IP로 덮어쓴다(nginx 템플릿 `$remote_addr`, Caddy 기본 동작) — 이어 붙이면 Spring이 위조 IP를 채택한다 (2026-10-16 실측·원문 소스 — `features/rate-limit.md` 3-1절).
 - **역할 분담 (2026-07-14 확정)**: **프록시 = HTTPS 종단 + 라우팅만**, **정적 서빙 = client(nginx) 컨테이너**(2-3절). 프록시가 같은 출처에서 `/api/*`는 server로, 그 외는 client로 넘기므로 CORS가 원천 해소된다.
 - **프록시 서비스와 그 설정 파일은 스캐폴드 기본 구성이다 (STRICT)** — 없으면 배포 모드 기동 시 외부 접근 경로가 아예 없다 (근거: 규칙만 있고 스캐폴드에 프록시가 빠져 배포 기동에서 접근 불가·CORS 차단이 발생한 사례).
-- 템플릿: **`~/.claude/jyp/scaffolds/templates/nginx-proxy.conf`**(기본) / **`Caddyfile`**(Caddy 채택 시) — compose 3종도 같은 폴더. 라우팅 규약(두 템플릿 동일):
+- 템플릿: **`~/.claude/jyp/scaffolds/templates/nginx-proxy.conf`**(기본) / **`Caddyfile`**(Caddy 채택 시) — compose 3종도 같은 폴더. **nginx 템플릿은 컨테이너 이름을 요청 시점에 다시 해석한다(`resolver 127.0.0.11` + 변수 `proxy_pass`, 연결 타임아웃 2초) — 고정 이름으로 바꾸지 않는다 (STRICT, 2026-10-19 실측)**: 기동 때 한 번만 해석하면 재배포로 컨테이너 IP가 바뀌는 순간(client·server가 IP를 맞바꾸기도 한다) 서비스 전체가 점검 안내 503에 고정되고, proxy 재시작 전까지 풀리지 않는다 (`features/zero-downtime-deploy.md` 3-1절). Caddy는 기본 동작이 재해석이다. 라우팅 규약(두 템플릿 동일):
 
 | 경로 | 대상 | 비고 |
 |---|---|---|
