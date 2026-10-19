@@ -2,7 +2,7 @@
 // TS 프로젝트는 eslint.config.server.mjs를 쓴다 (언어는 체크리스트 1 — express.md 0절).
 // TS 전용 규칙(any 금지)만 빠지고 나머지 강제는 동일하다.
 // 필요 패키지 (⚠ eslint와 @eslint/js의 메이저를 맞춘다 — 안 맞추면 ERESOLVE로 설치가 깨진다):
-//   npm i -D eslint@9 @eslint/js@9 eslint-plugin-import globals
+//   npm i -D eslint@9 @eslint/js@9 eslint-plugin-import globals eslint-import-resolver-typescript
 // package.json:  "lint": "eslint ."   (훅과 CI가 이 스크립트를 실행한다)
 
 import js from '@eslint/js';
@@ -15,6 +15,10 @@ export default [
   {
     files: ['**/*.js'],
     languageOptions: { globals: globals.node },
+    // import/no-cycle이 확장자 없는 경로·jsconfig paths 별칭(@/)까지 따라가게 한다 (2026-10-19 실측 — 없으면 순환을 못 잡는다)
+    settings: {
+      'import/resolver': { typescript: true, node: { extensions: ['.js', '.jsx', '.mjs'] } },
+    },
     plugins: { import: importPlugin },
     rules: {
       // patterns.md 1절 — 계층 단방향 (순환 의존 금지)

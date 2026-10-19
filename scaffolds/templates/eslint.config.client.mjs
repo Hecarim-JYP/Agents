@@ -1,7 +1,9 @@
 // client/eslint.config.mjs — 컨벤션을 자동 강제하는 린트 설정 (React + TypeScript)
 // 문서로만 있던 규칙을 도구로 옮긴 것이다. 규칙 근거는 각 rule의 message 참조.
 // 필요 패키지 (⚠ eslint와 @eslint/js의 메이저를 맞춘다 — 안 맞추면 ERESOLVE로 설치가 깨진다):
-//   npm i -D eslint@9 @eslint/js@9 typescript-eslint eslint-plugin-react-hooks eslint-plugin-import globals
+//   npm i -D eslint@9 @eslint/js@9 typescript-eslint eslint-plugin-react-hooks eslint-plugin-import globals eslint-import-resolver-typescript
+// ⚠ TypeScript는 6.0.x로 고정한다 (npm i -D typescript@~6.0.3) — typescript-eslint가 아직 TS 7을 지원하지 않아(peer <6.1.0)
+//   최신 Vite 템플릿(TS 7)·`npm i -D typescript`(7.x) 그대로면 위 설치가 ERESOLVE로 깨진다 (2026-10-19 실측)
 // package.json:  "lint": "eslint ."   (훅과 CI가 이 스크립트를 실행한다)
 
 import js from '@eslint/js';
@@ -17,6 +19,12 @@ export default tseslint.config(
   {
     files: ['**/*.{ts,tsx}'],
     languageOptions: { globals: globals.browser },
+    // import/no-cycle이 실제로 돌게 하는 설정 (2026-10-19 실측 — 없으면 TS 파일을 못 읽어 순환을 하나도 못 잡는다):
+    // TS 파서로 의존 파일을 읽고, typescript 리졸버로 확장자 없는 경로·'.js'로 쓴 TS 경로·tsconfig paths 별칭(@/)까지 따라간다
+    settings: {
+      'import/parsers': { '@typescript-eslint/parser': ['.ts', '.tsx'] },
+      'import/resolver': { typescript: true, node: true },
+    },
     plugins: { 'react-hooks': reactHooks, import: importPlugin },
     rules: {
       ...reactHooks.configs.recommended.rules,

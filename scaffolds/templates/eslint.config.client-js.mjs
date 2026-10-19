@@ -2,7 +2,7 @@
 // TS 프로젝트는 eslint.config.client.mjs를 쓴다 (언어는 체크리스트 1 — react.md 0절).
 // TS 전용 규칙(any 금지)만 빠지고 나머지 강제는 동일하다.
 // 필요 패키지 (⚠ eslint와 @eslint/js의 메이저를 맞춘다 — 안 맞추면 ERESOLVE로 설치가 깨진다):
-//   npm i -D eslint@9 @eslint/js@9 eslint-plugin-react-hooks eslint-plugin-import globals
+//   npm i -D eslint@9 @eslint/js@9 eslint-plugin-react-hooks eslint-plugin-import globals eslint-import-resolver-typescript
 // package.json:  "lint": "eslint ."   (훅과 CI가 이 스크립트를 실행한다)
 
 import js from '@eslint/js';
@@ -18,6 +18,10 @@ export default [
     languageOptions: {
       globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },   // JSX 파싱 — 아래 JSXAttribute 셀렉터의 전제
+    },
+    // import/no-cycle이 확장자 없는 경로·jsconfig paths 별칭(@/)까지 따라가게 한다 (2026-10-19 실측 — 없으면 순환을 못 잡는다)
+    settings: {
+      'import/resolver': { typescript: true, node: { extensions: ['.js', '.jsx', '.mjs'] } },
     },
     plugins: { 'react-hooks': reactHooks, import: importPlugin },
     rules: {
