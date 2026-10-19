@@ -90,9 +90,10 @@
 | 인증 필터 | 커스텀 미들웨어 (`authenticateToken`) | Spring Security `SecurityFilterChain` |
 | 권한 게이트 | `requireActionPermission('module.action')` | `@PreAuthorize("hasAuthority('module.action')")` |
 | JWT 발급/검증 | jsonwebtoken 또는 jose | jjwt / spring-security-oauth2-resource-server |
-| 비밀번호 해싱 (0절 a) | `bcrypt`(cost 12+) 또는 `argon2` | `BCryptPasswordEncoder(12)` 또는 `Argon2PasswordEncoder` |
+| 비밀번호 해싱 (0절 a) | 네이티브 `bcrypt`(cost 12+) 또는 `argon2` — **순수 JS `bcryptjs` 금지**: 해시 중 이벤트 루프를 막아 로그인이 몰리면 다른 API 처리량이 0이 된다 (2026-10-19 실측 — `features/load-test.md` 3-3절) | `BCryptPasswordEncoder(12)` 또는 `Argon2PasswordEncoder` |
 | 사내 인증 위임 (0절 b) | `external/` 연동 클라이언트 호출 후 자체 토큰 발급 | 동일 — `external/` 빈 호출 후 자체 토큰 발급 |
 | SSO (0절 c) | openid-client 등 OIDC 라이브러리 | `spring-boot-starter-oauth2-client` |
+| 대외 소셜 로그인(카카오·네이버·구글) | 같은 라이브러리 — 식별 키·계정 연결 규칙은 `features/social-login.md` | 동일 |
 | refresh 쿠키 | `res.cookie(..., { httpOnly, secure, sameSite })` | `ResponseCookie` + `HttpOnly/Secure/SameSite` |
 | CSRF | SameSite + Bearer 헤더 요구 (3절) | Spring Security CSRF 설정 (토큰 방식이면 비활성 + 3절 방식) |
 

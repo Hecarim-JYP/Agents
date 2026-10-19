@@ -1,6 +1,6 @@
 # 레시피: 개인정보 화면 마스킹·접속기록 `[사내]`
 
-> 확정: 2026-10-14 | 테이블: `schemas/14_personal_data_access_log.sql` | 짝: excel-download.md, ops.md 3절(로그 마스킹)
+> 확정: 2026-10-14 | 테이블: `schemas/14_personal_data_access_log.sql` | 짝: excel-download.md, ops.md 3절(로그 마스킹), account-withdrawal.md(탈퇴·파기·분리 보관)
 > 개인정보는 **서버가 가려서** 내보내고, 원문은 권한과 사유가 있을 때 한 건씩만 보여준다. 누가·언제·어디서·누구의·무엇을 처리했는지 **고칠 수 없는 접속기록**으로 남긴다.
 
 ## 1. 언제 쓰나

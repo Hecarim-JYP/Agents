@@ -40,6 +40,8 @@ WHERE NOT EXISTS (SELECT 1 FROM code_table WHERE code = 'NEW_CODE');
 1. **1차 배포**: 새 구조 추가 + 코드가 새 구조를 사용하도록 전환 (구 컬럼은 미사용 상태로 유지)
 2. **2차 배포**: 운영에서 문제없음을 확인한 뒤 구 구조 삭제
 
+- 순차 교체 배포(무중단)에서는 이 원칙이 선택이 아니다 — 교체하는 동안 **옛 코드와 새 코드가 같은 DB를 동시에** 쓰므로, 1차 배포의 스키마는 옛 코드에서도 동작해야 한다 (`features/zero-downtime-deploy.md`).
+
 - 즉시 삭제가 불가피하면 롤백 스크립트(복구용 SQL)를 같은 번호로 동반 작성한다 (`002_rollback.sql`).
 
 ## 5. 적용 기록과 canonical DDL 동기화

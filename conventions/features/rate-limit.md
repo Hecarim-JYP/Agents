@@ -13,7 +13,7 @@
 |---|---|---|
 | 제한 키 | 전역: IP / 로그인: IP (+ 계정 단위 잠금은 auth.md 1절) / 발송: IP + 대상 | **IP만으로 강하게 막지 않는다** — 통신사·회사 NAT 뒤에서는 많은 사용자가 IP 하나를 공유한다 |
 | 한도 | 전역 `/api` IP당 **분당 300** · 로그인 IP당 **분당 10** · 발송 IP당 **시간당 20** (대상당 한도는 account-lifecycle.md 2절) | 운영 로그를 보고 조정, CLAUDE.md에 기록 |
-| 카운터 저장소 | **앱 메모리** — 단일 인스턴스 전제(docker.md 7절) | 다중 인스턴스면 Redis 등 공유 저장소. CLAUDE.md "다중화 전환 목록"에 기록 |
+| 카운터 저장소 | **앱 메모리** — 단일 인스턴스 전제(docker.md 7절) | 다중 인스턴스면 Redis 등 공유 저장소(multi-instance.md 3-2절 — 실측: 메모리 저장소는 한도가 인스턴스 수 배). CLAUDE.md "다중화 전환 목록"에 기록 |
 | 초과 응답 | **429 + `Retry-After` + RateLimit 헤더 + 에러 봉투**(`TOO_MANY_REQUESTS`) | api.md 5절 |
 | CAPTCHA 위치 | **상시 아님** — 가입·발송 요청, 로그인 3회 실패 이후 | 제공사(reCAPTCHA·hCaptcha·Turnstile 등) 선택 = 이용자 정보가 제공사로 간다 → 개인정보 처리방침 반영 |
 | CAPTCHA 장애 시 | **차단(fail-closed) + 에러 알림**(error-alert.md) | 통과(fail-open)는 장애 동안 봇이 그대로 들어온다 |

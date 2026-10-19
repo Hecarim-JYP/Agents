@@ -72,7 +72,7 @@ export const getItems = async (raw: unknown) => {
 };
 ```
 
-- ZodError는 중앙 errorHandler에서 400 + 에러 키 계약(`message`/`error`/`field`)으로 변환한다.
+- ZodError는 중앙 errorHandler에서 400 + 에러 키 계약(`message`/`error`/`field`)으로 변환한다. **본문 파싱 실패(`err.type === 'entity.parse.failed'`)는 400, 용량 초과(`entity.too.large`·multer `LIMIT_FILE_SIZE`)는 413**으로 먼저 거른다 — 알려진 에러 외를 모두 500으로 내는 흔한 구현은 깨진 JSON 하나에도 500을 낸다 (2026-10-19 실측 — `features/error-pages.md` 3-1절).
 - 쿼리 함수에는 검증된 값만 전달하고, 쿼리 함수 내부의 인라인 형변환(`String(params.x ?? '')`)은 금지 — 정규화는 여기서 끝낸다.
 - 기존 JS 프로젝트는 기존 방식(`checkRequiredParams` + `toNumberOrNull` 유틸) 유지.
 

@@ -1,6 +1,6 @@
 # 레시피: 가입·이메일/휴대폰 인증·비밀번호 재설정 (계정 열거 방지) `[대외]`
 
-> 확정: 2026-10-16 | 테이블: `schemas/16_account_token.sql` + `user.email_verified_at`(01_auth.sql에 추가) | 원칙: auth.md 1절(비밀번호·시도 제한) | 짝: rate-limit.md(발송 빈도), session-control.md(재설정 후 세션 종료), notification.md(메일 발송), mfa.md
+> 확정: 2026-10-16 | 테이블: `schemas/16_account_token.sql` + `user.email_verified_at`(01_auth.sql에 추가) | 원칙: auth.md 1절(비밀번호·시도 제한) | 짝: rate-limit.md(발송 빈도), session-control.md(재설정 후 세션 종료), notification.md(메일 발송), mfa.md, social-login.md(같은 이메일 계정 연결), consent.md(가입 동의), account-withdrawal.md(탈퇴)
 > 계정이 있는지 없는지를 **응답 문구로도, 응답 시간으로도** 드러내지 않는다. 확인용 토큰·코드는 원문을 저장하지 않고 **한 번만·짧게·시도 한도 안에서** 쓰인다.
 
 ## 1. 언제 쓰나
