@@ -23,6 +23,9 @@ header {
 	# Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 }
 
+# 텍스트 응답 압축 — Caddy는 기본으로 압축하지 않는다 (features/static-assets.md 3-2절)
+encode zstd gzip
+
 # 컨테이너 IP가 재배포로 바뀌어도 Caddy는 연결할 때마다 이름을 다시 해석한다 — 별도 설정 불필요 (zero-downtime-deploy.md 3-1절, 2026-10-19 실측)
 handle /api/* {
 	reverse_proxy server:3000
