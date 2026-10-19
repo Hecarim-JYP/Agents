@@ -58,7 +58,7 @@
 | 항목 | 내용 |
 |---|---|
 | nginx 템플릿의 `listen [::]:8080;` | IPv6를 커널에서 끈 호스트(`ipv6.disable=1`)에서는 **nginx가 기동하지 못한다**(이 환경에서 실측: `socket() [::]:8080 failed (97)`). 기본 compose 네트워크는 IPv4라 이 줄의 이득은 작다 — 제거 또는 유지 결정 필요 |
-| JWT 서명 시크릿 변수 | 10-16에 보고한 그대로 — compose 템플릿·`.env.example`에 연결 지점이 없다 |
+| JWT 서명 시크릿 변수 | 10-16에 보고한 그대로 — compose 템플릿·`.env.example`에 연결 지점이 없다 → **같은 날 해소 (6절)** |
 
 ---
 
@@ -97,4 +97,101 @@
 ■ 연결
 - 체크리스트 29(검색 노출)·30(대외 계정 정책), auth.md bcryptjs 금지, express.md 400/413, react.md ErrorBoundary
 - 3-1차 레시피 SQL MySQL 8.0 검증 완료
+```
+
+---
+---
+
+# 2부 — JWT 시크릿 연결 + 4차(법적 요건 묶음)
+
+> 사용자 요청 "jwt 환경변수는 example 에 등록해야지 / 그리고 4차도 진행해". 1부 이후 커밋.
+> 핵심 주제: **① 서명 키를 `.env.example`·compose에 연결 + 환경변수 추가 규칙 보강 ② 4차 레시피 8개 + 스키마 4개 ③ 법령 원문 확인 경로 확보(legalize-kr) — 3-2차 "원문 미확인" 해소**
+
+## 6. JWT 서명 시크릿을 `.env.example`·compose에 연결 (fix)
+
+기존: 규칙(auth.md 2절 "서명 키는 환경변수로만")과 코드 예시는 있는데, `.env.example`·compose server `environment:` 어디에도 자리가 없어 매 프로젝트가 직접 추가하다 빠뜨릴 수 있었다.
+변경:
+- compose server에 `JWT_SECRET: ${JWT_SECRET:?JWT_SECRET 미설정}` — 비어 있으면 기동 전에 실패(실측: 메시지 그대로 출력)
+- `.env.example`에 빈 `JWT_SECRET=` + 생성 명령 주석, 스캐폴드 생성 절차 3에서 **랜덤값(48바이트 base64)으로 채움**(example에는 값을 넣지 않는다)
+- `auth.md`·`spring.md`가 같은 변수명을 가리키게, `verify-templates.sh`/`.ps1`에 검증용 더미 값
+- **`ops.md` 1절 규칙 보강 (MANDATORY)**: 새 환경변수는 `.env.example`과 compose server `environment:` **양쪽에** — base는 `.env`를 통째 주입하지 않으므로(docker.md 4-1절) example에만 넣으면 컨테이너에 값이 들어가지 않는다. 4차 레시피의 키(`FIELD_ENC_KEY_V{n}`·`UNSUBSCRIBE_KEY`·`PG_SECRET_KEY`·`WEBHOOK_SECRET_{SOURCE}`)도 이 규칙으로 안내
+
+**변경 파일**: `scaffolds/templates/docker-compose.yml`, `scaffolds/default.md`, `conventions/auth.md`, `conventions/spring.md`, `conventions/ops.md`, `scripts/verify-templates.sh`, `scripts/verify-templates.ps1`
+
+## 7. 법령 원문 확인 경로 (docs)
+
+- 법제처(law.go.kr)는 이 환경에서 접속 불가(403). **법제처 데이터를 마크다운으로 옮긴 공개 git 저장소(legalize-kr — 법령·행정규칙)** 를 읽기 전용으로 받아 조문을 직접 확인했다. 각 레시피 1-1절에 "원문 확인 2026-10-19 — legalize-kr"와 판본(공포·시행일)을 적었다.
+- 이 경로로 **1부 3절의 원문 미확인 항목을 해소**했다:
+
+| 항목 | 확인 결과 | 반영 |
+|---|---|---|
+| 전자상거래법 시행령 제6조 보존기간 | 표시·광고 6개월 / 계약·청약철회 5년 / 대금결제·공급 5년 / **소비자 불만·분쟁처리 3년** + 동의 철회 소비자 기록 별도 보존(②3호) — 2026-07-21 시행본 | account-withdrawal.md, inquiry.md(보관 3년) |
+| 파기 5일 | **표준 개인정보 보호지침 제10조** — 5일 이내 파기, 기록, 책임자 확인 / 제11조 분리 보관 + 처리방침 고지 (2025-04-11 시행본) | account-withdrawal.md |
+| 장기 미이용 분리(휴면) | 현행 법률·시행령에 조항 없음 확인 | account-withdrawal.md |
+| 동의 관련 | 제15조 ①4호, 제22조 ①③⑤, 시행령 제17조 ①②④ | consent.md |
+| 접속기록 점검 주기 | 현행 고시는 주기를 정하지 않는다(이전 판본의 "월 1회"는 현행 문언에 없음) — 내부 관리계획으로 정해 이행 | personal-data.md |
+
+## 8. 4차 레시피 8개 + 스키마 4개 (feat)
+
+| 레시피 | 스키마 | 원문 확인한 법정 요건 | 실측으로 확정한 함정 |
+|---|---|---|---|
+| `field-encryption.md` 민감 정보 암호화 ⚑ | — | 개인정보 보호법 제24조의2, 시행령 제21조의2, 안전성 확보조치 기준 제7조 ②③⑥ | DB `AES_ENCRYPT`는 **같은 평문 → 같은 암호문**(ECB) + **키·평문이 일반 로그에 그대로** / 앱 GCM + 블라인드 인덱스: 하이픈 없이 검색 성공·인덱스 사용, 1만 행 복호화 63~82ms, 키 교체 후 옛 행 복호화 |
+| `privacy-rights.md` 열람·정정·삭제·처리정지 | `25_privacy_request.sql` | 법 제35~38조, 시행령 제41~47조, 표준지침 제31~34조, 민법 제155~161조 — **받은 날부터 달력일 10일**, 연기·거절은 사유 + 이의제기방법, 수집 때 요구 안 한 증빙 금지 | **영업일로 세면 3~4일 늦은 기한**(10-19 접수 → 11-02, 법정 10-29) / UTC 날짜로 자르면 통지 기한이 하루 틀림 — Node·Java 같은 결과 |
+| `marketing-message.md` 광고성 정보 발송 | (19번 `terms_type`·`channel` 값 추가) | 정보통신망법 제50조, 시행령 제61~62조의3 — 사전 동의, **21~08시 별도 동의(전자우편 제외)**, 동의·거부 처리 결과 **14일 내 통지**, **2년마다 확인** | 컨테이너 UTC에서 `getHours()`가 한국 22:30을 13시로 → **야간 광고 발송** / **2024-02-29 + 2년: JS는 03-01(하루 늦음), DB `DATE_ADD`는 02-28** / 재확인 SQL 양쪽 DB 동일 |
+| `payment.md` 결제(PG) ⚑ | `24_payment.sql` | 전자상거래법 제17·18조, 시행령 제21조·제21조의3 — 청약철회 7일, **환급 3영업일**, 지연배상 연 15% | 리다이렉트 금액 그대로 승인 → **5만 원 주문이 100원 결제로 완료** / 승인 응답 유실을 실패로 → **돈은 나갔는데 주문 실패** / **취소 재시도마다 새 멱등 키 → 3만 원 결제에 6만 원 환불** / 동시 부분 취소는 조건부 UPDATE로 1건만 |
+| `webhook-receive.md` 웹훅 수신 | `22_webhook_inbox.sql` | (법정 요건 없음 — 서명 방식은 Standard Webhooks, 2차 출처) | 재직렬화 본문 검증 → 정상 웹훅 전부 401 / **전역 `express.json()` 뒤 라우트 `verify`는 실행되지 않음** / 요청 안에서 처리 → 제공사 4회 재전송·4회 처리 / 수신함 + 즉시 200 → 1회·31ms |
+| `public-api.md` 공개 API ⚑ | `23_api_client.sql` | — | **전역 IP 한도가 공개 API와 같은 IP의 화면 API까지 429** → `skip`으로 제외 / 폐기 후 캐시 30초 동안 통과 / base64url 비밀 1000개 중 491개에 `_` → `split('_')` 금지 |
+| `mail-domain-auth.md` SPF·DKIM·DMARC | — | (수신 측 요건 — Gmail 가이드라인·RFC 8058, 2차 출처) | mailauth 검증: SPF include 11개 → permerror, `From` 도메인 불일치 → DMARC fail, 본문 변경 + 미등록 IP → DMARC fail / **nodemailer 기본 DKIM 서명에 `List-Unsubscribe-Post`가 빠짐** → `headerFieldNames` 지정 |
+| `gdpr.md` 해외 이용자·국외 이전 | — | 개인정보 보호법 제28조의8(국외 이전 — 조회 포함). GDPR 제3·27조·적정성 결정은 2차 출처 | 분석 스크립트를 HTML에 직접 → **동의 전 쿠키 생성** / 동의 게이트: 거부 시 `consent`만 |
+
+**원문을 확인하지 못한 것** (레시피에 "미확인·2차 출처"로 표시, 착수 시 확인 MANDATORY): 정보통신망법 시행령 **별표 6**("(광고)" 표기 방법), GDPR 제12조 ③(1개월)·제33조(72시간)·ePrivacy 쿠키 요건, PG 승인 가능 시간·웹훅 서명 여부, Gmail 가이드라인 원문(접근 불가), 열람등요구 통지서 고시 서식.
+
+## 9. 기존 문서 연결 (docs)
+
+- 시작 결정 체크리스트 **27 보강**(고유식별정보·카드·계좌 저장 시 앱 계층 암호화), **31(결제 PG)·32(외부 공개 API)** 신설, 기초 테이블 22~25 포함 조건, 절차 1의 "23개" → 32개(낡은 수치 정정)
+- `rate-limit.md` 3-2절: limiter가 추가 옵션을 받고 전역 한도에서 공개 API 제외 / `integration.md` 1·4절: 웹훅·공개 API·결제 승인 링크 / `api.md` 1절: `/api/public/v1` / `notification.md` 3-3절: 메일 도메인 인증·광고성 정보 분리 / `personal-data.md`·`consent.md`·`account-withdrawal.md` 짝 링크
+- `19_terms_consent.sql` 주석: `MARKETING_{EMAIL|SMS|PUSH|NIGHT}`, `channel = UNSUBSCRIBE`
+- catalog 4차 전 항목 📄 — **카탈로그의 모든 항목이 레시피 또는 기존 컨벤션으로 채워졌다**, `dev-rules` 기능 목록, 프로필 31·32 + 미적용 신호, OVERVIEW 1.9(스키마 26종·체크리스트 32항목), README
+
+## 10. 발견했지만 고치지 않음 (확인 필요)
+
+| 항목 | 내용 |
+|---|---|
+| nginx 템플릿의 `listen [::]:8080;` | 1부 5절 그대로 — 사용자에게 영향 분석을 보고하고 결정 대기 |
+
+---
+
+## 검증 (2부)
+
+| 항목 | 결과 |
+|---|---|
+| `node scripts/check-refs.mjs` | 통과 — 문서 64개 / 참조 562건 (skills·agents 포함 확장: 73개 / 579건), 맨 파일명 참조도 전부 실재 |
+| `scripts/verify-templates.sh` | 통과 — 두 모드 compose 병합·치환 정상, `JWT_SECRET` 없으면 "JWT_SECRET 미설정"으로 실패 |
+| 스키마 26종 | 새 DB에 00~25 전부 적용 — MariaDB 10.11·MySQL 8.0.46(관리자 계정) 모두 39개 테이블, 오류 0 |
+| 레시피 SQL 원문 그대로 실행 | 열람등요구 기한 감시·광고 2년 확인·부분 취소 한도 — 양쪽 DB 같은 결과 |
+| 실측 스크립트 | 8절 표 전부 — Node 22 · Express 4.22 · express-rate-limit 7.5 · mysql2 3.24 · nodemailer 6.10 · mailauth 4.13 · Chromium 헤드리스 · Java 21 |
+| `install.sh` 임시 HOME 설치 | 레시피 42개·스키마 26개, 설치본과 저장소 conventions 동일 |
+| 실측 안 한 것 | 실제 PG·실제 수신함(Gmail)·실제 DNS, Spring 쪽 구현(AES-GCM·웹훅 원본 바이트·API 키 필터) — 각 레시피에 "미검증" 표기 |
+| `verify-templates.ps1`·`install.ps1` 실행 | **미수행** — 이 환경에 PowerShell 없음. `.ps1`은 BOM·CRLF 유지만 확인. 회사 PC에서 `git pull` 후 `install.ps1` 실행 필요 |
+
+---
+
+## 커밋 코멘트 (2부)
+
+```
+@@ 2026-10-19 (2부) @@
+JWT 서명 키를 .env.example·compose에 연결 + 운영 기능 카탈로그 4차(법적 요건 묶음) 레시피 8개
+
+■ 결함 정정
+- JWT_SECRET: 규칙만 있고 .env.example·compose에 자리가 없던 것 → 양쪽 연결, 미설정 시 기동 실패
+- ops.md 1절: 새 환경변수는 .env.example + compose server environment 양쪽에 (MANDATORY)
+
+■ 레시피 (conventions/features/) — 법령은 legalize-kr로 원문 확인
+- field-encryption, privacy-rights, marketing-message, payment
+- webhook-receive, public-api, mail-domain-auth, gdpr
+- schemas: 22_webhook_inbox, 23_api_client, 24_payment, 25_privacy_request
+
+■ 연결
+- 체크리스트 27 보강·31(결제)·32(공개 API), rate-limit 전역 한도에서 공개 API 제외
+- 3-2차 원문 미확인(보존 3년·파기 5일·휴면) 해소
 ```
