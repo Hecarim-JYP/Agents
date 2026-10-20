@@ -98,3 +98,102 @@
 - Java 21 → 25 — JRE 25 이미지에 wget이 없어 HEALTHCHECK를 bash /dev/tcp로
 - MySQL 호환 기준 8.0(지원 종료) → 8.4 LTS, MariaDB 11.4 LTS 유지
 ```
+
+---
+---
+
+# 2부 — 5차: 법적 요건 레시피 3종 + "미검증" 18건 해소
+
+> 사용자 요청 "5차 내용 보고해" → 권고안 보고(A: 법적 요건 레시피 3종 / D: 기존 레시피의 미검증 표시 전부 실측) → "권고안으로 5차 진행해".
+> 진행 방식은 4차와 같다: **법령 원문 확인 → 함정 실측 → 레시피 → 연결·검증 → 커밋**.
+
+## 1. 새 레시피 3종 + 스키마 2종 (feat)
+
+| 레시피 | 태그 | 스키마 | 핵심 |
+|---|---|---|---|
+| `privacy-breach.md` 개인정보 유출 대응 | `[공통]` | `26_privacy_breach.sql` (3개 테이블) | 알게 된 때부터 **72시간** 통지·신고, 확인된 것으로 먼저 알리고 추가 통지, 대상은 접속기록에서 **한 사람 한 행** |
+| `identity-verification.md` 본인확인 | `[대외]` ⚑ | `27_identity_verification.sql` (2개 테이블) | 결과는 **서버가 받은 값만**, 결과 **1회·같은 세션**, **CI 블라인드 인덱스 UNIQUE**로 중복 가입 차단, 한국 날짜 만 나이 |
+| `sms-message.md` 문자·알림톡 발송 | `[공통]` | outbox 재사용 | **사전 등록 발신번호로만**, **CP949 바이트**로 SMS/LMS 결정, 대체 발송은 한 곳에서만 |
+
+### 원문 확인 (legalize-kr — 법제처 데이터를 옮긴 공개 저장소, 2026-10-20)
+
+- 개인정보 보호법 제23조②(유출등 정의)·제22조의2·제34조(2026-03-10 개정분, 부칙 제1조로 2026-09 시행) / 시행령 제17조⑤·제17조의2·제39조·제39조의2·제39조의3·제40조(2026-09-11 시행본)
+- 「개인정보의 안전성 확보조치 기준」 제4조① 14호·제8조②(2026-07-01 시행본)
+- 정보통신망법 제23조의2·3·5·6(2026-10-02 시행본) / 민법 제4조·제158조·제160조
+- 전기통신사업법 제84조의2(2026-11-20 시행본) + 과기정통부 고시 「거짓으로 표시된 전화번호로 인한 이용자의 피해 예방 등에 관한 고시」 제7조④·제10조·제10조의2·제12조(2026-07-10 시행본)
+- 2차 출처로 표시: 대행사 API 바이트 한도(네이버 클라우드 SENS·Solapi), 알림톡 정책(Solapi·업계 안내), CI/DI 정의(KISA 본인확인 포털 자료)
+
+### 함정 실측 (2026-10-20)
+
+| 대상 | 결과 |
+|---|---|
+| 유출 대상 산정 (MariaDB 11.4.13 · MySQL 8.4.11 동일) | 고객 목록 24쪽×50명을 두 번씩 열람 + 원문 5건 + 목록 없는 3,000행 다운로드 → 접속기록 **행 수 54**(신고 판정 틀림) / `subject_count` 합계 5,405(과대) / **대상 표 1,200** / 목록 없는 기록은 JSON_TABLE에서 빠짐(하한으로 따로) / 범위 확대 재실행해도 중복 없음 |
+| 72시간 기한·종료 가드 | `+ INTERVAL 72 HOUR` 정확 / 기한 넘기고 사유 없는 행 CLOSED 0행, 사유 기록 후 1행 |
+| CI 중복 가입 | 암호문 UNIQUE → **2행 저장(통과)** / 블라인드 인덱스 UNIQUE → `ER_DUP_ENTRY` / 암호문 117바이트 |
+| CI에 숫자만 남기는 블라인드 인덱스 재사용 | 서로 다른 CI 20만 개 중 **17쌍 충돌** |
+| 본인확인 결과 1회 사용 | 동시 2회 → 1회 / 다른 세션 0행 / **DB 세션 시간대가 섞이면 만료 결과가 9시간 통과**(두 DB 모두, 통일하면 0행) |
+| 만 나이 (Node 24·Java 21 동일) | 연 나이는 2012-12-31생을 2026-01-01에 14세로 / UTC 날짜는 생일 0~9시에 한 살 적게 / Java `plusYears`는 2월 29일생을 하루 이르게 / `Period.between`·연월일 비교는 정확 |
+| 문자 바이트 (iconv-lite 0.7.3 · Java 21) | 한글 90자 `length` 90 vs CP949 180 / 44자 인증 문구 UTF-8 94 vs CP949 69 / **Java `EUC-KR`은 `똠`·`뷁`을 `?`로**, iconv-lite `euc-kr`은 실제로 CP949 / 이모지·`₩`·`–`는 두 스택 모두 `?` |
+
+## 2. "미검증" 18건 → 실측 (fix)
+
+Boot 4.1.1 · Java 25(Temurin 25.0.4) 테스트 프로젝트 하나 + nginx 1.30.6 · ClamAV 1.5.4 · React 19.3.1 · Playwright 1.64.1.
+
+| 레시피 | 항목 | 결과 |
+|---|---|---|
+| field-encryption | Java AES-GCM 형식 | Java 출력은 `암호문‖태그` — 재배치해 Node 형식과 **양방향 복호화 성공** |
+| load-test | `BCryptPasswordEncoder` | 톰캣 기본: 로그인 10건/s, 다른 API 420~457 req/s / 스레드 8: 다른 API 4 req/s / **가상 스레드: 다른 API 4 req/s, p99 5초** (2회 측정) → 해시 서버에 가상 스레드 금지 |
+| load-test | HikariCP 기본 풀 | 7.0.2 `DEFAULT_POOL_SIZE = 10` 상수 확인 |
+| mail-domain-auth | Java DKIM 서명 | `utils-mail-dkim` 3.3.1 → mailauth pass / **`List-Unsubscribe-Post`는 기본 서명 목록 밖**(nodemailer와 같은 함정) / 기본값이 서명 전 DNS 대조라 DNS 등록 전엔 실패 |
+| marketing-message | 야간 판정 | 서버 UTC + `LocalDateTime.now()` → 22:30을 야간 아님, 08:10을 야간으로 — 정반대 |
+| mfa | Java TOTP | `java-otp` 1.0.0 RFC 6238 SHA1 6/6·SHA256·SHA512 일치, Node otpauth와 같은 코드 |
+| multi-instance | Bucket4j + Redis | 두 인스턴스 번갈아 8회 → 정확히 5회 통과 / **만료 전략 없으면 TTL -1** |
+| multi-instance | `RedisMessageListenerContainer` | 두 인스턴스 수신 / 구독 중지 동안 발행분은 재시작 후에도 못 받음 |
+| public-api | `OncePerRequestFilter` 분리 체인 | 정상 동작 / **필터를 빈으로 만들면 모든 경로에 걸려 화면 API 401** / `setEnabled(false)`로 해결 |
+| rate-limit | nginx `set_real_ip_from` (LB·CDN) | LB 하나는 LB 주소만, CDN→LB는 둘 다 + `real_ip_recursive on` / **넓은 대역을 넣으면 위조값 채택** |
+| rate-limit | Bucket4j 필터 | 200×5 → 429×2, `Retry-After: 59`, 다른 경로 영향 없음 |
+| security-headers | Spring Security 헤더 | 기본 4종, **CSP·Referrer-Policy는 기본에 없음** — 설정으로 추가 확인 |
+| seo | Playwright 빌더 | 공식 이미지 빌드 단계에서 프리렌더 성공 / **v1.64.1 = Node 24.21**(v1.56.1은 Node 22) |
+| seo | React 19 머리 정보 | head로 올라가고 전환 시 바뀜 / **프리렌더와 함께면 제목 3개·설명 2개로 중복** → `useHead` 유지(React 19에서도 중복 없음) |
+| static-assets | Spring Security Cache-Control | 인증 응답 `no-cache, no-store…` / 정적 자산 `max-age=31536000, public` 그대로 |
+| static-assets · upload-security | 썸네일·재인코딩 | Thumbnailator: 400×800·EXIF 0 / **ImageIO 그대로: EXIF는 빠지지만 400×200(눕는다)** |
+| upload-security | ClamAV EICAR | INSTREAM 클라이언트(Node·Java) — EICAR·zip 안 EICAR 검출, 101MB는 `size limit exceeded` / ⚠ 공식 서명 DB는 네트워크 정책으로 받지 못해 **EICAR 해시 사용자 서명**으로 검증 |
+| upload-security | Apache Tika | 4.1.0 — 위장 HTML `text/html`, SVG `image/svg+xml`, **xlsx는 tika-core만이면 `x-tika-ooxml`** |
+| webhook-receive | `@RequestBody byte[]` | `byte[]`·`String` 서명 일치 / **`Map`으로 받아 재직렬화하면 401** |
+
+- 템플릿: `nginx-proxy.conf`에 LB·CDN 뒤 `real_ip` 설정을 주석으로 추가(켜면 `nginx -t` 통과, 꺼진 기본값도 통과).
+- `upload-security.md`에 3-4절(clamd INSTREAM 클라이언트) 신설.
+
+## 3. 연결
+
+catalog 5차 행 3개 + 5차 출처 원칙 / 시작 결정 체크리스트 **33(본인확인)** 신설(프로필·OVERVIEW 개수 32→33) / 스키마 목록 26·27 + 포함 조건 / dev-rules·README 기능 목록 / 짝 링크: personal-data·marketing-message·account-lifecycle·notification·gdpr·ops.md 4절(개인정보 장애 = 72시간 동시 시작)
+
+## 검증
+
+| 항목 | 결과 |
+|---|---|
+| `check-refs.mjs` | 통과 (620건, 확장 637건) |
+| 스키마 전체 | MariaDB 11.4.13 · MySQL 8.4.11 — 28개 파일 44개 테이블, 실패 0 |
+| `verify-templates.sh` | 통과 |
+| `nginx-proxy.conf` | nginx 1.30 `nginx -t` 통과 (기본·real_ip 켬 모두) |
+| `install.sh` 임시 HOME | 설치본 = 저장소 |
+| 인코딩 | 변경 파일 BOM·CRLF 없음, `install.ps1` BOM 유지 |
+| `install.ps1` 실행 | **미수행** — PowerShell 없음. 회사 PC에서 `git pull` 후 실행 필요 |
+
+## 커밋 코멘트
+
+```
+@@ 2026-10-20 (2부) @@
+5차 — 법적 요건 레시피 3종 + 기존 레시피 미검증 18건 실측
+
+■ 새 레시피 (법령 원문 확인)
+- 개인정보 유출 대응: 72시간 통지·신고, 우선 통지, 접속기록 → 한 사람 한 행 대상 산정
+- 본인확인: 서버 수신 결과만, 1회·같은 세션, CI 블라인드 인덱스 UNIQUE, 한국 날짜 만 나이
+- 문자·알림톡: 발신번호 사전 등록, CP949 바이트, 대체 발송 한 곳에서만
+- 스키마 26·27, 시작 결정 체크리스트 33(본인확인)
+
+■ 미검증 18건 → 실측 (Boot 4.1.1·Java 25·nginx 1.30·ClamAV 1.5·React 19·Playwright 1.64)
+- 가상 스레드 + bcrypt = 다른 API 정지 / 필터 빈 자동 등록 = 전 경로 401
+- DKIM·nodemailer 공통: List-Unsubscribe-Post 기본 미서명 / real_ip 넓은 대역 = 위조 채택
+- React 19 머리 태그 + 프리렌더 = 중복 → useHead 유지
+```
