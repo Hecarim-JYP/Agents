@@ -1,6 +1,6 @@
 # JYP Agents 전체 기능 통합 가이드
 
-> 최종 수정: 2026-10-20 | 버전: 1.11 | 대상 독자: 이 저장소를 처음 보는 개발자, 그리고 전체 구조를 한눈에 복기하려는 관리자(박진영)
+> 최종 수정: 2026-10-20 | 버전: 1.12 | 대상 독자: 이 저장소를 처음 보는 개발자, 그리고 전체 구조를 한눈에 복기하려는 관리자(박진영)
 
 ## 1. 개요
 
@@ -52,7 +52,7 @@ Agents/
 ├── skills/            # 슬래시 커맨드 6종 (new-project, work-log, deploy-check, paper-test, live-test, review)
 ├── profiles/          # 프로젝트 생성 프리셋 (project-default.md — 결정 항목의 기본 답안)
 ├── scaffolds/         # 새 프로젝트 초기 구조 스펙 (default.md + templates/ 실물 파일)
-├── schemas/           # DB 기초 테이블 표준 DDL 28종
+├── schemas/           # DB 기초 테이블 표준 DDL 29종
 ├── templates/         # 문서 템플릿 8종 (doc-claude용 6 + 개발용 2)
 ├── hooks/             # 자동 검증 훅 스크립트 2종 (post-edit-check, stop-test)
 ├── docs/              # 저장소 자체 문서 (이 파일)
@@ -223,12 +223,12 @@ doc-claude 규칙의 프로젝트 import용 축약판 — 템플릿 준수, 추�
 | 구성 | 역할 |
 |---|---|
 | [profiles/project-default.md](../profiles/project-default.md) | **사내 표준 프로필** — 결정 항목의 기본 답안. 매번 묻는 것은 **[확인] 항목**(프로젝트명·목적 / 언어 / 인증 소스 / 사내 API 연동 / 특수 요구 + Spring이면 데이터 접근)뿐이고 나머지는 [고정]으로 적용한다. 프로젝트마다 같은 예외를 반복하면 프로필을 고친다 |
-| [scaffolds/default.md](../scaffolds/default.md) | 절차(확인 → 생성 → `.env` 자동 생성 → git init → 보고) · **시작 결정 체크리스트 33항목**(프로필의 근거이자 미적용 시 전체 목록) · 기본/모노레포 구조 · 기초 테이블 · 스택별 조정표 · **린트 강제** · 초기 파일 전문(README·CLAUDE.md·.env.example·test.yml·release.yml) |
+| [scaffolds/default.md](../scaffolds/default.md) | 절차(확인 → 생성 → `.env` 자동 생성 → git init → 보고) · **시작 결정 체크리스트 35항목**(프로필의 근거이자 미적용 시 전체 목록) · 기본/모노레포 구조 · 기초 테이블 · 스택별 조정표 · **린트 강제** · 초기 파일 전문(README·CLAUDE.md·.env.example·test.yml·release.yml) |
 | [scaffolds/templates/](../scaffolds/templates/) | **실물 파일 템플릿** — docker-compose 3종(base/dev/deploy) · nginx-proxy.conf · Caddyfile · nginx.conf · ESLint 설정 4종(client/server × TS/JS) · Spring `build.gradle`(Boot 4 — Initializr를 못 쓸 때)·`checkstyle.xml`. docker.md 규칙(`${VAR:?}` 폴백 금지 · base 최소 · migrate/batch는 `profiles: tools`)이 이미 반영돼 있어 즉흥 작성을 금지한다. 검증: `scripts/verify-templates.ps1`(Windows)·`scripts/verify-templates.sh`(Mac/Linux) (임시 폴더에 조립 후 두 모드의 `docker compose config` 실행) · `scripts/check-refs.mjs` (문서 간 절 참조 무결성 — 2026-07-17 신설, **CI가 push/PR마다 자동 실행** — 2026-07-22) |
 
 - 주의: 파일 있는 폴더에 생성 금지, 요청 없는 샘플 코드 금지(단, CLI 데모 잔재 제거는 필수), 백로그는 첫 발견 시점에 생성.
 
-### 4-6. 표준 스키마 (schemas/ 28종)
+### 4-6. 표준 스키마 (schemas/ 29종)
 
 database.md 규칙(PK 네이밍, 공통 컬럼, 논리 FK + 인덱스, utf8mb4)의 **살아있는 레퍼런스**이자, 새 프로젝트의 첫 마이그레이션 원본.
 
@@ -262,6 +262,7 @@ database.md 규칙(PK 네이밍, 공통 컬럼, 논리 FK + 인덱스, utf8mb4)�
 | `25_privacy_request.sql` | privacy_request | 열람·정정·삭제·처리정지 요구의 접수·기한·결과 통지 (privacy-rights.md 3절) |
 | `26_privacy_breach.sql` | privacy_breach, privacy_breach_subject, privacy_breach_notice | 개인정보 유출등 대응 — 인지 시각·72시간 기한·대상 정보주체(한 사람 한 행)·통지·신고 이력 (privacy-breach.md 3절) |
 | `27_identity_verification.sql` | identity_verification, user_verified_identity | 본인확인 요청(1회용·세션 결합)·결과, CI 블라인드 인덱스 UNIQUE로 중복 가입 차단 (identity-verification.md 3절) |
+| `28_holiday.sql` | holiday | 공휴일·대체공휴일·지정 공휴일·회사 휴무일 — 규칙 생성 + 연도 확정, 기한·영업일 계산의 단일 목록 (holiday.md 3절) |
 
 ### 4-7. 템플릿 (templates/ 8종)
 

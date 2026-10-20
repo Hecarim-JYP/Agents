@@ -8,7 +8,7 @@
 - **Tailwind CSS + shadcn/ui** 를 표준으로 한다 (2026-07-11 확정).
 - 컴포넌트가 필요하면 **직접 만들기 전에 shadcn/ui에 있는지 먼저 확인**한다 (`npx shadcn@latest add table` 등). 테이블·폼·모달·셀렉트·토스트 등 업무 UI 대부분이 검증된 상태로 제공된다.
 - 커스텀 컴포넌트를 만들 때도 shadcn 패턴(cva variants, `cn()` 유틸)을 따른다 — 프로젝트 안에서 스타일 작성 방식이 하나여야 한다.
-- 별도 CSS 파일 작성은 Tailwind로 표현 불가능한 경우(복잡한 인쇄 양식, keyframe 등)로 한정하고, 사유를 주석으로 남긴다.
+- 별도 CSS 파일 작성은 Tailwind로 표현 불가능한 경우(복잡한 인쇄 양식, keyframe 등)로 한정하고, 사유를 주석으로 남긴다 — 인쇄 양식은 features/pdf-output.md.
 
 ## 2. 디자인 토큰 (STRICT)
 

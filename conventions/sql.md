@@ -119,7 +119,7 @@ export const functionName = async (conn, params) => {
 - 함수 상단에 doc comment(`@param`/`@returns`) 필수 (컨벤션 general.md 5절과 동일 원칙).
 - 템플릿 리터럴 내 SQL 들여쓰기: 함수 본문 기준 **4스페이스** 추가.
 - **타입 정규화는 서비스 계층 책임** — 쿼리 함수는 bind 값을 pass-through 한다. 쿼리 함수 내부에서 `String(params.x ?? '')` 같은 인라인 형변환 금지 (근거: 계층 책임이 섞이면 같은 파라미터가 함수마다 다르게 변환되는 불일치 발생).
-- 검색어를 LIKE 절에 쓸 때는 와일드카드/인젝션 안전 처리(sanitize 유틸)를 거친다.
+- 검색어를 LIKE 절에 쓸 때는 와일드카드/인젝션 안전 처리(sanitize 유틸)를 거친다 — 이스케이프 문자는 `ESCAPE '!'`로 명시하고 입력은 NFC로 정규화한다 (features/korean-search.md 3-1절 — 백슬래시 이스케이프는 `NO_BACKSLASH_ESCAPES`에서 조용히 틀린다).
 - **배열을 `IN (:list)`로 넘길 때는 `conn.query`를 쓴다 (STRICT — 2026-10-14 실측)** — mysql2 `execute`(prepared statement)는 배열을 펼치지 않아 **에러 없이 0건**을 돌려준다(같은 조건이 `query` 1건 / `execute` 0건). 상태 조건·중복 검사가 조용히 틀린다.
 
 ## 7. 안전 규칙
