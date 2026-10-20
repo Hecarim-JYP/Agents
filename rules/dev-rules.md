@@ -28,6 +28,7 @@
 ## 코딩 컨벤션과 스캐폴드
 - 코드 작성 시 `~/.claude/jyp/conventions/general.md`의 범용 컨벤션을 따른다 (기존 코드베이스 스타일이 우선)
 - 구현 구조는 `~/.claude/jyp/conventions/patterns.md`(계층 분리·책임 배치·신뢰 경계)를 따른다
+- **런타임·플랫폼 버전은 LTS 우선** — `~/.claude/jyp/conventions/general.md` 8-1절 (비LTS 금지, 선택한 버전·지원 종료일을 CLAUDE.md에 기록, 기억으로 버전을 정하지 않고 템플릿·컨벤션의 검증된 값을 쓴다)
 - 스택별 추가 적용: SQL은 `sql.md`, DB 스키마 설계·운영은 `database.md`(네이밍·공통 컬럼·타입·인덱스/제약), Express/Node 서버는 `express.md`, Spring Boot 서버는 `spring.md`, React 클라이언트는 `react.md`
 - DB 기초 테이블(인증·권한, 공통코드, 파일 메타, 감사 로그, schema_migrations)은 새로 설계하지 말고 `~/.claude/jyp/schemas/`의 표준 DDL을 복사·조정해서 시작한다
 - 자동화 테스트는 `~/.claude/jyp/conventions/testing.md`를 따른다 — **테스트 DB 사용 여부(0절)에 따라 실제 DB 검증 또는 쿼리 목킹**, 핵심 로직 변경 시 테스트 동반 작성, 못 썼으면 보고·changelog에 "테스트 미작성" 명시 + 백로그 `TEST-` 항목 추가 (게이트+기록). **운영 DB는 어떤 테스트·검증에도 사용 금지**, 자동화 테스트는 테스트 DB 전용, 개발 DB 실동작 검증은 삭제·DDL 금지 (6절)

@@ -69,6 +69,14 @@
 - 새 의존성 추가 기준: 활발히 유지보수되는가, 대안 대비 이득이 명확한가. 추가 전 사용자에게 보고.
 - 버전은 잠근다 (lock 파일 커밋).
 
+### 8-1. 런타임·플랫폼 버전 — LTS 우선 (MANDATORY, 2026-10-20 확정)
+
+- **LTS가 있는 구성요소(Node.js·Java·MariaDB·MySQL 등)는 LTS만 쓴다.** 기본값은 **프로젝트 시작 시점에 지원 종료가 3년 이상 남은 LTS 중 가장 새것**이되, 이 저장소에서 스택을 검증한 버전(아래 "값이 정해진 곳"에 적힌 값)이어야 한다. 비LTS(Node 홀수 메이저, Java 비LTS, MariaDB 단기 지원 릴리스, MySQL Innovation 릴리스)는 쓰지 않는다.
+- **LTS가 없는 구성요소**는 지원 중인 최신 정식 마이너(Spring Boot — OSS 지원 기간이 가장 긴 것), 안정 계열(nginx 짝수 마이너), 현행 메이저(Express·Gradle·React·Vite·ESLint)를 쓴다. 호환성 때문에 최신이 아닌 버전에 고정하면(예: ESLint 호환 때문에 TypeScript를 한 메이저 낮게) **고정 사유를 템플릿 주석과 CLAUDE.md에 적는다** — 사유가 없는 고정은 낡은 값과 구별되지 않는다.
+- 프로젝트 CLAUDE.md "프로젝트 참고사항"에 **선택한 버전과 지원 종료일**을 기록하고, **지원 종료 6개월 전에 업그레이드를 계획**한다(작업 정리 때 확인). 지원 기간 출처: 각 프로젝트 공식 일정(Node.js Release 일정표, Adoptium, MariaDB·MySQL 정책) 또는 endoflife.date.
+- 값이 정해진 곳 — 값은 여기에 다시 쓰지 않는다(SSOT): Node → docker.md 2절 Dockerfile·scaffolds/default.md CI 템플릿 / Java → spring.md 0절·`scaffolds/templates/build.gradle` / MariaDB → `scaffolds/templates/docker-compose.yml` / MySQL 호환 기준 → database.md 1절 / Spring Boot → spring.md 0절.
+- 근거 (2026-10-20 대조): 기본값이 "LTS이긴 하지만 곧 끝나는 버전"으로 남아 있었다 — Node 22(유지보수 단계, 2027-04-30 종료), 이 저장소 자체 CI는 이미 지원이 끝난 Node 20, MySQL 호환 검증은 이미 지원이 끝난 8.0이었다. 고정값은 아무도 고치지 않으면 조용히 낡는다.
+
 ## 9. 규칙 문서화 (메타 규칙)
 
 프로젝트 규칙 문서(CLAUDE.md 등)에 새 규칙을 추가할 때:

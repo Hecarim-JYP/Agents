@@ -8,7 +8,7 @@ services:
 
   # 테스트 DB (체크리스트 21 — 사용 시에만 포함, testing.md 0절)
   db-test:
-    image: mariadb:11.4
+    image: mariadb:11.4   # LTS — 2029-05-29 지원 종료 (general.md 8-1절). 마이너까지 고정 (docker.md 2절)
     command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
     environment:
       TZ: Asia/Seoul

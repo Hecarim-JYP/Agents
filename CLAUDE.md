@@ -43,7 +43,7 @@ Claude Code의 규칙·컨벤션·스킬·훅을 버전 관리하는 저장소. 
 - **compose 템플릿**: `.\scripts\verify-templates.ps1`(Windows) / `./scripts/verify-templates.sh`(Mac/Linux) (임시 폴더 조립 + 두 모드 `docker compose config`)
 - **ESLint 템플릿**: 위반 코드를 일부러 만들어 검출되는지 + 정상 코드에서 오탐이 없는지 둘 다 확인 — **규칙마다 하나씩** 확인한다. `import/no-cycle`처럼 설정(파서·리졸버)이 없으면 에러 없이 조용히 꺼지는 규칙이 있다 (2026-07-17 검증이 이 규칙을 빠뜨려 TS에서 3개월간 무력이었다 — 2026-10-19 발견)
 - **Spring 빌드 템플릿**(`build.gradle`·`checkstyle.xml`): 바꾸면 템플릿 그대로 새 프로젝트를 만들어 `./gradlew check`(정상 통과 + 순환·위반 검출)까지 돌린다
-- **버전 고정값**(템플릿의 이미지 태그·플러그인·패키지 메이저): 차수 작업 때 Maven Central·npm·Docker Hub의 현행과 대조한다 — 고정값은 조용히 낡는다(2026-10-19: nginx 1.27·Flyway 10·Spotless 6.25·MyBatis 4.0.x 고정 규칙이 모두 낡아 있었다)
+- **버전 고정값**(템플릿의 이미지 태그·플러그인·패키지 메이저): 차수 작업 때 Maven Central·npm·Docker Hub의 현행과 대조하고, **런타임·DB는 LTS 지원 종료일까지 확인**한다(general.md 8-1절 — 종료 3년 미만이면 다음 LTS 검토) — 고정값은 조용히 낡는다(2026-10-19: nginx 1.27·Flyway 10·Spotless 6.25·MyBatis 4.0.x 고정 규칙이 모두 낡아 있었다)
 - **훅**: 깨진 코드로 exit 2(검출), 정상 코드로 exit 0(오탐 없음)을 각각 확인. 훅에 stdin으로 넣는 JSON은 **BOM 없이** 만든다(BOM이면 파싱 실패로 조용히 통과한다)
 - 스택별 규칙(Dockerfile·빌드·헬스체크)을 바꾸면 그 스택을 실제로 기동해 확인한다
 

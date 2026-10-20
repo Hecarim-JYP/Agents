@@ -8,6 +8,8 @@
 - **기초 테이블은 표준 스키마(`~/.claude/jyp/schemas/`)로 시작한다**: schema_migrations, 인증·권한(user/role/permission/login_history), 공통코드, 파일 메타, 감사 로그, (멀티테넌트 시) company — 새로 설계하지 말고 이 DDL을 프로젝트 첫 마이그레이션으로 복사·조정한다.
 - 운영은 Docker 컨테이너 + named volume (docker.md 4절), 백업·복구 절차는 ops.md 6절.
 - **지원 최소 버전: MariaDB 10.4+ / MySQL 8.0+** (근거: 구버전은 인덱스 키 한계가 767바이트라 utf8mb4 `VARCHAR(255)` UNIQUE 생성이 실패한다 — 최신 버전은 DYNAMIC 행 포맷 기본으로 3,072바이트). Docker로 DB를 직접 기동하므로(docker.md) 버전은 compose에서 고정한다.
+  - 위는 **기술적 최저선**이다 — **신규 프로젝트는 지원 중인 LTS만** 쓴다 (general.md 8-1절): MariaDB는 compose 템플릿 값(11.4 LTS — 2029-05-29 종료), MySQL을 써야 하면 **8.4 LTS**(2032-04-30 종료) 이상. MySQL 8.0은 2026-04-30에 지원이 끝났다. MariaDB 10.4·10.6도 종료.
+  - 실측 2026-10-20: 스키마 26종이 MariaDB 11.4·12.3 LTS, MySQL 8.4·9.7 LTS에서 그대로 생성되고, MySQL 전용 차이(앱 계정 트리거 ERROR 1419, 같은 테이블 서브쿼리 UPDATE ERROR 1093, 중복 키 메시지의 `테이블.키이름` 형식)와 레시피 SQL 결과가 8.0 때와 같다.
 - 문자셋·정렬: **`utf8mb4` / `utf8mb4_unicode_ci` 고정** (근거: utf8=utf8mb3은 3바이트까지만 저장하는 불완전 UTF-8이라 이모지·일부 한자에서 깨진다. `utf8mb4_0900_ai_ci`는 MariaDB에 없어 MySQL↔MariaDB 이관이 깨지므로 양쪽 지원되는 unicode_ci 채택).
   - `_ci`는 대소문자를 무시하고 비교한다 — 대소문자 구분이 필요한 컬럼(토큰, 외부 시스템 키 등)은 해당 컬럼만 `utf8mb4_bin`으로 예외 선언.
 - **커넥션 문자셋도 utf8mb4로 명시 (STRICT)**: 드라이버 풀 설정에 `charset: 'utf8mb4'` — 테이블만 utf8mb4이고 커넥션이 utf8이면 이모지 저장 시 `Incorrect string value` 에러 또는 깨짐이 발생한다.
