@@ -1,6 +1,6 @@
 # 레시피: 광고성 정보 발송 — 수신 동의·야간 제한·수신거부 `[대외]`
 
-> 확정: 2026-10-19 | 테이블: `schemas/19_terms_consent.sql`(동의 이력) + `schemas/07_outbox.sql`(발송) | 원칙: consent.md(동의는 이력), notification.md(사건 키·outbox 발송) | 짝: mail-domain-auth.md(원클릭 수신거부 헤더·DKIM), privacy-rights.md(처리정지·동의 철회)
+> 확정: 2026-10-19 | 테이블: `schemas/19_terms_consent.sql`(동의 이력) + `schemas/07_outbox.sql`(발송) | 원칙: consent.md(동의는 이력), notification.md(사건 키·outbox 발송) | 짝: mail-domain-auth.md(원클릭 수신거부 헤더·DKIM), sms-message.md(문자·알림톡 발송), privacy-rights.md(처리정지·동의 철회)
 > 광고는 **채널별 사전 동의가 있는 사람에게만, 보내기 직전에 다시 확인하고** 보낸다. 앱 푸시·문자는 **한국 시각 21시~08시에 별도 동의 없이 보내지 않고 08시로 미룬다**. 수신거부는 로그인 없이 한 번에 되고, 동의·거부를 하면 14일 안에 결과를 알리며, 동의는 2년마다 확인 안내를 보낸다.
 
 ## 1. 언제 쓰나

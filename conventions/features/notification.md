@@ -1,6 +1,6 @@
 # 레시피: 알림 발송 `[공통]`
 
-> 확정: 2026-10-14 | 테이블: `schemas/10_notification.sql`(화면 알림함) + `schemas/07_outbox.sql`(외부 채널) | 짝: outbox.md, idempotency.md
+> 확정: 2026-10-14 | 테이블: `schemas/10_notification.sql`(화면 알림함) + `schemas/07_outbox.sql`(외부 채널) | 짝: outbox.md, idempotency.md, sms-message.md(문자·알림톡 채널)
 > 업무 사건(결재 요청, 반려, 마감 임박…)을 사람에게 알린다. **화면 알림은 업무와 같은 트랜잭션에 넣고, 메일·메신저는 outbox로 보낸다.** 같은 사건을 같은 사람에게 두 번 보내지 않는다.
 
 ## 1. 언제 쓰나
