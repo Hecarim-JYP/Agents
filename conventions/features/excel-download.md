@@ -13,7 +13,7 @@
 |---|---|---|
 | 형식 | **xlsx** | CSV는 요청 시만 — BOM·수식 주입 처리 필수 (4절) |
 | 생성 방식 | **스트리밍 쓰기** (Node: ExcelJS `stream.xlsx.WorkbookWriter` / Spring: POI `SXSSFWorkbook`) | 일반 Workbook은 수천 행 이하 고정 양식에만 |
-| 동기 다운로드 상한 | **10만 행** — 넘으면 생성 전에 400 `EXPORT_LIMIT_EXCEEDED`("조건을 좁혀 주세요") | 더 큰 추출은 장시간 작업 레시피(예정)로 비동기 생성 |
+| 동기 다운로드 상한 | **10만 행** — 넘으면 생성 전에 400 `EXPORT_LIMIT_EXCEEDED`("조건을 좁혀 주세요") | 더 큰 추출은 장시간 작업(long-running-job.md)으로 비동기 생성 |
 | 다운로드 기록 | 개인정보가 들어간 목록은 **audit_log에 기록**(누가·언제·조건·건수 — auth.md 5절) | 개인정보 없는 목록은 기록 생략 가능 |
 
 ## 3. 표준 설계
