@@ -22,7 +22,7 @@
 | # | 결정 항목 | 기본값 | 근거 문서 |
 |---|---|---|---|
 | 1 | **언어 — 반드시 묻는다**: 프론트(TS/JS) · 백엔드가 Node면 백엔드도 | **기본값 없음 — 확인 필수** (중간 전환 = 재생성 비용) | react.md / express.md 0절 |
-| 2 | 백엔드 스택 | Express (대안: Spring Boot — Java 21 + Gradle). 언어는 1번에서 확인 | express.md / spring.md 0절 |
+| 2 | 백엔드 스택 | Express (대안: Spring Boot — Java 25 + Gradle). 언어는 1번에서 확인. **런타임은 LTS만**(Node·Java 버전은 템플릿 값 — general.md 8-1절) | express.md / spring.md 0절 |
 | 3 | 구조 | 풀스택이면 모노레포(client/+server/) | 아래 모노레포 절 |
 | 4 | UI 모드 | 업무 시스템 모드 | design.md 4절 |
 | 5 | 다크모드 지원 | 프로젝트별 결정 | design.md 3절 |
@@ -118,7 +118,7 @@
 |---|---|
 | Python | `pyproject.toml` 추가, `src/<패키지명>/` 레이아웃, `src/<패키지명>/__init__.py`. 테스트: **pytest** |
 | Node/Express 서버 | **언어는 체크리스트 1에서 확인** — `package.json`(`"type": "module"`). TS면 `tsconfig.json`(`strict: true`) + 개발 `tsx watch` / 배포 `tsc` 빌드 — **TypeScript는 `typescript@~6.0.3`으로 고정**(린트 절 — `npm i -D typescript`는 7.x를 설치해 ESLint 설치가 ERESOLVE로 깨진다), JS면 개발 `node --watch` / 빌드 없음. 계층 구조는 `conventions/express.md` 1절, 경계 검증은 **zod**. 테스트: **Vitest + supertest** — 의존성 설치 + `"test"` 스크립트 등록까지 스캐폴드가 한다. DB 사용 시 **마이그레이션 러너**(`npm run migrate` — migration.md 5절) 포함 |
-| Spring Boot 서버 | **Java 21 + Spring Boot 4.x + Gradle 9.x — Boot 3.x로 시작하지 않는다**(spring.md 0절 STRICT). 구조·패턴은 `conventions/spring.md`. Spring Initializr 산출물로 시작(webmvc, validation, actuator, flyway + DB 드라이버) — **Initializr에 접근할 수 없으면 `~/.claude/jyp/scaffolds/templates/build.gradle`을 복사**하고 버전을 Maven Central 최신 GA로 갱신한다(기억으로 쓰지 않는다 — 학습 데이터 기본값이 Boot 3.x다). `config/checkstyle/checkstyle.xml`은 템플릿 `checkstyle.xml`, `config/header.txt`(파일 헤더 주석)도 함께. **데이터 접근 의존성은 체크리스트 24 선택에 따른다**: JdbcClient=`spring-boot-starter-jdbc`(별도 ORM 없음) / JPA=`spring-boot-starter-data-jpa`(+ QueryDSL 포크 `io.github.openfeign.querydsl`) / MyBatis=`mybatis-spring-boot-starter`(⚠ Boot 대응 버전 — 4.0.x↔4.0, 4.1.x↔4.1). **Gradle wrapper jar 확보 필수**(Initializr 산출물, 또는 로컬 Gradle로 `gradle wrapper --gradle-version 9.x`, 둘 다 없으면 spring.md 0절 컨테이너 방식) + `git update-index --chmod=+x gradlew`(Windows 실행 비트 유실 — spring.md 0절). 마이그레이션: **Flyway**(`spring.flyway.enabled=false` + 별도 단계). 테스트: **JUnit Jupiter(Boot 4 관리) + `@MockitoBean`**, `./gradlew test` + **패키지 순환 검사 `ArchitectureTest`(ArchUnit — spring.md 7절)**. **자동 강제: Spotless + Checkstyle을 `check`에 연결**(템플릿에 포함) |
+| Spring Boot 서버 | **Java 25(LTS) + Spring Boot 4.x + Gradle 9.x — Boot 3.x로 시작하지 않는다**(spring.md 0절 STRICT). 구조·패턴은 `conventions/spring.md`. Spring Initializr 산출물로 시작(webmvc, validation, actuator, flyway + DB 드라이버) — **Initializr에 접근할 수 없으면 `~/.claude/jyp/scaffolds/templates/build.gradle`을 복사**하고 버전을 Maven Central 최신 GA로 갱신한다(기억으로 쓰지 않는다 — 학습 데이터 기본값이 Boot 3.x다). `config/checkstyle/checkstyle.xml`은 템플릿 `checkstyle.xml`, `config/header.txt`(파일 헤더 주석)도 함께. **데이터 접근 의존성은 체크리스트 24 선택에 따른다**: JdbcClient=`spring-boot-starter-jdbc`(별도 ORM 없음) / JPA=`spring-boot-starter-data-jpa`(+ QueryDSL 포크 `io.github.openfeign.querydsl`) / MyBatis=`mybatis-spring-boot-starter`(⚠ Boot 대응 버전 — 4.0.x↔4.0, 4.1.x↔4.1). **Gradle wrapper jar 확보 필수**(Initializr 산출물, 또는 로컬 Gradle로 `gradle wrapper --gradle-version 9.x`, 둘 다 없으면 spring.md 0절 컨테이너 방식) + `git update-index --chmod=+x gradlew`(Windows 실행 비트 유실 — spring.md 0절). 마이그레이션: **Flyway**(`spring.flyway.enabled=false` + 별도 단계). 테스트: **JUnit Jupiter(Boot 4 관리) + `@MockitoBean`**, `./gradlew test` + **패키지 순환 검사 `ArchitectureTest`(ArchUnit — spring.md 7절)**. **자동 강제: Spotless + Checkstyle을 `check`에 연결**(템플릿에 포함) |
 | React/Next.js | **언어는 체크리스트 1에서 확인** — TS면 Vite `react-ts` 템플릿 / Next.js `create-next-app --typescript` + `strict: true` 고정, JS면 Vite `react` 템플릿 / `create-next-app`(TS 미지정). **CLI 산출물 위에 얹은 뒤 데모 잔재를 정리한다**: ⚠ 최신 Vite 템플릿(create-vite 9.x, 2026-10-19 확인)은 **린트가 oxlint(`"lint": "oxlint"`)이고 TypeScript가 `~7.0`이다** — `oxlint` 의존성을 지우고 `lint` 스크립트를 ESLint로 바꾸며(린트 절), **TS는 `~6.0.3`으로 내린다**(TS 7이면 ESLint 설치가 ERESOLVE). 데모 App/CSS/로고 에셋 제거, `index.html`의 `<title>`·메타를 프로젝트명으로 치환, favicon 결정. 스타일링: **Tailwind + shadcn/ui — `design.md` 8절 셋업 레시피의 체크리스트 전 항목 수행**(JS 프로젝트면 `components.json`의 `tsx: false` 포함). 테스트: **Vitest + Testing Library** — ⚠ Vite 템플릿에는 test 스크립트가 없다: 의존성 설치 + `"test": "vitest run --passWithNoTests"` 등록까지 해야 CI `npm test`가 깨지지 않는다 |
 | 기타 | 해당 언어 커뮤니티의 표준 레이아웃을 조사해서 따르고, CLAUDE.md/docs/는 항상 추가. 테스트 도구는 해당 언어 표준 채택 |
 
@@ -168,7 +168,9 @@
 @~/.claude/jyp/conventions/general.md
 
 ## 프로젝트 참고사항
-<!-- 시작 결정 체크리스트 확정값을 여기에 기록. 이 프로젝트만의 규칙, 주의점 추가 -->
+<!-- 시작 결정 체크리스트 확정값을 여기에 기록. 이 프로젝트만의 규칙, 주의점 추가
+     런타임·플랫폼 버전과 지원 종료일도 여기에 (general.md 8-1절) — 예: Node 24 (2028-04-30) / Java 25 (2031-09-30) / MariaDB 11.4 (2029-05-29)
+     지원 종료 6개월 전에 업그레이드를 계획한다 -->
 
 ## 다중화 전환 목록
 <!-- 단일 인스턴스 전제에 의존하는 항목 (patterns.md 0-3절).
@@ -250,7 +252,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24        # LTS — Dockerfile의 node 이미지와 같은 메이저 (general.md 8-1절)
       - run: npm ci
       - run: npm run lint          # 컨벤션 자동 강제 (린트 절)
       - run: npm test
@@ -282,7 +284,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
+          java-version: 25        # LTS — build.gradle toolchain·Dockerfile과 같은 버전 (general.md 8-1절)
       - run: chmod +x gradlew
       - run: ./gradlew check --no-daemon      # spotlessCheck + checkstyle + test
 

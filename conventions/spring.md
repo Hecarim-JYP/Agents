@@ -4,13 +4,15 @@
 
 ## 0. 언어·빌드 (신규 프로젝트)
 
-- **Java 21(LTS) + Spring Boot 4.x + Gradle 9.x** 기본 (2026-07-14 실측 갱신, 2026-10-19 Boot 4.1.1·Gradle 9.8.2로 재검증). Kotlin은 사용자가 명시적으로 요청할 때만.
+- **Java 25(LTS) + Spring Boot 4.x + Gradle 9.x** 기본 (2026-10-20 Java 21 → 25 — general.md 8-1절 LTS 정책: 21은 2029-12, 25는 2031-09 지원 종료). Kotlin은 사용자가 명시적으로 요청할 때만.
+  - Java 25 실측 (2026-10-20, Temurin 25.0.4): 템플릿 `build.gradle` 그대로 `check`(Spotless·Checkstyle·`@WebMvcTest`·ArchUnit)·`bootJar` 통과, JRE 25에서 기동·에러 매핑·안전 종료 정상, 데이터 접근 3방식(JdbcClient·MyBatis 4.1.0·JPA + QueryDSL 포크 7.7) 실DB 조회 정상, ArchUnit이 Java 25 클래스(major 69)를 읽어 순환을 검출. ⚠ **`eclipse-temurin:25-jre`에는 wget·curl이 없다** — HEALTHCHECK는 docker.md 2-2절 방식.
+  - **Spring Boot에는 LTS가 없다** — 마이너마다 OSS 지원이 약 13개월이라 **최신 정식 마이너**를 쓴다(2026-10-20: 4.1 — 2027-07-31까지, 4.0은 **2026-12-31 종료**). 4.0으로 시작한 프로젝트는 종료 전에 4.1로 올린다.
   - ⚠ **Spring Initializr는 더 이상 Boot 3.x를 제공하지 않는다**(최소 4.0). Boot 4 플러그인은 **Gradle 8.14+ 또는 9.x**를 요구하므로 wrapper 버전을 맞춘다 — 낮으면 `Spring Boot plugin requires Gradle 8.x (8.14 or later) or 9.x`로 빌드가 즉시 실패한다.
   - **Boot 3.x로 시작하지 않는다 (STRICT, 2026-10-19 확정)** — 3.x는 2026-06-25 3.5.16을 끝으로 OSS 릴리스가 끝났다(Maven Central 확인). 근거: Initializr에 접근하지 못하는 환경에서 `build.gradle`을 기억(학습 데이터 — Boot 3.x 기준)으로 쓰면 3.x로 시작하게 된다. **Initializr를 못 쓰면 `~/.claude/jyp/scaffolds/templates/build.gradle`(Boot 4.1.1 실빌드 검증)로 시작하고, 버전은 Maven Central의 최신 GA로 갱신해 CLAUDE.md에 기록한다.**
   - Boot 4는 스타터·테스트 이름이 바뀌었다: `spring-boot-starter-webmvc`(옛 `-web`), 테스트는 기술별 스타터 `spring-boot-starter-webmvc-test`(옛 `-test` 하나로 끝나지 않는다), Flyway 자동 설정도 `spring-boot-starter-flyway`. JSON은 **Jackson 3**(`tools.jackson` 패키지 — 애노테이션은 `com.fasterxml.jackson.annotation` 그대로).
 - **Gradle wrapper(`gradlew` + `gradle/wrapper/*.jar`)를 저장소에 포함**한다 — CI·다른 기기에서 로컬 Gradle 설치 없이 빌드하기 위함. 확보 방법 두 가지:
   1. Spring Initializr 산출물 사용 (기본)
-  2. 로컬에 Gradle이 없고 Initializr도 못 쓸 때: **컨테이너로 생성** — `docker run --rm -v "$PWD:/app" -w /app gradle:9-jdk21 gradle wrapper --gradle-version 9.0` (2026-07-14 검증)
+  2. 로컬에 Gradle이 없고 Initializr도 못 쓸 때: **컨테이너로 생성** — `docker run --rm -v "$PWD:/app" -w /app gradle:9-jdk25 gradle wrapper --gradle-version 9.8.2` (2026-07-14 검증, 태그는 2026-10-20 JDK 25로 갱신)
 - ⚠ **Windows에서 생성한 `gradlew`는 실행 비트가 유실된다** — Linux CI/컨테이너에서 `Permission denied`로 깨진다. 조치: `git update-index --chmod=+x gradlew` 커밋 또는 Dockerfile/CI에서 `chmod +x gradlew`.
 - **데이터 접근은 프로젝트 시작 시 사용자에게 묻는다** (scaffolds/default.md 체크리스트 24 — 리포지토리 계층·의존성·Boot 버전 제약이 통째로 갈리는 되돌리기 어려운 결정이다). 선택지와 근거:
   - **(a) `JdbcClient`** (Spring JDBC, **기본**) — 순수 SQL 유지(sql.md 스타일 그대로), Spring 1st-party라 Boot 버전 호환 문제가 없다. CRUD·조회 위주면 이걸로 충분하다.

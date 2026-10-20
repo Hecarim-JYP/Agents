@@ -2,7 +2,8 @@
 // Spring Initializr 산출물이 기본이다. Initializr에 접근할 수 없을 때만 이 파일로 시작한다 — 기억으로 쓰지 않는다
 // (근거: 학습 데이터의 기본값은 Boot 3.x — 3.x는 2026-06-25 3.5.16을 끝으로 OSS 지원이 끝났다).
 // ⚠ 생성 시 아래 버전을 Maven Central·Gradle Plugin Portal의 최신 GA로 갱신하고 CLAUDE.md에 기록한다.
-//   2026-10-19 실빌드 검증: Boot 4.1.1 · Gradle 9.8.2 · Java 21 · Spotless 8.10.4 · Checkstyle 14.3.0 · ArchUnit 1.5.1
+//   실빌드 검증: Boot 4.1.1 · Gradle 9.8.2 · Spotless 8.10.4 · Checkstyle 14.3.0 · ArchUnit 1.5.1 — Java 21(2026-10-19)·Java 25(2026-10-20)
+//   Java는 LTS만 (general.md 8-1절) — 25(2031-09 지원 종료). 선택한 버전·지원 종료일을 CLAUDE.md에 기록한다
 // 함께 만드는 파일: config/checkstyle/checkstyle.xml(템플릿), config/header.txt(파일 헤더 주석), .gitattributes(* text=auto eol=lf)
 
 plugins {
@@ -18,7 +19,7 @@ version = '0.0.1'
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(25)
     }
 }
 

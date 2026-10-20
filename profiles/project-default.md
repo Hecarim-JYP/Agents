@@ -24,7 +24,8 @@
 
 **스택**
 - 프론트: **React** (Vite) — 언어(TS/JS)는 [확인]에서 선택. TS면 `react-ts` 템플릿 + `strict: true`
-- 백엔드: **Spring Boot (Java 21 + Gradle)** — 데이터 접근 방식은 [확인]에서 선택(기본 JdbcClient). Node/Express도 표준이며, 팀·기존 자산에 따라 선택. 확정값은 CLAUDE.md에 기록
+- 런타임 버전: **LTS만**(general.md 8-1절) — Node·Java·DB 이미지 값은 템플릿이 단일 출처, 확정값과 지원 종료일을 CLAUDE.md에 기록
+- 백엔드: **Spring Boot (Java 25 LTS + Gradle)** — 데이터 접근 방식은 [확인]에서 선택(기본 JdbcClient). Node/Express도 표준이며, 팀·기존 자산에 따라 선택. 확정값은 CLAUDE.md에 기록
 - DB: **MariaDB / Asia/Seoul / utf8mb4**
 - 구조: 풀스택이면 **모노레포**(client/ + server/)
 - UI: **업무 시스템 모드**, 다크모드 미지원(요청 시 추가), shadcn 기본 색 → 브랜드 색은 확정되면 교체
