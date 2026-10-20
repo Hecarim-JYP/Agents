@@ -125,7 +125,7 @@ app.get('/api/public/v1/orders', requireScope('orders:read'), listOrdersForClien
 
 | 구성 | Express | Spring |
 |---|---|---|
-| 키 인증 | `apiKeyAuth` 미들웨어 (3-2절, 실측) | `OncePerRequestFilter` — `/api/public/**`에만 등록, 화면용 `SecurityFilterChain`과 분리 (이 레시피에서 미검증) |
+| 키 인증 | `apiKeyAuth` 미들웨어 (3-2절, 실측) | `OncePerRequestFilter`를 `securityMatcher("/api/public/**")` 체인에 `addFilterBefore(new ApiKeyFilter(), AuthorizationFilter.class)`, 세션 `STATELESS`, 화면용 `SecurityFilterChain`과 분리 — **필터를 `@Component`·`@Bean`으로 만들지 않는다**: Boot가 서블릿 필터로 자동 등록해 **모든 경로에 걸리고**, 화면 API까지 키를 요구해 401이 난다. 빈이어야 하면 `FilterRegistrationBean.setEnabled(false)` (실측 2026-10-20, Boot 4.1.1 · Security 7: 분리 체인은 키 없음 401·있음 200·화면 요청에 필터 0회·Set-Cookie 없음 / 빈 등록 시 화면 `/api/app/me` 401 / `setEnabled(false)` 후 200) |
 | 해시 비교 | `timingSafeEqual` | `MessageDigest.isEqual` |
 | 연동사별 한도 | express-rate-limit `keyGenerator` + `limit` 함수 | Bucket4j 등 — 키 = 연동사 ID |
 | 버전 라우터 | `routes/public/v1/` | `@RequestMapping("/api/public/v1")` 컨트롤러 패키지 분리 |

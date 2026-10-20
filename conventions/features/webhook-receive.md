@@ -121,7 +121,7 @@ router.post('/webhooks/:source', async (req, res) => {
 
 | 구성 | Express | Spring |
 |---|---|---|
-| 원본 바이트 | 전역 `express.json({ verify })` 경로 한정 (3-1절, 실측) | 컨트롤러 파라미터 `@RequestBody byte[] body`(또는 `String`) — 객체로 받지 않는다 (이 레시피에서 미검증) |
+| 원본 바이트 | 전역 `express.json({ verify })` 경로 한정 (3-1절, 실측) | 컨트롤러 파라미터 `@RequestBody byte[] body` — 객체로 받지 않는다. 검증 뒤 `objectMapper.readValue(body, …)`로 파싱 (실측 2026-10-20, Boot 4.1.1 · Jackson 3, 공백·키 순서·`\uXXXX`·`1.50`이 섞인 본문: `byte[]` 서명 일치 / `String`도 일치(UTF-8) / **`Map`으로 받아 다시 직렬화하면 불일치 401**) |
 | 서명 | `createHmac` + `timingSafeEqual` | `Mac`(HmacSHA256) + `MessageDigest.isEqual` |
 | 중복 | `ER_DUP_ENTRY` + 키 이름 | `DuplicateKeyException` + 키 이름 |
 | 워커 | outbox relay와 같은 프로세스·같은 선점 방식 | `@Scheduled` 선점 루프 |

@@ -76,7 +76,7 @@ font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-ac
 | 구성 | Express | Spring |
 |---|---|---|
 | 기본 위치 | 프록시 템플릿 (앱 설정 불필요) | 동일 |
-| 앱이 HTML을 내려줄 때 | `helmet({ contentSecurityPolicy: { directives: { upgradeInsecureRequests: null } } })` | Spring Security `headers()` 기본 헤더 + CSP는 `contentSecurityPolicy(...)`로 같은 값 (이 레시피에서 미검증) |
+| 앱이 HTML을 내려줄 때 | `helmet({ contentSecurityPolicy: { directives: { upgradeInsecureRequests: null } } })` | Spring Security 기본 헤더 = `nosniff`·`X-Frame-Options: DENY`·`X-XSS-Protection: 0`·`Cache-Control: no-cache, no-store, max-age=0, must-revalidate` — **CSP와 `Referrer-Policy`는 기본에 없다**: `headers(h -> h.contentSecurityPolicy(c -> c.policyDirectives(3-2절 값)).referrerPolicy(r -> r.policy(STRICT_ORIGIN_WHEN_CROSS_ORIGIN)))`. HSTS는 HTTPS 요청에만 붙는다 (실측 2026-10-20, Boot 4.1.1 · Security 7, HTTP 요청: 기본 4종만 / 설정 후 CSP·Referrer-Policy 추가, `upgrade-insecure-requests` 없음) |
 | 중복 | 프록시와 앱이 같은 헤더를 붙이면 한쪽을 끈다 | 동일 |
 
 ## 6. 검증 포인트

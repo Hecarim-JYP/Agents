@@ -141,7 +141,7 @@ HAVING due <= CURDATE() + INTERVAL 30 DAY;
 
 | 구성 | Express | Spring |
 |---|---|---|
-| 야간 판정 | `isNightKst` (3-2절, 실측) | `ZonedDateTime.now(ZoneId.of("Asia/Seoul")).getHour()` — 서버 기본 시간대(`LocalDateTime.now()`)를 쓰지 않는다 (이 레시피에서 미검증) |
+| 야간 판정 | `isNightKst` (3-2절, 실측) | `ZonedDateTime.now(ZoneId.of("Asia/Seoul")).getHour()` — 서버 기본 시간대(`LocalDateTime.now()`)를 쓰지 않는다 (실측 2026-10-20, Java 25 고정 시계: 서버가 UTC면 한국 22:30을 13시로 읽어 **야간 아님**, 한국 08:10을 23시로 읽어 **야간** — 정반대로 판정) |
 | 08시 보류 | outbox `next_attempt_at` 갱신 | 동일 |
 | 수신거부 토큰 | `createHmac` + `timingSafeEqual` | `Mac`(HmacSHA256) + `MessageDigest.isEqual` |
 | 2년 확인 | 3-4절 SQL (실측) | 동일 SQL |

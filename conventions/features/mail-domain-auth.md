@@ -106,7 +106,7 @@ await transport.sendMail({
 | 구성 | Express | Spring |
 |---|---|---|
 | 발송 | nodemailer — `external/mail/` (notification.md 5절) | `JavaMailSender` — `external/mail/` |
-| 앱 서명 | nodemailer `dkim` 옵션 (3-2절, 실측) | JavaMail 자체 DKIM 서명 기능 없음 — 대행사·메일 서버 서명을 기본으로 (서명 라이브러리 사용은 이 레시피에서 미검증) |
+| 앱 서명 | nodemailer `dkim` 옵션 (3-2절, 실측) | Jakarta Mail 자체 서명 기능은 없다 — 대행사·메일 서버 서명이 기본. 앱이 서명해야 하면 `org.simplejavamail:utils-mail-dkim` `DkimMessage(msg, new DkimSigner(도메인, 선택자, RSAPrivateKey))` + **`addHeaderToSign("List-Unsubscribe-Post")`** — 기본 서명 목록에 `List-Unsubscribe`는 있고 `-Post`는 없다(nodemailer와 같은 함정). 기본값은 서명 전에 DNS의 선택자 공개키와 대조해 **DNS 등록 전에는 서명이 실패**한다 — DNS를 먼저 올린다 (실측 2026-10-20, 3.3.1 · Java 25: `rsa-sha256`·`relaxed/simple`, mailauth 검증 pass, 헤더 변조 fail) |
 | 원클릭 헤더 | `list.unsubscribe` + `headers` (3-3절, 실측) | `MimeMessage.setHeader("List-Unsubscribe", …)`·`("List-Unsubscribe-Post", …)` |
 | 검증 테스트 | mailauth로 생성 메일을 검증(가짜 리졸버) | 실제 수신함 원본 확인 |
 

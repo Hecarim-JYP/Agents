@@ -80,8 +80,8 @@ window.addEventListener('vite:preloadError', (event) => {
 
 | 구성 | Express | Spring |
 |---|---|---|
-| 개인 응답 캐시 금지 | 인증 미들웨어 뒤 `res.set('Cache-Control', 'private, no-store')` | Spring Security 기본 헤더(`Cache-Control: no-cache, no-store …`)를 끄지 않는다 (이 레시피에서 미검증) |
-| 썸네일 | sharp `resize(400)` (upload-security.md 재인코딩 단계) | 업로드 처리에서 같은 원칙 (이 레시피에서 미검증) |
+| 개인 응답 캐시 금지 | 인증 미들웨어 뒤 `res.set('Cache-Control', 'private, no-store')` | Spring Security 기본 헤더(`Cache-Control: no-cache, no-store, max-age=0, must-revalidate`)를 끄지 않는다 — 앱이 직접 `Cache-Control`을 정한 응답은 덮어쓰지 않으므로 끌 이유가 없다 (실측 2026-10-20, Boot 4.1.1 · Security 7: 인증 API 응답 `no-cache, no-store…` / `spring.web.resources.cache.cachecontrol.max-age=365d`인 정적 자산은 `max-age=31536000, public` 그대로) |
+| 썸네일 | sharp `resize(400)` (upload-security.md 재인코딩 단계) | Thumbnailator `Thumbnails.of(in).width(400).outputFormat(형식)` — EXIF 방향 반영·메타데이터 제거를 함께 한다 (upload-security.md 5절 실측) |
 | 청크 실패 새로고침 | 프론트 공통 (3-1절) | 동일 |
 
 ## 6. 검증 포인트

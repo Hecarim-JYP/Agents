@@ -131,7 +131,7 @@ function decryptSecret(blob) {
 
 | 구성 | Express | Spring |
 |---|---|---|
-| TOTP | `otpauth` (9.5 실측) | RFC 6238 구현 라이브러리 — 부록 B 벡터로 검증 후 채택 (이 레시피에서 미검증) |
+| TOTP | `otpauth` (9.5 실측) | `com.eatthepath:java-otp` 1.0.0 — 기본 생성자가 SHA1·6자리·30초 (실측 2026-10-20, Java 25: RFC 6238 부록 B SHA1 벡터 6/6·SHA256·SHA512 일치, 같은 비밀·시각에서 Node `otpauth`와 같은 코드). 다른 라이브러리를 쓰면 같은 벡터로 검증 후 채택 |
 | QR | 화면에서 otpauth URI를 QR로 렌더링 (`qrcode` 등) — 비밀이 외부 QR 서비스로 나가지 않게 | 동일 |
 | 암호화 | `node:crypto` `aes-256-gcm` | `Cipher.getInstance("AES/GCM/NoPadding")` + `GCMParameterSpec(128, iv)` |
 | 대기 증표 | jose/jsonwebtoken, `purpose: 'mfa'` + 5분 — 인증 미들웨어는 `purpose`가 있는 토큰을 거부 | 동일 원칙 |

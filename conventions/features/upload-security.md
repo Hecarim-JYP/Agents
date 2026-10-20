@@ -16,7 +16,7 @@
 | 픽셀 상한 | **5천만 픽셀**(약 8000×6000 — 48MP 휴대폰 사진까지) | 서비스가 받는 최대 해상도로 명시. sharp 기본은 약 2.68억 |
 | 화면 표시(inline) | **래스터 이미지(jpeg·png·gif·webp)만** | 그 외는 전부 다운로드(attachment) |
 | SVG | **받지 않는다** | 꼭 받아야 하면 attachment + CSP sandbox로만 내려주고 화면에는 `<img>`로만 표시 |
-| 악성코드 검사 | **다른 이용자에게 전달되는 파일이면** ClamAV(clamd) | 이 레시피에서 미검증 — 도입 시 EICAR 테스트 파일로 검출 확인 |
+| 악성코드 검사 | **다른 이용자에게 전달되는 파일이면** ClamAV(clamd) — 3-4절 | 서명 DB가 최신인지(freshclam)와 EICAR 검출을 도입 시 운영 환경에서 확인 |
 | 저장 위치 | 웹 루트 밖 + 앱이 권한 확인 후 내려준다 (express.md 6절) | 대규모 대외 서비스는 이용자 파일 전용 도메인으로 분리하면 3-3절 위험이 출처째 격리된다 |
 
 ## 3. 표준 설계
@@ -72,6 +72,46 @@ const output = await sharp(buffer, { limitInputPixels: 50_000_000 })   // 압축
 - 같은 헤더(`default-src 'none'; sandbox` + `nosniff`)를 붙여도 정상 이미지는 `<img>`와 직접 열기 모두 정상 표시된다 (실측: 둘 다 naturalWidth 30).
 - 다운로드는 권한 검사 후 DB에 기록된 경로로만 (express.md 6절). URL의 파일 ID는 공개 ID (public-id.md).
 
+### 3-4. 악성코드 검사 — clamd (다른 이용자에게 전달되는 파일만)
+
+```js
+// external/clamd.js — 파일을 디스크에 쓰지 않고 clamd에 소켓으로 보내 검사한다 (INSTREAM)
+import net from 'node:net';
+
+/**
+ * @param {Buffer} buf 업로드 파일 내용
+ * @returns {Promise<{ clean: boolean, reply: string }>} clean은 응답이 정확히 "stream: OK"일 때만 true
+ */
+export function scanBuffer(buf, { host = process.env.CLAMD_HOST, port = 3310, timeoutMs = 10_000 } = {}) {
+  return new Promise((resolve, reject) => {
+    const sock = net.connect(port, host);
+    let reply = '';
+    sock.setTimeout(timeoutMs, () => sock.destroy(new Error('clamd timeout')));
+    sock.on('connect', () => {
+      sock.write('zINSTREAM\0');
+      for (let i = 0; i < buf.length; i += 64 * 1024) {           // 청크 = 4바이트 길이(빅엔디언) + 데이터
+        const chunk = buf.subarray(i, i + 64 * 1024);
+        const len = Buffer.alloc(4);
+        len.writeUInt32BE(chunk.length);
+        sock.write(Buffer.concat([len, chunk]));
+      }
+      sock.write(Buffer.alloc(4));                                   // 길이 0 = 끝
+    });
+    sock.on('data', (d) => { reply += d.toString(); });
+    sock.on('end', () => {
+      const r = reply.replace(/\0$/, '').trim();
+      resolve({ clean: r === 'stream: OK', reply: r });              // 검출·오류·한도 초과는 모두 clean이 아니다
+    });
+    sock.on('error', reject);                                        // clamd 중지 → 업로드도 실패(통과시키지 않는다)
+  });
+}
+```
+
+- 실측 2026-10-20 (ClamAV 1.5.4 `clamav/clamav` 이미지, clamd TCP 3310): EICAR → `stream: … FOUND` / **zip 안의 EICAR도 FOUND** / PNG·xlsx → `stream: OK` / 99MB(EICAR 포함) FOUND / **101MB → `INSTREAM size limit exceeded. ERROR`**(기본 `StreamMaxLength` 100MB — 검사하지 못했다는 뜻이라 거부) / clamd 중지 → `ECONNREFUSED`.
+- ⚠ 이 실측은 **공식 서명 DB 없이** EICAR 해시를 넣은 사용자 서명으로 했다 — 이 환경의 네트워크 정책이 `database.clamav.net`을 막는다. 운영에서는 freshclam이 서명을 받아야 검출이 된다(이미지 기본 진입점이 시작할 때 freshclam으로 서명을 받는다 — 이 환경에서는 받지 못해 `Update failed`로 끝났다). 도입 시 운영 환경에서 공식 서명으로 EICAR 검출을 한 번 확인한다.
+- 업로드 상한(express.md 6절)을 `StreamMaxLength`보다 작게 둔다 — 크면 큰 파일이 전부 "검사 불가"로 거부된다.
+- clamd는 별도 컨테이너로 두고 compose에 추가한다(메모리는 공식 서명을 받은 뒤 운영 환경에서 확인). 검사가 필요 없는 기능(본인만 보는 파일)은 부르지 않는다(2절).
+
 ## 4. 함정 (STRICT)
 
 | 함정 | 증상 | 처방 |
@@ -88,10 +128,10 @@ const output = await sharp(buffer, { limitInputPixels: 50_000_000 })   // 압축
 
 | 구성 | Express | Spring |
 |---|---|---|
-| 형식 판정 | `file-type` (19.x, ESM 전용) | Apache Tika `tika-core` `new Tika().detect(bytes)` (이 레시피에서 미검증) |
-| 이미지 재인코딩 | `sharp` (0.33 실측) | `ImageIO` 재기록 등 — 방향 반영·메타데이터 제거를 같은 방식으로 실측 후 채택 |
+| 형식 판정 | `file-type` (19.x, ESM 전용) | Apache Tika `tika-core` `new Tika().detect(bytes)` — **파일명을 함께 넘기지 않는다**. `file-type`과 달리 HTML·SVG·텍스트도 형식을 돌려주므로(판정 불가가 아니다) 허용 목록 비교가 거부의 전부다. **tika-core만으로는 xlsx·docx가 `application/x-tika-ooxml`**로 나온다 — 허용 목록에 그 값을 쓰거나 `tika-parser-microsoft-module`을 추가해 세부 형식을 받는다 (실측 2026-10-20, 4.1.0: PNG·JPEG·PDF 정상 / `.png`로 위장한 HTML → `text/html` / SVG → `image/svg+xml` / xlsx → `x-tika-ooxml`, 이름을 주면 xlsx MIME / CSV → `text/plain`, 이름을 주면 `text/csv`) |
+| 이미지 재인코딩 | `sharp` (0.33 실측) | Thumbnailator `Thumbnails.of(in).width(…).outputFormat(판정 형식)` — 방향 반영 + 메타데이터 제거. **`ImageIO`로 읽어 그대로 다시 쓰면 메타데이터는 빠지지만 방향을 보지 않아 사진이 눕는다** (실측 2026-10-20, Thumbnailator 0.4.21 · Java 25: 800×400 + Orientation 6 + GPS → Thumbnailator 400×800·EXIF 0바이트 / ImageIO 축소 400×200·EXIF 0바이트) |
 | 헤더 | `res.attachment(original_file_name)`(파일명 인코딩 처리) + `res.set(...)` | `ContentDisposition.attachment().filename(name, UTF_8)` + `HttpHeaders` |
-| 악성코드 검사 | clamd 소켓 클라이언트 (도입 시 결정) | 동일 |
+| 악성코드 검사 | 3-4절 `scanBuffer` (INSTREAM, 실측) | 같은 프로토콜 — `Socket`에 `zINSTREAM\0` + (4바이트 길이 `ByteBuffer.putInt` + 청크)… + 4바이트 0, 응답이 정확히 `stream: OK`일 때만 통과 (실측 2026-10-20, Java 25: EICAR·zip 안 EICAR FOUND, PNG OK — Node와 같은 결과) |
 
 ## 6. 검증 포인트
 

@@ -48,7 +48,11 @@
 | `bcryptjs`(순수 JS) | 2.2건/s | 7,319ms | **0 req/s — 서버 전체가 멈춤** |
 | **`bcrypt`(네이티브, 스레드풀 4)** | **11.1건/s** | 1,978ms | 5,466 req/s, p99 5ms — 영향 없음 |
 | `bcrypt` + `UV_THREADPOOL_SIZE=8` | 12.3건/s | 1,852ms | 2,199 req/s, p99 13ms |
+| Spring `BCryptPasswordEncoder(12)` · 톰캣 기본(최대 200 스레드) | 10.0건/s | 1,886~2,127ms | 420~457 req/s, p99 84~89ms — 느려지지만 응답한다 |
+| 같은 구성 + `server.tomcat.threads.max=8` | 13.1건/s | 3,906ms | **4 req/s, p99 3,422ms** — 스레드를 해시가 다 잡아 다른 요청이 줄을 선다 |
+| 같은 구성 + **가상 스레드**(`spring.threads.virtual.enabled=true`) | 13.0~13.4건/s | 5,178~5,641ms | **4 req/s, p99 5,177~5,611ms** — CPU만 쓰는 해시가 캐리어 스레드(코어 수)를 다 잡는다 |
 
+- Spring 실측 2026-10-20 (같은 4 vCPU·같은 부하, Boot 4.1.1 · Java 25 · 2회 측정): 가상 스레드는 I/O 대기에는 유리하지만 **CPU만 쓰는 작업은 양보하지 않는다** — 로그인이 몰리면 다른 API까지 멈춘다. 해시가 있는 서버는 플랫폼 스레드(기본값)로 두고, 톰캣 스레드 수를 코어 수 근처로 줄이지 않는다.
 - **순수 JS 해시는 이벤트 루프를 막는다** — 로그인이 몰리는 동안 다른 모든 API가 멈춘다. auth.md 6절 매핑대로 네이티브 `bcrypt`(또는 `argon2`)를 쓴다.
 - 로그인 처리량의 상한은 **CPU 코어 수 ÷ 해시 1회 시간**이다 — 스레드풀을 늘려도 코어보다 많으면 거의 늘지 않고 다른 요청만 느려진다(실측). 오픈 이벤트처럼 로그인이 몰리면 인스턴스·코어를 늘리고, 로그인 빈도 제한(rate-limit.md)이 공격성 몰림을 끊는다.
 
@@ -88,8 +92,8 @@ console.log({ rps: result.requests.average, p50: result.latency.p50, p99: result
 
 | 구성 | Express | Spring |
 |---|---|---|
-| 풀 크기 | mysql2 `connectionLimit`(기본 10) — 설정값으로 | HikariCP `maximum-pool-size`(기본 10 — 문서 기준, 이 레시피에서 미실측) |
-| 비밀번호 해시 | 네이티브 `bcrypt` (실측) | `BCryptPasswordEncoder`는 요청 스레드에서 돈다 — 톰캣 스레드 수가 동시 해시 상한 (미검증) |
+| 풀 크기 | mysql2 `connectionLimit`(기본 10) — 설정값으로 | HikariCP `maximum-pool-size`(기본 10 — Boot 4.1이 고르는 HikariCP 7.0.2의 `DEFAULT_POOL_SIZE` 상수 확인 2026-10-20) — 설정값으로 |
+| 비밀번호 해시 | 네이티브 `bcrypt` (실측) | `BCryptPasswordEncoder` — 요청 스레드에서 돈다. **가상 스레드(`spring.threads.virtual.enabled`)를 켜지 않는다**(3-3절 실측) |
 | 부하 도구 | autocannon 7.x (실측 — 8.0에서 같은 API·결과 필드 재확인 2026-10-19) | 동일하게 외부에서 |
 
 ## 6. 검증 포인트

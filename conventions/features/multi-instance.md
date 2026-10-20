@@ -87,8 +87,8 @@ export const invalidateEverywhere = (key) => redis.publish('cache:invalidate', k
 
 | 구성 | Express | Spring |
 |---|---|---|
-| 빈도 제한 저장소 | `rate-limit-redis` 4.x + `redis` 4.x (실측 — 최신 6.x + 6.x에서 같은 코드로 한도 동작 재확인 2026-10-19) | Bucket4j + Redis 백엔드 (이 레시피에서 미검증) |
-| 캐시 무효화 | `redis` pub/sub (실측) | Spring Data Redis `RedisMessageListenerContainer` (미검증) |
+| 빈도 제한 저장소 | `rate-limit-redis` 4.x + `redis` 4.x (실측 — 최신 6.x + 6.x에서 같은 코드로 한도 동작 재확인 2026-10-19) | `bucket4j_jdk17-lettuce` `Bucket4jLettuce.casBasedBuilder(연결).expirationAfterWrite(basedOnTimeForRefillingBucketUpToMax(…))` — **만료 전략을 꼭 지정** (실측 2026-10-20, 8.21.0 · Redis 7.0: 인스턴스 둘이 번갈아 8회 → 한도 5에서 정확히 5회 통과, 키 TTL 120초 / 만료 전략 없이 만들면 **TTL -1 — IP마다 키가 영영 쌓인다**) |
+| 캐시 무효화 | `redis` pub/sub (실측) | Spring Data Redis `RedisMessageListenerContainer` + `convertAndSend` (실측 2026-10-20, Boot 4.1.1: `start()` 직후 발행도 두 인스턴스 모두 수신 / **구독이 멈춘 동안 발행한 메시지는 재시작 후에도 받지 못한다** — pub/sub은 저장하지 않는다. 그래서 TTL을 함께 둔다) |
 | 세션 | 무상태 토큰 + DB 세션(session-control.md) — 변경 없음 | 동일 |
 
 ## 6. 검증 포인트

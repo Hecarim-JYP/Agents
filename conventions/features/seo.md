@@ -88,7 +88,26 @@ location / {
 ```
 
 - 실측 (위 설정 그대로): `/`·`/about`·`/about/` 200 + 경로별 제목·본문, `/nope`·`/orders/1` 200 껍데기(브라우저에서 404 화면 + `noindex`), 없는 자산 404, HTML 전부 `no-cache`.
-- 프리렌더 단계는 브라우저가 필요하다 — client 이미지 빌더(`node:24-slim`)에는 없으므로 Playwright 이미지를 빌더로 쓰거나 CI에서 프리렌더 후 `dist`를 이미지에 넣는다(이 레시피에서 미검증 — 채택 시 CI에서 확인).
+- 프리렌더 단계는 브라우저가 필요하다 — client 이미지 빌더(`node:24-slim`)에는 브라우저가 없다(실측: `/ms-playwright` 없음). 빌드 단계를 **Playwright 공식 이미지**로 바꾼다:
+
+```dockerfile
+# 빌드 단계 = Playwright 이미지(브라우저 포함) — 태그는 package.json의 playwright 버전과 같게(devDependencies에 정확한 버전으로)
+FROM mcr.microsoft.com/playwright:v1.64.1-noble AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npx vite build \
+ && (npx vite preview --port 4173 --strictPort > /tmp/preview.log 2>&1 &) \
+ && sleep 3 \
+ && node scripts/prerender.mjs http://127.0.0.1:4173 dist / /about
+
+FROM nginxinc/nginx-unprivileged:1.30-alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+```
+
+  - 실측 2026-10-20 (위 구성 그대로 `docker build`): 이미지 안의 `/`·`/about/index.html`에 경로별 제목·본문, `200.html`은 껍데기. 이미지의 Node 메이저는 태그가 정한다 — **v1.64.1-noble = Node 24.21**(LTS 기본값과 같다), v1.56.1-noble = Node 22.20이었다. Playwright를 올리면 이미지 태그도 같이 올린다(버전이 다르면 브라우저를 못 찾는다).
+  - CI에서 프리렌더하고 `dist`만 이미지에 넣는 방식도 된다 — 그때는 CI의 Playwright 버전과 브라우저 설치를 CI가 맡는다.
 - React 18의 `createRoot`는 프리렌더된 DOM을 지우고 다시 그린다 — 화면은 정상이다(실측: `#content` 1개, 콘솔 에러 0).
 
 ### 3-4. 함께 두는 파일
@@ -119,7 +138,7 @@ location / {
 
 | 구성 | React(Vite) | 비고 |
 |---|---|---|
-| 머리 정보 | 3-2절 `useHead` (React 18 실측) | React 19는 컴포넌트 안 `<title>`·`<meta>`를 head로 올려 준다 (이 레시피에서 미검증) |
+| 머리 정보 | 3-2절 `useHead` (React 18 실측, **React 19.3에서도 프리렌더 후 중복 없음** — 실측 2026-10-20) | React 19의 컴포넌트 안 `<title>`·`<meta>`는 head로 올라가고 화면 전환 시 바뀐다 — 하지만 **프리렌더와 함께 쓰면 중복된다**: 프리렌더 HTML에 이미 있는 태그 위에 `createRoot`가 하나씩 더 넣어 제목·설명이 2개가 되고, `index.html`의 `<title>`도 그대로 남는다(실측 2026-10-20, React 19.3.1 + Vite 8: 제목 3개·설명 2개). 프리렌더하는 프로젝트는 `useHead`를 쓴다 |
 | 프리렌더 | 3-3절 스크립트 (Playwright, 실측) | 서버 렌더링이 필요하면 프레임워크 결정(⚑) |
 | 서빙 | nginx 프리렌더 모드 (실측) | Spring 백엔드와 무관 — 정적 서빙은 client 컨테이너 |
 

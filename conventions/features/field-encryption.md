@@ -102,7 +102,7 @@ KEY idx_{테이블}_rrn_bidx (rrn_bidx)
 
 | 구성 | Express | Spring |
 |---|---|---|
-| 암호화 | `node:crypto` `aes-256-gcm` (3-1절, 실측) | `Cipher.getInstance("AES/GCM/NoPadding")` + `GCMParameterSpec(128, iv)` — 같은 바이트 형식으로(이 레시피에서 미검증) |
+| 암호화 | `node:crypto` `aes-256-gcm` (3-1절, 실측) | `Cipher.getInstance("AES/GCM/NoPadding")` + `GCMParameterSpec(128, iv)` — **Java 출력은 `암호문 ‖ 태그` 순서**라 저장 전에 `버전 + iv + 태그 + 암호문`으로 재배치하고, 복호화는 `update(암호문)` 뒤 `doFinal(태그)` (실측 2026-10-20, Java 25: Node가 만든 암호문을 Java가, Java가 만든 암호문을 Node가 각각 복호화 — 같은 형식) |
 | 블라인드 인덱스 | `createHmac('sha256', key)` | `Mac.getInstance("HmacSHA256")` |
 | 컬럼 매핑 | 리포지토리에서 암·복호화 — 서비스 위로는 평문 문자열 | JPA `AttributeConverter` 또는 리포지토리 계층 |
 

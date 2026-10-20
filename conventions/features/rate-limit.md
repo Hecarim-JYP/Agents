@@ -41,7 +41,17 @@
   - `framework` 전략(`ForwardedHeaderFilter`)은 `X-Forwarded-For`의 **맨 왼쪽 값**을 클라이언트 IP로 쓴다 (spring-web 6.2 `ForwardedHeaderUtils.parseForwardedFor`) → 클라이언트가 보낸 값 그대로.
   - `native` 전략(Tomcat `RemoteIpValve`)은 오른쪽부터 읽으며 **사설 대역(10/8·172.16/12·192.168/16·127/8 등 — `internalProxies` 기본값)을 프록시로 보고 건너뛴다** (Tomcat 10.1) → 사내망처럼 접속 IP가 사설 대역이면 실제 IP를 건너뛰고 그 왼쪽의 위조값을 채택한다.
   - 프록시가 덮어쓰면 값이 하나뿐이라 두 전략 모두 실제 IP가 된다. 그래서 **방어 위치는 앱 설정이 아니라 맨 앞 프록시**다.
-- 앞에 로드밸런서·CDN이 추가되면 홉 수가 바뀐다 — nginx `set_real_ip_from`(LB 대역) + `real_ip_header X-Forwarded-For`로 `$remote_addr`를 실제 IP로 복원한 뒤 같은 덮어쓰기를 유지한다 (이 레시피에서 미검증 — 전환 시 위 표를 다시 실측).
+- 앞에 로드밸런서·CDN이 추가되면 홉 수가 바뀐다 — nginx `set_real_ip_from`(LB 주소) + `real_ip_header X-Forwarded-For`로 `$remote_addr`를 실제 IP로 복원한 뒤 같은 덮어쓰기를 유지한다. 앞 단계가 둘 이상(CDN → LB)이면 **각각의 주소를 모두** `set_real_ip_from`에 넣고 `real_ip_recursive on`. 실측 2026-10-20 (nginx 1.30.6 — LB·CDN은 XFF에 이어 붙이는 nginx, 클라이언트 `127.0.0.2`, 앱이 받는 X-Forwarded-For):
+
+| 프록시 설정 | LB 경유 정상 / 위조 `6.6.6.6` | CDN → LB 경유 정상 / 위조 |
+|---|---|---|
+| real_ip 없음(현재 템플릿 그대로) | **LB 주소** / LB 주소 — 모든 사용자가 같은 IP | CDN·LB 주소 |
+| `set_real_ip_from <LB>` | 실제 IP / 실제 IP | **CDN 주소** / CDN 주소 |
+| `set_real_ip_from <LB>` + `<CDN>`, recursive 없음 | 실제 IP / 실제 IP | **CDN 주소** / CDN 주소 |
+| `set_real_ip_from <LB>` + `<CDN>` + `real_ip_recursive on` | 실제 IP / 실제 IP | 실제 IP / 실제 IP |
+| `set_real_ip_from 127.0.0.0/8`(클라이언트까지 포함하는 넓은 대역) + recursive | 실제 IP / **`6.6.6.6`** | 실제 IP / **`6.6.6.6`** |
+
+  - `set_real_ip_from`은 **앞 단계 장비의 주소만** — 클라이언트가 있을 수 있는 대역(사내망 전체·`0.0.0.0/0`)을 넣으면 recursive가 위조값까지 거슬러 올라간다(Tomcat 사설 대역 함정과 같은 구조). CDN 주소 목록은 CDN이 공개하는 대역으로, 바뀌면 갱신한다.
 
 ### 3-2. 계층별 한도
 
@@ -111,7 +121,7 @@ app.use(['/api/auth/signup', '/api/auth/password-reset', '/api/auth/send-code'],
 | 구성 | Express | Spring |
 |---|---|---|
 | 실제 IP | `app.set('trust proxy', 1)` + `req.ip` | `server.forward-headers-strategy: native` + `request.getRemoteAddr()` (프록시 덮어쓰기 전제) |
-| 빈도 제한 | express-rate-limit (7.x 실측) | Bucket4j 등 — 필터에서 (이 레시피에서 미검증) |
+| 빈도 제한 | express-rate-limit (7.x 실측) | Bucket4j `bucket4j_jdk17-core` — `FilterRegistrationBean`으로 대상 경로에만, IP별 버킷 `tryConsumeAndReturnRemaining`, 거부 시 429 + `Retry-After` + 에러 봉투 (실측 2026-10-20, 8.21.0: 한도 5 → `200×5, 429×2`, `Retry-After: 59`, 다른 경로 영향 없음). 다중 인스턴스는 Redis 백엔드(multi-instance.md 5절) |
 | 대상당 한도 | `account_token` 집계 쿼리 | 동일 |
 | CAPTCHA 검증 | `external/captcha` 클라이언트 | 동일 |
 
