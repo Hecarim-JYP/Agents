@@ -7,6 +7,7 @@
 //       "(STRICT …YYYY-MM-DD…)" / "(MANDATORY …YYYY-MM-DD…)" 표기. 날짜 없는 표기는 판단할 수 없어 세지 않는다.
 // 기준: dev-rules.md 머리 주석의 "요약 확인일: YYYY-MM-DD". 그보다 늦은 확정이 있으면 나열하고 exit 1.
 // 고치는 법: 나열된 항목을 dev-rules 요약에 반영할지 판단해(구체 값 없이 금지·결정 항목명만) 반영하고, 확인일을 그 날짜로 올린다.
+// 한계: 날짜 단위라 확인일과 같은 날 새로 확정한 항목은 구분하지 못한다 — 그날 확정했다면 커밋 전에 직접 확인한다.
 //
 // 사용법: 저장소 루트에서  node scripts/check-rules-sync.mjs   (CI verify.yml이 push/PR마다 실행)
 
