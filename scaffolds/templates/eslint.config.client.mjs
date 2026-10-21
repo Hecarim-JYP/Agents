@@ -1,7 +1,9 @@
 // client/eslint.config.mjs — 컨벤션을 자동 강제하는 린트 설정 (React + TypeScript)
 // 문서로만 있던 규칙을 도구로 옮긴 것이다. 규칙 근거는 각 rule의 message 참조.
 // 필요 패키지 (⚠ eslint와 @eslint/js의 메이저를 맞춘다 — 안 맞추면 ERESOLVE로 설치가 깨진다):
-//   npm i -D eslint@9 @eslint/js@9 typescript-eslint eslint-plugin-react-hooks eslint-plugin-import globals eslint-import-resolver-typescript
+//   npm i -D eslint@10 @eslint/js@10 typescript-eslint eslint-plugin-react-hooks eslint-plugin-import-x globals eslint-import-resolver-typescript
+// ⚠ import 규칙은 eslint-plugin-import-x를 쓴다 — eslint-plugin-import(2.32, 2025-06 이후 출시 없음)는 ESLint 10을 지원하지 않고(peer ~^9),
+//   ESLint 9는 2026-08-06 지원 종료(eslint.org version-support)라 9에 묶어 둘 수 없다 (2026-10-21 확인)
 // ⚠ TypeScript는 6.0.x로 고정한다 (npm i -D typescript@~6.0.3) — typescript-eslint가 아직 TS 7을 지원하지 않아(peer <6.1.0)
 //   최신 Vite 템플릿(TS 7)·`npm i -D typescript`(7.x) 그대로면 위 설치가 ERESOLVE로 깨진다 (2026-10-19 실측)
 // package.json:  "lint": "eslint ."   (훅과 CI가 이 스크립트를 실행한다)
@@ -9,7 +11,8 @@
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
-import importPlugin from 'eslint-plugin-import';
+import { importX, createNodeResolver } from 'eslint-plugin-import-x';
+import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
 import globals from 'globals';
 
 export default tseslint.config(
@@ -19,13 +22,13 @@ export default tseslint.config(
   {
     files: ['**/*.{ts,tsx}'],
     languageOptions: { globals: globals.browser },
-    // import/no-cycle이 실제로 돌게 하는 설정 (2026-10-19 실측 — 없으면 TS 파일을 못 읽어 순환을 하나도 못 잡는다):
+    // import-x/no-cycle이 실제로 돌게 하는 설정 (2026-10-21 실측 — parsers가 없으면 TS 파일을 못 읽어 순환을 하나도 못 잡는다):
     // TS 파서로 의존 파일을 읽고, typescript 리졸버로 확장자 없는 경로·'.js'로 쓴 TS 경로·tsconfig paths 별칭(@/)까지 따라간다
     settings: {
-      'import/parsers': { '@typescript-eslint/parser': ['.ts', '.tsx'] },
-      'import/resolver': { typescript: true, node: true },
+      'import-x/parsers': { '@typescript-eslint/parser': ['.ts', '.tsx'] },
+      'import-x/resolver-next': [createTypeScriptImportResolver(), createNodeResolver()],
     },
-    plugins: { 'react-hooks': reactHooks, import: importPlugin },
+    plugins: { 'react-hooks': reactHooks, 'import-x': importX },
     rules: {
       ...reactHooks.configs.recommended.rules,
 
@@ -33,7 +36,7 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'error',
 
       // general.md 3절 — 순환 의존 금지
-      'import/no-cycle': 'error',
+      'import-x/no-cycle': 'error',
 
       // react.md 7절 — axios 직접 import 금지, 공용 인스턴스만 사용
       'no-restricted-imports': ['error', {

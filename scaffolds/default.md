@@ -135,11 +135,12 @@
     # TS 프로젝트만 — 먼저 실행
     npm i -D typescript@~6.0.3
     # client (JS면 typescript-eslint 제외)
-    npm i -D eslint@9 @eslint/js@9 typescript-eslint eslint-plugin-react-hooks eslint-plugin-import globals eslint-import-resolver-typescript
+    npm i -D eslint@10 @eslint/js@10 typescript-eslint eslint-plugin-react-hooks eslint-plugin-import-x globals eslint-import-resolver-typescript
     # server (JS면 typescript-eslint 제외)
-    npm i -D eslint@9 @eslint/js@9 typescript-eslint eslint-plugin-import globals eslint-import-resolver-typescript
+    npm i -D eslint@10 @eslint/js@10 typescript-eslint eslint-plugin-import-x globals eslint-import-resolver-typescript
     ```
-  - **`eslint-import-resolver-typescript`가 있어야 순환 의존 규칙이 동작한다** — 템플릿의 `settings`(TS 파서·리졸버)가 없던 이전 판은 TS에서 **순환을 하나도 잡지 못했고**(JS는 `@/` 별칭 순환을 놓쳤다), 2026-07-17 검증도 이 규칙은 빠져 있었다. 2026-10-19 수정 후 4종 모두 상대경로·`@/` 별칭 순환 검출, 오탐 없음(실측).
+  - **import 규칙은 `eslint-plugin-import-x`** — 원조 `eslint-plugin-import`는 ESLint 10을 지원하지 않고 ESLint 9는 2026-08-06 지원 종료다(2026-10-21 확인). 규칙 이름은 `import-x/no-cycle`.
+  - **`eslint-import-resolver-typescript`가 있어야 순환 의존 규칙이 동작한다** — 템플릿의 `settings`(TS 파서·리졸버)가 없던 이전 판은 TS에서 **순환을 하나도 잡지 못했고**(JS는 `@/` 별칭 순환을 놓쳤다), 2026-07-17 검증도 이 규칙은 빠져 있었다. 2026-10-19 수정 후 4종 모두 상대경로·`@/` 별칭 순환 검출, 오탐 없음(실측). 2026-10-21 ESLint 10 + import-x로 바꾼 뒤 4종 × 전 규칙 위반 검출·정상 무오탐 다시 확인(TS는 `import-x/parsers`를 빼면 순환 0건 — 실측).
 - **Java/Spring**: Spotless(google-java-format) + Checkstyle을 `check`에 연결, 패키지 순환은 ArchUnit `ArchitectureTest` — 설정은 `~/.claude/jyp/scaffolds/templates/build.gradle`·`checkstyle.xml` (spring.md 7절). ⚠ **`.gitattributes`(`* text=auto eol=lf`)를 반드시 함께 생성**한다 — 없으면 Windows에서 CRLF를 기대해 정상 코드가 `spotlessCheck`에서 실패한다 (2026-07-14 실측).
 - **CI와 훅이 이 스크립트를 실행한다** — 린트가 없으면 훅이 조용히 통과해 자동 검증 층이 사라진다.
 

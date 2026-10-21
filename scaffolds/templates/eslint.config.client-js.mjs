@@ -2,12 +2,15 @@
 // TS 프로젝트는 eslint.config.client.mjs를 쓴다 (언어는 체크리스트 1 — react.md 0절).
 // TS 전용 규칙(any 금지)만 빠지고 나머지 강제는 동일하다.
 // 필요 패키지 (⚠ eslint와 @eslint/js의 메이저를 맞춘다 — 안 맞추면 ERESOLVE로 설치가 깨진다):
-//   npm i -D eslint@9 @eslint/js@9 eslint-plugin-react-hooks eslint-plugin-import globals eslint-import-resolver-typescript
+//   npm i -D eslint@10 @eslint/js@10 eslint-plugin-react-hooks eslint-plugin-import-x globals eslint-import-resolver-typescript
+// ⚠ import 규칙은 eslint-plugin-import-x를 쓴다 — eslint-plugin-import(2.32, 2025-06 이후 출시 없음)는 ESLint 10을 지원하지 않고(peer ~^9),
+//   ESLint 9는 2026-08-06 지원 종료(eslint.org version-support)라 9에 묶어 둘 수 없다 (2026-10-21 확인)
 // package.json:  "lint": "eslint ."   (훅과 CI가 이 스크립트를 실행한다)
 
 import js from '@eslint/js';
 import reactHooks from 'eslint-plugin-react-hooks';
-import importPlugin from 'eslint-plugin-import';
+import { importX, createNodeResolver } from 'eslint-plugin-import-x';
+import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
 import globals from 'globals';
 
 export default [
@@ -19,16 +22,16 @@ export default [
       globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },   // JSX 파싱 — 아래 JSXAttribute 셀렉터의 전제
     },
-    // import/no-cycle이 확장자 없는 경로·jsconfig paths 별칭(@/)까지 따라가게 한다 (2026-10-19 실측 — 없으면 순환을 못 잡는다)
+    // import-x/no-cycle이 확장자 없는 경로·jsconfig paths 별칭(@/)까지 따라가게 한다 (2026-10-21 실측)
     settings: {
-      'import/resolver': { typescript: true, node: { extensions: ['.js', '.jsx', '.mjs'] } },
+      'import-x/resolver-next': [createTypeScriptImportResolver(), createNodeResolver({ extensions: ['.js', '.jsx', '.mjs'] })],
     },
-    plugins: { 'react-hooks': reactHooks, import: importPlugin },
+    plugins: { 'react-hooks': reactHooks, 'import-x': importX },
     rules: {
       ...reactHooks.configs.recommended.rules,
 
       // general.md 3절 — 순환 의존 금지
-      'import/no-cycle': 'error',
+      'import-x/no-cycle': 'error',
 
       // react.md 7절 — axios 직접 import 금지, 공용 인스턴스만 사용
       'no-restricted-imports': ['error', {
