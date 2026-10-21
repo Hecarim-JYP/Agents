@@ -1,7 +1,8 @@
 # 개발 작업 규칙
 
 <!-- 프로젝트 CLAUDE.md에서 @로 import해서 사용:
-     @~/.claude/jyp/rules/dev-rules.md -->
+     @~/.claude/jyp/rules/dev-rules.md
+     컨벤션 STRICT·MANDATORY 요약 확인일: 2026-10-21 — 컨벤션에 이보다 늦게 확정된 항목이 생기면 저장소 CI(check-rules-sync)가 실패한다 -->
 
 ## 소통
 - 설명과 보고는 한국어, 코드와 기술 용어는 영어 원문 유지
@@ -33,12 +34,12 @@
 - DB 기초 테이블(인증·권한, 공통코드, 파일 메타, 감사 로그, schema_migrations)은 새로 설계하지 말고 `~/.claude/jyp/schemas/`의 표준 DDL을 복사·조정해서 시작한다
 - 자동화 테스트는 `~/.claude/jyp/conventions/testing.md`를 따른다 — **테스트 DB 사용 여부(0절)에 따라 실제 DB 검증 또는 쿼리 목킹**, 핵심 로직 변경 시 테스트 동반 작성, 못 썼으면 보고·changelog에 "테스트 미작성" 명시 + 백로그 `TEST-` 항목 추가 (게이트+기록). **운영 DB는 어떤 테스트·검증에도 사용 금지**, 자동화 테스트는 테스트 DB 전용, 개발 DB 실동작 검증은 삭제·DDL 금지 (6절)
 - **동시 수정 방어는 SQL이 최종 방어선** (`sql.md` 8절) — 여러 사용자가 고치는 테이블은 `version` 컬럼 + 낙관적 락, 상태 전이는 조건부 UPDATE(`WHERE status='PENDING'`), 변경 0행이면 409. 읽고 계산해 쓰는 값(재고·잔액)은 `FOR UPDATE` 또는 DB 계산
-- 배포·운영은 `~/.claude/jyp/conventions/ops.md`(환경 분리·로깅·보안 체크리스트·백업), DB 마이그레이션은 `migration.md`(번호·멱등성·DDL/DML 분리·2단계 배포)를 따른다
-- 모든 서비스는 개발·운영 공통 **Docker 컨테이너**로 배포·운영 — `~/.claude/jyp/conventions/docker.md` (멀티스테이지·non-root·.env 이미지 포함 금지·태그=git 태그·롤백=직전 이미지·앞단 리버스 프록시(+외부 노출 시 자동 HTTPS))
+- 배포·운영은 `~/.claude/jyp/conventions/ops.md`를 따른다 — 환경 분리·로깅·보안 체크리스트, **비밀값은 저장소에 넣지 않는다(`.env.*` 무시 + CI 비밀값 검사, 검출되면 유출로 보고 재발급)**, **의존성 취약점 검사를 배포 전에 도구로 강제**(검사를 끄거나 건너뛰지 않는다), **백업은 기본 구성 그대로(만들 때 암호화·다른 호스트 사본·정기 복구 리허설)**, 디스크 사용률 감시. DB 마이그레이션은 `migration.md`(번호·멱등성·DDL/DML 분리·2단계 배포)를 따른다
+- 모든 서비스는 개발·운영 공통 **Docker 컨테이너**로 배포·운영 — `~/.claude/jyp/conventions/docker.md` (멀티스테이지·non-root·.env 이미지 포함 금지·태그=git 태그·롤백=직전 이미지·앞단 리버스 프록시(+외부 노출 시 자동 HTTPS)·운영 컨테이너 로그 크기 제한)
 - 인증·권한은 `auth.md`(**인증 소스 결정 — 자체 로그인/사내 위임/SSO**, 비밀번호 해시·시도 제한, access 짧게+refresh, 서버측 무효화, RBAC+데이터 스코프 3종, default deny, **토큰은 메모리+httpOnly refresh 쿠키 — 로컬/세션스토리지 저장 금지**, 스택별 매핑 표), API 설계는 `api.md`(리소스 URL·상태코드·page/size/sort 표준·snake_case 필드)를 따른다
 - 사내·외부 API 연동은 `integration.md`를 따른다 — 프론트는 백엔드 경유(직접 호출 금지), `external/` 연동 계층 분리, 타임아웃 필수·동기 쓰기 재시도 금지, **외부 쓰기 연동은 outbox 경유**, 외부 응답도 경계 검증, `/health`에 외부 의존 넣지 않기
 - **기능을 구현하기 전에 `~/.claude/jyp/conventions/features/catalog.md`(운영 기능 레시피 목록)에서 해당 레시피가 있는지 먼저 확인한다** — 레시피가 있는 기능은 즉흥 설계 금지, 기본값과 다르게 가면 CLAUDE.md에 기록 (MANDATORY)
-- 정기 배치·스케줄 작업은 `batch.md`를 따른다 — **첫 배치 구현 전에 실행 방식(앱 내/별도 컨테이너+호스트 cron/분산 락)을 사용자에게 제안·확정**(MANDATORY), 멱등 작성, 실행 이력 기록 + 실패 알림 필수, 컨테이너 타임존 명시
+- 정기 배치·스케줄 작업은 `batch.md`를 따른다 — **첫 배치 구현 전에 실행 방식(앱 내/별도 컨테이너+호스트 cron/분산 락)을 사용자에게 제안·확정**(MANDATORY), 멱등 작성, 실행 이력 기록 + 실패 알림 필수, **새 배치는 운영 감시 엔드포인트(`batch.md` 3-1절)의 감시 목록에 함께 추가**(MANDATORY — 목록에 없는 배치는 감시되지 않는다), 경과 시간은 DB에서 계산, 컨테이너 타임존 명시
 - 화면 디자인·테마·UX는 `~/.claude/jyp/conventions/design.md`를 따른다 — Tailwind + shadcn/ui 표준, 색상은 시맨틱 토큰만(hex 직접 지정 금지), 업무/서비스 UI 모드, 로딩·빈 상태·에러 3종 필수
 - 다국어 지원 프로젝트는 `i18n.md`를 따른다 — 모든 문구는 키로(기본 언어 하드코딩 금지), react-i18next, 에러 분기는 `error` 코드, 코드성 데이터는 번역 테이블
 - 새 프로젝트 세팅 요청 시 `~/.claude/jyp/scaffolds/default.md`의 절차를 따른다 — **사내 표준 프로필(`~/.claude/jyp/profiles/project-default.md`)이 결정 항목의 기본 답안**이므로 먼저 읽고, 프로필의 [확인] 항목만 묻는다
