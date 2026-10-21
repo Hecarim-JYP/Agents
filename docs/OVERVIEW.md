@@ -57,7 +57,7 @@ Agents/
 ├── hooks/             # 자동 검증 훅 스크립트 2종 (post-edit-check, stop-test)
 ├── docs/              # 저장소 자체 문서 (이 파일)
 ├── scripts/           # 검증·설치 보조 (check-refs, check-versions, verify-templates(ps1/sh), register-hooks)
-├── .github/workflows/ # CI — push/PR마다 check-refs, 주 1회 check-versions 자동 실행
+├── .github/workflows/ # CI — push/PR마다 check-refs, 주 1회 check-versions, ps1·설치 관련 변경 시 Windows PowerShell 5.1 검증(verify-windows)
 ├── install.ps1        # Windows 설치 스크립트
 ├── install.sh         # Mac/Linux 설치 스크립트
 ├── CLAUDE.md          # 이 저장소를 고칠 때의 규칙 (수정 사이클·SSOT·인코딩·검증)

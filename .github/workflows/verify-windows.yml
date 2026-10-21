@@ -1,0 +1,83 @@
+# Windows PowerShell 5.1 실행 검증 — 이 저장소를 실제로 쓰는 곳(회사 PC)과 같은 셸에서 ps1 스크립트를 돌린다.
+# 리눅스 검증(install.sh·verify-templates.sh)으로는 5.1 고유의 문제(BOM 없는 한글, 네이티브 명령 stderr 처리)가 보이지 않는다
+# — 2026-10-21까지 install.ps1은 변경 이력 10곳에서 "미수행"이었다.
+# ps1과 그 입력(설치 대상 목록·훅·compose 템플릿)이 바뀔 때만 돈다 — Windows 러너는 기동이 느리다.
+name: verify-windows
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - '**.ps1'
+      - 'install.sh'
+      - 'hooks/**'
+      - 'scripts/register-hooks.mjs'
+      - 'scaffolds/templates/docker-compose*.yml'
+      - 'scaffolds/templates/nginx-proxy.conf'
+      - '.github/workflows/verify-windows.yml'
+  pull_request:
+    paths:
+      - '**.ps1'
+      - 'install.sh'
+      - 'hooks/**'
+      - 'scripts/register-hooks.mjs'
+      - 'scaffolds/templates/docker-compose*.yml'
+      - 'scaffolds/templates/nginx-proxy.conf'
+      - '.github/workflows/verify-windows.yml'
+  workflow_dispatch:
+
+jobs:
+  powershell:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'   # register-hooks.mjs (install이 호출)
+
+      # 1) 인코딩 — 5.1은 BOM 없는 UTF-8을 시스템 코드 페이지로 읽어 한글이 깨진다 (CLAUDE.md 인코딩 표).
+      #    5.1 파서로 직접 읽어 한글 음절 토큰이 살아 있는지 본다. 대조군: BOM을 뗀 사본은 반드시 걸려야 한다 —
+      #    대조군이 통과하면 이 러너는 문제를 재현하지 못하는 것이므로 그것도 실패로 본다.
+      # ⚠ run 블록 안은 ASCII만 — 러너는 powershell 스텝 스크립트를 BOM 없이(또는 콘솔 코드 페이지로) 저장한다
+      #    (actions/runner ScriptHandler.cs). 한글을 쓰면 5.1이 그 스텝 자체를 깨뜨린다.
+      - name: ps1 encoding (Windows PowerShell 5.1 parser)
+        shell: powershell
+        run: |
+          if ($PSVersionTable.PSVersion.Major -ne 5) { throw "not Windows PowerShell 5.1: $($PSVersionTable.PSVersion)" }
+          function Get-HangulTokens([string]$path) {
+            $tokens = $null; $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors)
+            [pscustomobject]@{ Hangul = @($tokens | Where-Object { $_.Text -match '[\uAC00-\uD7A3]' }).Count; Errors = $errors.Count }
+          }
+          $failed = $false
+          foreach ($f in Get-ChildItem -Recurse -File -Filter *.ps1) {
+            $r = Get-HangulTokens $f.FullName
+            Write-Host ("{0}: hangul tokens {1}, parse errors {2}" -f $f.Name, $r.Hangul, $r.Errors)
+            if ($r.Hangul -eq 0 -or $r.Errors -gt 0) { $failed = $true }
+          }
+          $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path .\install.ps1).Path)
+          $control = Join-Path $env:RUNNER_TEMP "install-nobom.ps1"
+          [System.IO.File]::WriteAllBytes($control, [byte[]]$bytes[3..($bytes.Length - 1)])
+          $c = Get-HangulTokens $control
+          Write-Host ("control (BOM removed): hangul tokens {0}, parse errors {1}" -f $c.Hangul, $c.Errors)
+          if ($c.Hangul -gt 0) { throw "control passed - this runner does not reproduce the BOM problem, the check is meaningless" }
+          if ($failed) { throw "a ps1 file is missing its UTF-8 BOM (or has parse errors) - save it as UTF-8 with BOM" }
+
+      - name: install.ps1
+        shell: powershell
+        run: .\install.ps1
+
+      # 2) 두 설치 스크립트의 결과가 같아야 한다 — 폴더 목록을 한쪽만 고치면 여기서 갈린다 (install.ps1 주석)
+      #    register-hooks.mjs는 Windows에서 USERPROFILE을 홈으로 쓰므로 둘 다 바꿔 따로 설치한다
+      - name: install.sh 결과와 대조
+        shell: bash
+        run: |
+          sh_home="$RUNNER_TEMP/sh-home"
+          mkdir -p "$sh_home"
+          HOME="$sh_home" USERPROFILE="$(cygpath -w "$sh_home")" ./install.sh > /dev/null
+          diff -r "$(cygpath -u "$USERPROFILE")/.claude" "$sh_home/.claude"
+          echo "install.ps1 == install.sh: $(find "$sh_home/.claude" -type f | wc -l) files"
+
+      - name: verify-templates.ps1
+        shell: powershell
+        run: .\scripts\verify-templates.ps1
