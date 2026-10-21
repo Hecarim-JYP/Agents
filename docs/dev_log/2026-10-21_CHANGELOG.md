@@ -226,3 +226,107 @@
 ■ 백업: compose backup 서비스 + backup.sh — --single-transaction(기본 옵션은 3.5초 쓰기 정지, 잠금 없음은 불일치), pipefail·완료 표시 검사·암호화·배포 계정 소유
 ■ 의존성: 최신 Boot 4.1.1도 Tomcat·Jackson 취약점 10건 → 관리 버전 덮어쓰기, GitHub=Dependabot+자동 의존성 제출, 사내=osv-scanner(init 스크립트 잠금)
 ```
+
+---
+
+# 4부 — 9차: 문서 규칙을 템플릿·CI로 (디스크 · 취약점 검사 · Windows 검증)
+
+> 사용자 요청 "9차 내용 보고해" → 권고안(A 디스크가 차는 경로 / B 취약점 검사 CI 강제 / C PowerShell 5.1 실행 검증, 새 레시피 없음) → "권고안으로 9차 진행해"
+> 확인 질문 3개는 권장안으로 진행했다: 보안 패치 덮어쓰기를 템플릿에 넣는다, release 차단 기준은 high 이상, 10-29 예약 작업의 수정 목록은 check-versions 결과를 기준으로 한다.
+
+## A. 디스크가 차는 경로 막기 (feat)
+
+- 근거: docker.md 6절·ops.md 8절은 "로그 로테이션을 설정한다"고 하지만 compose 템플릿에 `logging:`이 없었다. 8차부터 백업(30일)이 같은 디스크에 쌓이고, 디스크 점검은 "배포할 때마다"뿐이었다.
+- 로그 실측 (Docker 29.8, 40만 줄 출력):
+
+| 설정 | 디스크 | `docker logs` |
+|---|---|---|
+| 기본 json-file | **103MB — 제한 없음** | 전체 40만 줄 |
+| json-file `max-size 10m`·`max-file 3` | 26MB에서 멈춤 (파일 3개) | 최근 약 10만 줄 |
+| local (같은 제한) | 0.8MB (압축) | 최근 약 9만 줄 |
+
+  - compose의 `logging:`을 바꾸면 `up -d`가 컨테이너를 다시 만든다(Recreate 확인). 사내 수집기 호환을 위해 json-file을 유지했다.
+- 디스크가 찼을 때 MariaDB 실측 (11.4, 데이터 디렉터리를 400MB tmpfs로 제한):
+  - **헬스체크는 healthy 그대로**다. 읽기와 기존 페이지 안의 작은 UPDATE·INSERT는 성공한다.
+  - 테이블이 커져야 하는 쓰기는 `ERROR 1114 The table 'fill' is full`로 실패한다. 디스크 문제인데 테이블 문제처럼 보이는 메시지다. 테이블 생성은 `Errcode: 28`.
+  - **10만 행을 지워도 사용량은 400MB 그대로**다. 지운 공간은 같은 테이블 안에서만 재사용된다.
+  - 다른 파일을 지워 공간을 확보하면 바로 회복된다.
+- 템플릿:
+  - deploy override에 `x-logging` 앵커(json-file 10m×5)를 넣고 7개 서비스 모두에 걸었다.
+  - `backup.sh`가 백업 디스크(`/backup`)와 Docker 데이터 디스크(`db-data` 읽기 전용 마운트)의 사용률을 잰다. `DISK_ALERT_PCT`(85)를 넘으면 `DISK_CHECK` 실패 기록 + exit 1, 정상이면 성공 기록을 남긴다.
+  - 실패해도 미완성 `.part` 파일을 남기지 않는다(trap).
+- 템플릿 그대로 조립한 프로젝트에서 실행한 결과:
+  - 정상: DB_BACKUP·DISK_CHECK 성공, exit 0.
+  - 기준을 10%로 낮추면: DISK_CHECK 실패 + 사용률 메시지, exit 1.
+  - 2MB tmpfs를 백업 디스크로 썼을 때: 백업은 들어갔지만 사용률 100%라 DISK_CHECK 실패.
+  - 남은 공간이 28KB일 때: 덤프 쓰기 실패로 exit 1, 성공 기록 없음, `.part` 남지 않음.
+- 연결: ops.md 6·8절(감시 목록에 `DB_BACKUP`·`DISK_CHECK`), docker.md 6절(STRICT), `.env.example`, verify-templates(.sh/.ps1) env, deploy-check 9단계.
+
+## B. 취약점 검사를 생성 프로젝트 CI로 강제 (feat)
+
+- 근거: 8차 ops.md 5-1절은 사람이 돌리는 규칙이었다(8차 B에서 수동 버전 점검이 Actions를 놓친 것과 같은 구조).
+- 템플릿 `build.gradle` 그대로(MyBatis 선택 포함) 프로젝트를 만들어 runtimeClasspath 73건을 검사했다:
+  - 덮어쓰기 전: 10건(CVSS 9.8·9.1·9.1 Tomcat, 7.5 Jackson ×5, 중간 등급 2건).
+  - `ext['tomcat.version'] = '11.0.27'`·`ext['jackson-bom.version'] = '3.1.8'` 후: **0건**.
+  - `./gradlew check` 통과, 순환·포맷 위반 검출도 그대로다.
+  - bootJar 안의 jar 버전이 바뀐 것과 기동(Tomcat/11.0.27)·헬스·SNAKE_CASE JSON 응답·graceful 종료가 모두 정상이다.
+- `audit.yml`(scaffolds/default.md): `workflow_call`·`workflow_dispatch`·주 1회 `schedule`로 돈다.
+  - npm은 `npm audit --omit=dev --audit-level=high`.
+  - Gradle은 `gradle/osv-lock.gradle`로 runtimeClasspath 잠금 파일을 만들고 osv-scanner 2.7.0으로 검사한다. osv-scanner에는 등급 기준 옵션이 없어(`--help` 확인) JSON의 `max_severity`로 7.0 이상만 실패 처리한다. 등급 미상은 경고, exit 2 이상(잠금 파일 없음 등)은 도구 오류로 실패한다.
+- `release.yml`: `audit` job(재사용 워크플로 호출) → `build-push`(`needs: audit`).
+- act 실행 결과 (템플릿을 그대로 넣은 표본. 이 환경은 api.osv.dev가 막혀 있어 osv-scanner만 오프라인 DB 옵션을 붙였고, 그 한 줄 외에는 같다):
+
+| 표본 | audit-client | audit-server | release 이미지 push |
+|---|---|---|---|
+| lodash 4.17.20이 개발 의존성에만 + 덮어쓰기 있음 | 통과(`--omit=dev`) | 통과 | — |
+| lodash 운영 의존성 + 덮어쓰기 제거 | **실패** (high) | **실패** (high 이상 8건, 중간 등급 2건은 차단 안 함) | **0건** |
+| 깨끗한 표본 | 통과 | 통과 | client·server push 성공 |
+
+- `check-versions.mjs`에 규칙 2개를 추가했다:
+  - `ext['X.version']` 덮어쓰기는 Boot 관리 버전이 따라잡으면 "덮어쓰기 삭제"로 실패한다.
+  - GitHub 릴리스 다운로드 URL에 고정한 버전(osv-scanner)을 추적한다.
+  - 대조군(Tomcat 11.0.24·Jackson 3.1.2·osv-scanner v2.5.1)으로 3건 모두 검출됐고, 현재 저장소에서는 0건이다(고정값 77·보류 5).
+- 연결: ops.md 5-1절 개편(STRICT — 도구로 강제), 체크리스트 16, 구조도, Spring 조정표(`gradle/osv-lock.gradle` 복사), CLAUDE.md 검증 항목.
+
+## C. Windows PowerShell 5.1 실행 검증 — `verify-windows.yml` (ci)
+
+- `windows-latest`(Windows Server 2025, Docker 29.7·Compose 2.40) 러너에서 push·PR마다 돈다.
+- 실측 (GitHub Actions run 39568138713·39568354260):
+  - **5.1 파서**: `install.ps1` 한글 토큰 20개, `verify-templates.ps1` 19~20개, 구문 오류 0개. **BOM을 뗀 대조군은 한글 0개에 구문 오류 3개** — 5.1에서 BOM이 없으면 실제로 파싱부터 깨진다. 대조군이 통과하면 검사가 의미 없으므로 그것도 실패로 처리한다.
+  - **install.ps1 결과 = install.sh 결과**: 133개 파일, settings.json 포함 `diff -r` 일치.
+  - **verify-templates.ps1**: 두 모드 통과. 5.1에서 처음 실제로 돌려 본 것이다.
+- 작성 중 발견: 러너는 `shell: powershell` 스텝 스크립트를 BOM 없이(또는 콘솔 코드 페이지로) 저장한다(actions/runner `ScriptHandler.cs`). 그래서 **run 블록 안은 ASCII만** 쓴다 — CLAUDE.md 인코딩 표에 추가.
+- 처음에는 ps1 관련 변경 때만 돌게 했지만, 실행이 약 30초이고 install이 저장소 전체를 복사하므로(Windows에서 쓸 수 없는 파일명 등) push마다로 바꿨다.
+- 함께 고친 것: verify-templates(.sh/.ps1) 출력의 서비스 목록에 networks·volumes·x-logging의 하위 키가 섞이던 문제. 판정에는 영향이 없었다.
+
+## 예약 작업 지시문 갱신
+
+- 10-29 "Node 26 LTS 전환 재검증"의 수정 목록을 손으로 고른 7곳에서 **`check-versions.mjs`가 node 24 → 26으로 가리키는 곳 전부**로 바꿨다. `CHECK_TODAY=2026-10-29` 기준 11곳이고, 이전 목록은 pdf-output.md·audit.yml 템플릿·verify.yml 둘째 job·verify-windows.yml을 빠뜨렸다.
+
+## 검증
+
+| 항목 | 결과 |
+|---|---|
+| `check-refs.mjs` | 통과 (커밋마다) |
+| `check-versions.mjs` | 고정값 77 / 낡음 0 / 보류 5, 대조군 3/3 |
+| `verify-templates.sh` | 통과 (커밋마다) |
+| 백업·디스크 e2e | 정상·기준 초과·백업 디스크 가득 참 2종 |
+| Spring 템플릿 | check 통과·위반 검출·bootJar 기동, 취약점 10 → 0 |
+| act | audit 3종 표본 · release 차단/통과 |
+| shellcheck 0.11.0 | `backup.sh` 경고 0 |
+| GitHub CI | verify · **verify-windows(5.1)** 성공 |
+| 인코딩 | 변경 파일 BOM·CR 없음, ps1은 BOM+CRLF 유지(5.1 파서로 확인) |
+| `install.sh` 임시 HOME | 설치본 = 저장소 |
+| `install.ps1` | **처음으로 실행 확인** — Windows 러너 5.1 (회사 PC에서는 기존대로 `git pull` 후 실행) |
+
+## 커밋 코멘트
+
+```
+@@ 2026-10-21 (4부) @@
+9차 — 문서 규칙을 템플릿·CI로 (새 레시피 없음)
+
+■ 디스크: 모든 서비스 로그 10m×5 제한(기본은 무제한 — 103MB), 백업 때 디스크 사용률 검사 → DISK_CHECK
+  (디스크가 차도 DB 헬스체크는 healthy, 행 삭제로는 공간이 안 돌아온다 — 실측)
+■ 취약점: audit.yml이 release 전에 high 이상 차단 + 주 1회, Boot 4.1.1 템플릿 취약점 10건 → 덮어쓰기로 0건
+■ Windows: verify-windows.yml — install.ps1·verify-templates.ps1을 5.1로 처음 실행, BOM 대조군으로 검사 자체를 검증
+```
