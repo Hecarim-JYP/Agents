@@ -48,7 +48,7 @@ Claude Code의 규칙·컨벤션·스킬·훅을 버전 관리하는 저장소. 
 - **버전 고정값**(템플릿·문서의 이미지 태그·플러그인·패키지 메이저·Actions·런타임): `node scripts/check-versions.mjs`로 현행 배포본·LTS 정책(general.md 8-1절)과 대조한다 — **CI(verify.yml)가 주 1회 자동 실행**하고, 차수 작업 때도 로컬에서 돌린다. 새 이미지를 템플릿에 넣으면 스크립트의 `IMAGES`에 정책을 추가하고(안 하면 "규칙 없음"으로 실패), 일부러 최신이 아닌 값은 고정 사유를 조회로 확인하게 하거나 `HOLDS`에 사유·기한과 함께 둔다 — 고정값은 조용히 낡는다(2026-10-19: nginx 1.27·Flyway 10·Spotless 6.25·MyBatis 4.0.x 고정 규칙이 모두 낡아 있었다 / 2026-10-21: CI 템플릿의 Actions가 전부 Node 20 런타임 — 수동 점검 범위 밖이었다)
 - **백업 스크립트**(`backup.sh`·compose `backup` 서비스): 바꾸면 템플릿 그대로 조립한 프로젝트에서 백업 → 복원(체크섬 대조)과 실패 경로(DB 비밀번호 오류·기록 테이블 없음·디스크 기준 초과·디스크 가득 참)의 종료 코드를 확인한다
 - **취약점 검사 템플릿**(`audit.yml`·`osv-lock.gradle`·`build.gradle`의 보안 패치 덮어쓰기): 바꾸면 act로 표본 프로젝트에 돌려 **취약한 대조군은 실패하고 release가 push하지 않는지 + 깨끗한 쪽은 push까지 가는지** 둘 다 확인한다
-- **PowerShell 스크립트**(`*.ps1`): 이 환경에 5.1이 없으면 push 후 `verify-windows.yml`(Windows 러너의 5.1 — 인코딩·install 결과의 install.sh 대조·verify-templates.ps1) 결과로 확인한다 — ps1·설치 대상·compose 템플릿을 바꾸면 자동 실행된다
+- **PowerShell 스크립트**(`*.ps1`): 이 환경에 5.1이 없으면 push 후 `verify-windows.yml`(Windows 러너의 5.1 — 인코딩·install 결과의 install.sh 대조·verify-templates.ps1) 결과로 확인한다 — push·PR마다 자동 실행된다(약 30초)
 - **훅**: 깨진 코드로 exit 2(검출), 정상 코드로 exit 0(오탐 없음)을 각각 확인. 훅에 stdin으로 넣는 JSON은 **BOM 없이** 만든다(BOM이면 파싱 실패로 조용히 통과한다)
 - 스택별 규칙(Dockerfile·빌드·헬스체크)을 바꾸면 그 스택을 실제로 기동해 확인한다
 

@@ -1,29 +1,14 @@
 # Windows PowerShell 5.1 실행 검증 — 이 저장소를 실제로 쓰는 곳(회사 PC)과 같은 셸에서 ps1 스크립트를 돌린다.
 # 리눅스 검증(install.sh·verify-templates.sh)으로는 5.1 고유의 문제(BOM 없는 한글, 네이티브 명령 stderr 처리)가 보이지 않는다
 # — 2026-10-21까지 install.ps1은 변경 이력 10곳에서 "미수행"이었다.
-# ps1과 그 입력(설치 대상 목록·훅·compose 템플릿)이 바뀔 때만 돈다 — Windows 러너는 기동이 느리다.
+# push·PR마다 돈다 (실행 약 30초 — 2026-10-21 실측). install은 저장소 전체를 복사하므로 ps1 밖의 변경
+# (Windows에서 쓸 수 없는 파일명·경로 등)도 여기서 걸린다.
 name: verify-windows
 
 on:
   push:
     branches: ['**']
-    paths:
-      - '**.ps1'
-      - 'install.sh'
-      - 'hooks/**'
-      - 'scripts/register-hooks.mjs'
-      - 'scaffolds/templates/docker-compose*.yml'
-      - 'scaffolds/templates/nginx-proxy.conf'
-      - '.github/workflows/verify-windows.yml'
   pull_request:
-    paths:
-      - '**.ps1'
-      - 'install.sh'
-      - 'hooks/**'
-      - 'scripts/register-hooks.mjs'
-      - 'scaffolds/templates/docker-compose*.yml'
-      - 'scaffolds/templates/nginx-proxy.conf'
-      - '.github/workflows/verify-windows.yml'
   workflow_dispatch:
 
 jobs:
