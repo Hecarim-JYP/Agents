@@ -137,7 +137,7 @@ CRON_TZ=Asia/Seoul
 | 암호문 손상·변조 | 복호(openssl)는 exit 0으로 지나간다 — 걸리는 곳은 gzip CRC(`crc error`) | 백업 직후 복호+압축 검사 (템플릿), 복원도 `pipefail` |
 | SQL 파일을 `mariadb` 클라이언트로 직접 넣기 | 이모지가 ERROR 1366 (덤프 파일은 `SET NAMES utf8mb4`를 담고 있어 복원은 정상) | 수동 SQL은 `--default-character-set=utf8mb4` |
 
-- **복구 리허설 — 분기 1회 (STRICT, 2026-07-13 확정)**: 최신 백업을 개발서버(또는 로컬)에 실제로 복원하고 배포 모드로 기동해 핵심 화면 1개가 동작하는지 확인한다. 결과와 소요 시간을 changelog에 기록, 실패하면 백로그 High 등록 (근거: 이 패턴 운영 사고의 전형이 "백업은 있는데 복구가 안 됨" — 복원해 본 적 없는 백업은 백업이 아니다). 명령: `docker compose run --rm backup restore <파일명>` → `<DB명>_restore`에 복원한다(운영 DB에 덮어쓰려면 DB명을 세 번째 인자로 직접 적는다). 개발서버로 옮길 때는 백업 파일과 키를 따로 전달한다.
+- **복구 리허설 — 분기 1회 (STRICT, 2026-07-13 확정)**: 최신 백업을 개발서버(또는 로컬)에 실제로 복원하고 배포 모드로 기동해 핵심 화면 1개가 동작하는지 확인한다. 결과와 소요 시간을 changelog에 기록하고 CLAUDE.md "정기 점검" 표의 마지막 수행일을 고친다(기한이 지나면 `/deploy-check`·`/work-log`가 보고한다), 실패하면 백로그 High 등록 (근거: 이 패턴 운영 사고의 전형이 "백업은 있는데 복구가 안 됨" — 복원해 본 적 없는 백업은 백업이 아니다). 명령: `docker compose run --rm backup restore <파일명>` → `<DB명>_restore`에 복원한다(운영 DB에 덮어쓰려면 DB명을 세 번째 인자로 직접 적는다). 개발서버로 옮길 때는 백업 파일과 키를 따로 전달한다.
 - 복원한 뒤에는 **파기 목록을 다시 적용한다** — 백업 시점 이후 처리한 탈퇴·삭제·정정이 되살아난다 (features/account-withdrawal.md, privacy-rights.md).
 
 ## 7. 가동 모니터링·알림
