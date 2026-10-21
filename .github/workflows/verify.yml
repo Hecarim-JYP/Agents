@@ -1,15 +1,20 @@
-# 문서 참조 무결성 자동 검증 — "도구로 강제할 수 있는 규칙은 도구로"(general.md 9절)의 자기적용.
+# 저장소 자동 검증 — "도구로 강제할 수 있는 규칙은 도구로"(general.md 9절)의 자기적용.
 # check-refs.mjs는 문서끼리 가리키는 "X.md N절" 참조가 실재하는 절인지 검사한다.
 # 절 번호를 개편·삭제하면 조용히 깨지는데, 사람의 기억 대신 push/PR마다 여기서 막는다.
+# check-versions.mjs는 템플릿·문서의 고정 버전이 현행 배포본·LTS 정책보다 낡았는지 검사한다 — 주 1회.
 name: verify
 
 on:
   push:
     branches: ['**']
   pull_request:
+  schedule:
+    - cron: '17 0 * * 1'   # 매주 월요일 09:17 KST — 예약 실행은 기본 브랜치(main) 기준, 실패 알림은 이 cron을 마지막으로 고친 사람에게
+  workflow_dispatch:       # 수동 실행 (Actions 탭 → verify → Run workflow)
 
 jobs:
   check-refs:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -18,3 +23,14 @@ jobs:
           node-version: '24'   # LTS (general.md 8-1절) — 20은 2026-04-30 지원 종료
       # 의존성 없음 — check-refs.mjs는 Node 표준 모듈만 쓴다. 실패 시 exit 1로 잡을 막는다.
       - run: node scripts/check-refs.mjs
+
+  # push마다 돌리지 않는다 — 결과가 코드가 아니라 외부 배포 상황에 달려 있어, 새 릴리스 하나로 무관한 push가 빨개진다
+  check-versions:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - run: node scripts/check-versions.mjs
