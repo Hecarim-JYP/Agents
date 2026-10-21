@@ -83,7 +83,13 @@ foreach ($mode in @(
     Write-Host "`n[$($mode.Name)] $($mode.Files)" -ForegroundColor Cyan
     $out = docker compose config 2>&1
     if ($LASTEXITCODE -eq 0) {
-        $svcs = ($out | Select-String "^  (\w[\w-]*):" | ForEach-Object { $_.Matches[0].Groups[1].Value }) -join ", "
+        # services: 아래 키만 — networks·volumes·x-logging 같은 다른 최상위 키의 하위 항목은 서비스가 아니다
+        $inServices = $false
+        $svcs = ($out | ForEach-Object {
+            $line = "$_"
+            if ($line -match '^\S') { $inServices = ($line -eq "services:") }
+            elseif ($inServices -and $line -match '^  (\w[\w-]*):') { $Matches[1] }
+        }) -join ", "
         Write-Host "  OK — 병합·치환 정상 (서비스: $svcs)" -ForegroundColor Green
     } else {
         Write-Host "  FAIL" -ForegroundColor Red

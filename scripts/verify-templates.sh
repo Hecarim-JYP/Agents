@@ -77,7 +77,8 @@ for mode in "개발 모드:docker-compose.yml:docker-compose.dev.yml" "배포 �
   echo ""
   echo "[$name] $files"
   if out="$(COMPOSE_FILE="$files" docker compose config 2>&1)"; then
-    svcs="$(printf '%s\n' "$out" | sed -n 's/^  \([A-Za-z][A-Za-z0-9_-]*\):.*/\1/p' | paste -sd ', ' -)"
+    # services: 아래 키만 — networks·volumes·x-logging 같은 다른 최상위 키의 하위 항목은 서비스가 아니다
+    svcs="$(printf '%s\n' "$out" | awk '/^[^ ]/ { s = ($0 == "services:") } s && /^  [A-Za-z][A-Za-z0-9_-]*:/ { sub(/^  /, ""); sub(/:.*/, ""); print }' | paste -sd ',' - | sed 's/,/, /g')"
     echo "  OK — 병합·치환 정상 (서비스: $svcs)"
   else
     echo "  FAIL"
