@@ -33,7 +33,7 @@
 
 - `gdpr.md` 3-3절에 **한국 vs GDPR 유출 대응 비교표** — 정보주체 통지는 한국이 더 넓고(모든 유출 72시간), 기관 신고는 GDPR이 더 넓다(저위험이 아닌 모든 유출)
 - `privacy-breach.md`·`catalog.md`의 "원문 미확인" 표시 교체
-- 남은 2차 출처: EDPB 지침 3/2018 해석(우연한 제공·위치 기반 광고) — `edpb.europa.eu`는 허용하지 않았다
+- 남은 2차 출처: EDPB 지침 3/2018 해석(우연한 제공·위치 기반 광고) — 사용자가 `edpb.europa.eu`를 허용했지만 EDPB는 모든 페이지·파일을 `www.edpb.europa.eu`로 308 리다이렉트한다. `www.edpb.europa.eu`(또는 `*.edpb.europa.eu`)를 추가로 허용하면 원문 확인 가능 — 그때 gdpr.md 1-1절 해당 행을 갱신한다
 
 ## 검증
 
@@ -43,6 +43,7 @@
 | `install.sh` 임시 HOME | 설치본 = 저장소 |
 | 인코딩 | 변경 파일 BOM·CRLF 없음 |
 | `install.ps1` 실행 | **미수행** — PowerShell 없음 |
+| main 반영 | 이 변경 이력 커밋까지 fast-forward로 push (6차 10-20 커밋 포함) |
 
 ## 커밋 코멘트
 
