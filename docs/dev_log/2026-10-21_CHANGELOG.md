@@ -110,3 +110,119 @@
 ■ TS 6.0 고정·Flyway 12 고정은 사유 유효(typescript-eslint peer, Boot 관리 버전) — 그대로
 ■ 레시피 목록은 catalog.md 한 곳 — dev-rules·README 나열 제거, 추가 시 고칠 곳 = 레시피 + 표 한 줄
 ```
+
+---
+
+# 3부 — 8차: 운영 기본기 정비 (Actions 버전 · 버전 점검 자동화 · 백업 · 의존성 취약점)
+
+> 사용자 요청 "8차 내용 보고해" → 권고안(A Actions 버전 / B 버전 점검 자동화 / C 의존성 취약점·갱신 / D 백업 구현, 새 레시피 없음) → "권고안으로 8차 진행해"
+> 기준은 7차 재검토와 같다 — 대부분의 서비스가 부딪히는가, 모르면 운영 사고가 나는가, 기존 컨벤션에 없는가.
+
+## A. CI 템플릿·verify.yml의 Actions 버전 (fix)
+
+- 근거: main CI 로그 실측 *"Node.js 20 is deprecated … forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4"*. 고정된 5개가 모두 `using: node20` (각 저장소 action.yml).
+- 일정 원문: actions/runner `Constants.cs` — Node 24 기본 2026-06-16, 러너의 Node 20 제거 2026-09-23 (서버 변수로 바뀔 수 있는 기본값).
+- 조치: checkout v4→**v7**, setup-node v4→**v7**, setup-java v4→**v6**, login-action v3→**v4** (모두 node24). 메이저마다 바뀐 점(릴리스 노트·README)을 확인했고, 템플릿이 쓰는 입력값(`node-version`, `distribution`·`java-version`, `registry`·`username`·`password`)에는 깨지는 변경이 없다.
+- 실행 검증(act 0.2.89, 템플릿을 그대로 넣은 표본 프로젝트):
+  - test-client(checkout·setup-node v7 + npm ci·lint·test) 통과
+  - test-server(setup-java v6 + MariaDB 서비스 컨테이너) 통과 — setup-java는 adoptium API가 막혀 있어 tool cache의 Temurin 25로 확인
+  - docker job 통과
+  - release(login-action v4) — ghcr 대신 htpasswd 인증 로컬 레지스트리로 로그인·push 성공
+- scaffolds/default.md에 "Actions는 Node 24 런타임 메이저, 메이저 갱신은 Dependabot PR" 규칙 추가.
+
+## B. 버전 고정값 점검 자동화 — `scripts/check-versions.mjs` (feat)
+
+- 근거: 차수마다 하던 수동 점검이 Actions를 놓쳤다(A). CLAUDE.md "도구로 강제할 수 있는 규칙은 도구로"를 적용했다.
+- 대상: 템플릿·스캐폴드·Dockerfile 예시(docker.md 등)의 고정값 65건.
+  - Actions → git 태그
+  - 이미지 → 정책별: Node·Temurin·MariaDB는 LTS, nginx는 짝수 마이너, Caddy·Gradle은 최신 메이저, Playwright는 MCR 최신
+  - Gradle 플러그인 → 플러그인 포털
+  - Maven 의존성·Checkstyle → Central
+  - npm 메이저, Gradle 래퍼
+  - LTS·지원 종료일은 endoflife.date 원본 데이터(GitHub raw)로 읽어, API 도메인이 막힌 곳에서도 같은 결과
+- 일부러 최신이 아닌 값은 사유를 조회해 비교한다:
+  - Flyway 이미지 = Boot가 관리하는 Flyway 메이저
+  - TypeScript = typescript-eslint peer가 허용하는 최대 메이저
+  - 기계로 확인할 수 없는 MariaDB 11.4 유지는 `HOLDS`에 기한(2027-04-21)과 함께 둔다 → 기한이 지나면 다시 실패
+- 검증:
+  - 현재 저장소: 0건(보류 5).
+  - 저장소 사본에 낡은 값 18종을 넣은 대조군에서 **18건 전부 검출**. Boot를 4.0.6으로 낮추면 Flyway 기대값이 11로 따라 바뀌는 것도 확인했다.
+  - `CHECK_TODAY=2026-10-29`로 돌리면 Node 24 고정 8곳이 26으로 검출된다(10-29 예약 작업과 일치).
+  - `2027-05-01`이면 보류 기한 만료로 실패한다.
+  - 조회 실패도 exit 1이다.
+- CI: verify.yml에 `schedule`(매주 월 09:17 KST)·`workflow_dispatch` 추가. check-versions는 예약·수동 실행 때만 돈다 — 외부 릴리스 하나로 무관한 push가 빨개지지 않게. act로 dispatch(두 job 통과)와 push(check-refs만)를 확인했다.
+
+## D. 백업 구현 기본값 — ops.md 6절 + `backup.sh` + compose `backup` 서비스 (feat)
+
+- 근거: ops.md 6절에는 "정기 백업을 설정한다"만 있고 도구·주기·보관·사본 위치·실패 감지가 없었다.
+- 법령 원문: 개인정보의 안전성 확보조치 기준(고시 제2026-9호, 2026-07-01 시행) 제7조⑤(개인정보취급자 컴퓨터·보조저장매체 저장 시 암호화), 제11조(10만/100만 명 이상 백업·복구 계획).
+- 실측 (MariaDB 11.4.13, 덤프 145MB·60만 행, 잔액 갱신 + 이체 기록을 한 트랜잭션으로 계속 쓰는 중):
+
+| 옵션 | 덤프 중 쓰기 | 복원 후 불변식 |
+|---|---|---|
+| 기본(`--lock-tables`) | 최대 3.5초 정지, 커밋 1,536건 | 맞음 |
+| `--skip-lock-tables` | 계속(7,418건) | **이체 5,707건 어긋남** |
+| `--single-transaction` | 계속(7,484건, 최대 간격 0.36초) | 맞음 (2회) |
+
+  - ⚠ 측정 코드 실수 1건을 바로잡았다 — `WHERE id = FLOOR(1+RAND()*100)`은 행마다 RAND()를 다시 계산해 원본부터 불변식이 깨졌다 → 변수로 고친 뒤 재측정.
+- 함정 실측:
+  - `| gzip`에 pipefail이 없으면 접속 실패에도 exit 0과 20바이트 파일이 남는다(pipefail이면 exit 2).
+  - 끊긴 덤프에는 `-- Dump completed`가 없고, 복원하면 ERROR 1064와 함께 앞 테이블만 생긴다.
+  - 기본 덤프에서는 프로시저·이벤트가 빠진다(뷰·트리거는 포함).
+  - 백업 컨테이너를 root로 돌리면 파일이 root 소유 600이라 배포 계정이 복사할 수 없다.
+  - openssl 복호는 변조된 파일도 exit 0으로 통과시킨다 — 잡아내는 곳은 gzip CRC다.
+  - mariadb 이미지에는 gpg-agent가 없어 gpg 대칭 암호화를 쓸 수 없다.
+  - SQL 파일을 클라이언트로 직접 넣으면 이모지가 ERROR 1366이 된다(덤프 복원은 정상, CHECKSUM 일치).
+  - compose v5.6 TTY 손상은 재현되지 않았다 → 함정으로 쓰지 않음.
+- 템플릿(템플릿 그대로 조립한 프로젝트에서 실행):
+  - 백업 → 검사 → 정식 이름 → 기한 지난 파일 삭제 → `batch_history`에 성공 기록
+  - 복원 리허설 명령(`restore <파일> [대상DB]`, 기본 `<DB>_restore`)으로 복원 → CHECKSUM 일치
+  - 실패 경로: 틀린 비밀번호 exit 2(정식 파일 없음), 기록 테이블 없음 exit 1, 키·UID 미설정은 compose가 거부
+  - MySQL 8.4 이미지에서도 같은 스크립트가 백업·복원·체크섬 일치까지 돈다(`mysqldump` 자동 선택)
+- 연결:
+  - scaffolds/default.md: `.env.example`에 BACKUP_* 5개, 구조도에 `scripts/backup.sh`, 복사 목록, `06_batch_history.sql` 포함 조건, **시작 결정 체크리스트 36(백업 사본 위치)**
+  - 프로필 답안, verify-templates(.sh/.ps1) 검증 env, CLAUDE.md 검증 항목
+
+## C. 생성 프로젝트의 의존성 취약점·갱신 — ops.md 5-1절 + `dependabot.yml` + `osv-lock.gradle` (feat)
+
+- **실측 핵심**(OSV 데이터, 2026-10-21): 템플릿 그대로 Spring Boot 4.1.1(현행 최신) + webmvc만 둔 프로젝트에서 **알려진 취약점 10건(Critical 3)** — Boot가 관리하는 Tomcat 11.0.24(인증 우회 등, 11.0.25에서 수정)와 Jackson 3.1.5.
+  - `ext['tomcat.version']`·`ext['jackson-bom.version']` 덮어쓰기 후 재검사 0건.
+- osv-scanner 2.7.0:
+  - `build.gradle`만으로는 "No package sources found"
+  - 검사할 때만 init 스크립트(`osv-lock.gradle`)로 `gradle.lockfile`을 만들면 전이 의존성까지 검사된다(빌드 설정은 바꾸지 않음)
+  - 잠금을 켜지 않은 빌드는 남은(일부러 틀리게 고친) 잠금 파일도 무시한다
+  - npm은 `npm audit`과 같은 lodash 취약점을 찾았다
+- GitHub 원문(github/docs 저장소, 2026-10-20):
+  - Dependabot은 npm·gradle·github-actions의 버전·보안 갱신을 지원한다. docker·docker-compose는 버전 갱신만 된다.
+  - **Gradle은 dependency graph 정적 분석이 지원되지 않아 "Automatic dependency submission"을 켜야 한다.**
+  - 보안 PR은 고정 한도 10개다.
+- `dependabot.yml` 템플릿: npm·gradle(메이저가 아닌 갱신은 묶음)·github-actions, 주 1회. Docker는 제외(태그 고정 + 재빌드, 메이저 전환은 LTS 정책).
+  - SchemaStore 스키마 검증 통과, 일부러 틀린 값은 검출.
+  - ⚠ 실제 동작은 GitHub 저장소에서만 확인 가능 → ops.md에 **미검증** 표시.
+- 연결: ops.md 5절 표 9번 → 5-1절, deploy-check 스킬 3단계, scaffolds/default.md(체크리스트 16, 구조도, dependabot.yml 절).
+
+## 검증
+
+| 항목 | 결과 |
+|---|---|
+| `check-refs.mjs` | 통과 (문서 71 / 참조 666) |
+| `check-versions.mjs` | 고정값 65 / 낡음 0 / 보류 5, 대조군 18/18 검출 |
+| `verify-templates.sh` | 두 모드 통과 (backup 서비스 포함 tools 프로필 병합도 확인) |
+| act | test.yml 3 job · release(로컬 레지스트리) · verify.yml dispatch/push |
+| 백업 e2e | MariaDB 11.4 · MySQL 8.4 백업·복원·체크섬, 실패 경로 4종 |
+| shellcheck 0.11.0 | `backup.sh` 경고 0 |
+| 인코딩 | 변경 파일 BOM·CR 없음, `install.ps1`·`verify-templates.ps1` BOM(+ps1 CRLF) 유지 |
+| `install.sh` 임시 HOME | 새 템플릿(backup.sh·osv-lock.gradle)·ops.md·스킬 설치본 = 저장소 |
+| `install.ps1` 실행 | **미수행** — PowerShell 없음. 회사 PC에서 `git pull` 후 실행 필요 |
+
+## 커밋 코멘트
+
+```
+@@ 2026-10-21 (3부) @@
+8차 — 운영 기본기 정비 (새 레시피 없음)
+
+■ CI 템플릿 Actions 전부 Node 20 런타임(매 실행 경고) → checkout·setup-node v7, setup-java v6, login-action v4 — act로 실행 확인
+■ 고정 버전 점검을 스크립트로(check-versions.mjs, CI 주 1회) — LTS·안정 계열 정책 + 고정 사유 연동, 대조군 18/18
+■ 백업: compose backup 서비스 + backup.sh — --single-transaction(기본 옵션은 3.5초 쓰기 정지, 잠금 없음은 불일치), pipefail·완료 표시 검사·암호화·배포 계정 소유
+■ 의존성: 최신 Boot 4.1.1도 Tomcat·Jackson 취약점 10건 → 관리 버전 덮어쓰기, GitHub=Dependabot+자동 의존성 제출, 사내=osv-scanner(init 스크립트 잠금)
+```
