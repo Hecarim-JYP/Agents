@@ -37,7 +37,7 @@
 | 14 | 테스트 파일 위치 | `tests/` 미러링 | testing.md 4절 |
 | 15 | **외부 노출·도메인·프록시 — 반드시 묻는다**: ①서버가 인터넷에서 접근 가능한가 ②도메인 유무 ③프록시 선택(nginx / Caddy) | 사내망 전용 — **nginx-unprivileged 프록시**(HTTP, non-root). **외부 노출 + 도메인이면 Caddy 권장**(자동 HTTPS — ACME 검증은 인터넷에서 80 도달 가능할 때만 동작). 외부 노출인데 nginx를 택하면 certbot 갱신 운영을 CLAUDE.md에 기록 | docker.md 7절 |
 | 16 | GitHub 원격/CI 사용 여부 | 사용 (test.yml + release.yml + audit.yml + dependabot.yml 생성, 저장소 보안 설정 — ops.md 5-1절) | 아래 CI 절 |
-| 17 | **가동 모니터링/알림 구현 여부 — 반드시 묻는다**: (a) 사내 인프라팀 위임 / (b) 자체 구축(Uptime Kuma) | (a) 인프라팀 위임 — 헬스 URL·연락처 전달, CLAUDE.md 기록 | ops.md 7절 |
+| 17 | **가동 모니터링/알림 구현 여부 — 반드시 묻는다**: (a) 사내 인프라팀 위임 / (b) 자체 구축(Uptime Kuma) | (a) 인프라팀 위임 — 헬스 URL·연락처 전달 + **운영 감시 URL(`/api/ops/status`)은 수신자를 개발팀으로** 등록, CLAUDE.md 기록 | ops.md 7절, batch.md 3-1절 |
 | 18 | **사내 API서버 연동 여부** — 있으면 대상·주소(env 키)·인증 방식·담당 창구를 CLAUDE.md에 기록. **쓰기 연동이 있으면 outbox**(`07_outbox.sql` + relay 워커) + 수신 측 멱등 방식 기록 | 미연동 (연동 시 `external/` 계층 + `INTERNAL_API_URL` 추가) | integration.md 4절 / features/outbox.md |
 | 19 | **인증 소스 — 반드시 묻는다**: (a) 자체 로그인 / (b) 사내 인증 위임 / (c) SSO(OIDC·SAML) | (a) 자체 로그인 — 표준 스키마 그대로. (b)(c)는 user 테이블 조정(`password_hash` 제거 + `external_user_key`) + 계정 프로비저닝(JIT/사전등록) 결정 필요. **(b)는 잠금 컬럼 유지 + 시도 제한 구현**(우리가 ID/PW를 받는다), (c)는 잠금 컬럼도 제거 | auth.md 0·1절 |
 | 20 | **정기 배치 작업 필요 여부** (집계·사내 API 동기화·알림 발송·정리) | 없음 (필요하면 `06_batch_history.sql` 포함 + 첫 배치 구현 전에 실행 방식을 사용자에게 제안·확정) | batch.md 0·1절 |

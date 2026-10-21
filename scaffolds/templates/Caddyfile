@@ -28,6 +28,15 @@ encode zstd gzip
 
 # 컨테이너 IP가 재배포로 바뀌어도 Caddy는 연결할 때마다 이름을 다시 해석한다 — 별도 설정 불필요 (zero-downtime-deploy.md 3-1절, 2026-10-19 실측)
 handle /api/* {
+	# 운영 감시 엔드포인트(/api/ops/*) — 사내 대역에서만 (batch.md 3-1절). 판정 기준은 Caddy가 보는 접속 IP다
+	# 대소문자를 무시한다 — Express는 경로 대소문자를 구분하지 않아 /api/OPS/status에도 응답한다. Caddy의 path 매처도
+	# 대소문자를 무시하지만(실측), nginx-proxy.conf와 같은 정규식으로 맞춘다 (2026-10-21 실측 — /api/ops 단독 경로까지 막는다)
+	# private_ranges = 10/8·172.16/12·192.168/16·127/8 (+IPv6 사설). 사내망이 다른 대역이면 그 대역으로 바꾼다
+	@ops_outside {
+		path_regexp (?i)^/api/ops(/|$)
+		not remote_ip private_ranges
+	}
+	respond @ops_outside 403
 	reverse_proxy server:3000
 }
 

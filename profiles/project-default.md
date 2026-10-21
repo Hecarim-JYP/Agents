@@ -39,7 +39,7 @@
 - **사내 도메인: 미확보 전제** (`SITE_ADDRESS=:80`) — 확보되면 값 교체만으로 HTTPS 전환
 - **HTTP 운영 제약**: `COOKIE_SECURE=false` (HTTPS 전환 시 true), `crypto.randomUUID`·`navigator.locks` 사용 금지 — docker.md 7절
 - 배포 호스트: **운영서버 1대 + 개발서버 1대** (한 PC 공존이면 `COMPOSE_PROJECT_NAME` 분리 — docker.md 7-2절)
-- **가동 모니터링: 사내 인프라팀 위임** — 헬스 URL(`/health`)과 연락처를 전달하고 CLAUDE.md에 기록
+- **가동 모니터링: 사내 인프라팀 위임** — 헬스 URL(`/health`)과 연락처를 전달하고 CLAUDE.md에 기록. 운영 감시 URL(`/api/ops/status` — 백업·디스크·배치)도 같은 도구에 등록하되 **알림 수신자는 개발팀** (batch.md 3-1절)
 
 **품질**
 - 테스트: 스택 표준 도구(Vitest / JUnit Jupiter), **테스트 DB 사용**(compose `db-test` + CI `services:`)
