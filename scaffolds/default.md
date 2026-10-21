@@ -253,8 +253,8 @@ jobs:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: client } }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24        # LTS — Dockerfile의 node 이미지와 같은 메이저 (general.md 8-1절)
       - run: npm ci
@@ -284,8 +284,8 @@ jobs:
       TEST_DB_USER: app
       TEST_DB_PASSWORD: test
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: 25        # LTS — build.gradle toolchain·Dockerfile과 같은 버전 (general.md 8-1절)
@@ -295,7 +295,7 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: docker build -t ci-client-check client/
       - run: docker build -t ci-server-check server/
 ```
@@ -304,6 +304,7 @@ jobs:
 - **테스트 DB를 쓰지 않기로 했으면(체크리스트 21-b) `services:`·`env:` 블록을 제거**한다 — 대신 쿼리 목킹으로 테스트한다.
 - Python 프로젝트는 `setup-python` + `pip install -e .[dev]` + `pytest`로 대체.
 - docker job은 이미지 빌드 성공만 검증한다 — Dockerfile이 깨진 채 배포 시점까지 가는 것을 방지 (push/실행은 하지 않음).
+- **Actions는 메이저 태그로 고정하고, 실행 런타임이 Node 24인 메이저를 쓴다** (2026-10-21 확정). Node 20 런타임 액션(`checkout@v4`·`setup-node@v4`·`setup-java@v4`·`login-action@v3`)은 2026-06-16부터 Node 24로 강제 실행되며 매 실행 경고가 붙고, 러너의 Node 20은 2026-09-23 제거 일정이다(actions/runner `Constants.cs`).
 
 ### .github/workflows/release.yml
 
@@ -321,8 +322,8 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@v7
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -336,7 +337,6 @@ jobs:
 
 - 단일 구조는 이미지 하나로 축소 (`docker build .`). deploy override의 `image:`는 같은 ghcr 경로를 참조한다.
 - 서버 최초 셋업 시 `docker login ghcr.io`(`read:packages` 토큰) 1회 — 토큰 보관은 ops.md 1절 시크릿 규칙.
-
 ## 주의
 
 - 이미 파일이 있는 폴더에는 생성하지 않는다. 먼저 사용자에게 확인한다.
