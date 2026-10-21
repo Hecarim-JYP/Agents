@@ -83,6 +83,28 @@ services:
         condition: service_healthy
     networks: [app]
 
+  # 백업 — 호스트 cron이 호출한다 (ops.md 6절). DB 위치가 (b) 호스트 로컬 / (c) 외부 매니지드면 삭제 (docker.md 4-2절)
+  # 실행: docker compose run --rm backup   /  복원 리허설: docker compose run --rm backup restore <파일명>
+  backup:
+    profiles: ["tools"]
+    image: mariadb:11.4                 # db와 같은 이미지 — 덤프 도구가 서버 버전과 맞고 gzip·openssl이 들어 있다
+    entrypoint: ["bash", "/scripts/backup.sh"]
+    user: "${BACKUP_UID:?BACKUP_UID 미설정}:${BACKUP_GID:?BACKUP_GID 미설정}"   # 배포 계정(id -u / id -g) — 기본(root)으로 돌면 파일이 root 소유 600이라 배포 계정이 다른 호스트로 복사하지 못한다 (실측)
+    environment:
+      TZ: Asia/Seoul                    # 파일명·보관 기간 기준
+      DB_NAME: ${DB_NAME:?DB_NAME 미설정}
+      MYSQL_PWD: ${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD 미설정}   # 명령줄 -p 대신 — 프로세스 목록에 비밀번호가 남지 않는다
+      BACKUP_KEY: ${BACKUP_KEY:?BACKUP_KEY 미설정}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:?BACKUP_KEEP_DAYS 미설정}
+    volumes:
+      - ./scripts/backup.sh:/scripts/backup.sh:ro
+      - uploads:/data/uploads:ro        # 업로드 기능이 없으면 이 줄 삭제 (스크립트가 건너뛴다)
+      - ${BACKUP_DIR:?BACKUP_DIR 미설정}:/backup   # 호스트 경로 — 여기서 다른 호스트로 복사한다 (ops.md 6절)
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [app]
+
 volumes:
   caddy-data:                           # Caddy 채택 시에만 사용
   caddy-config:

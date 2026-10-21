@@ -41,6 +41,11 @@ INTERNAL_API_KEY=
 COOKIE_SECURE=false
 JWT_SECRET=verify-only-not-a-real-secret
 APP_BASE_URL=
+BACKUP_DIR=/tmp/verify-backup
+BACKUP_KEY=verify-only-not-a-real-key
+BACKUP_KEEP_DAYS=30
+BACKUP_UID=1000
+BACKUP_GID=1000
 ENV
 
 # 개발 모드는 build 컨텍스트(client/·server/)가 필요하다 — 검증용 빈 Dockerfile

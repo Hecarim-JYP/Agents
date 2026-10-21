@@ -43,6 +43,11 @@ INTERNAL_API_KEY=
 COOKIE_SECURE=false
 JWT_SECRET=verify-only-not-a-real-secret
 APP_BASE_URL=
+BACKUP_DIR=/tmp/verify-backup
+BACKUP_KEY=verify-only-not-a-real-key
+BACKUP_KEEP_DAYS=30
+BACKUP_UID=1000
+BACKUP_GID=1000
 '@
 [System.IO.File]::WriteAllText((Join-Path $work ".env"), $envText, [System.Text.UTF8Encoding]::new($false))
 

@@ -4,7 +4,7 @@
 
 ## 생성 절차
 
-1. **확인**: **`~/.claude/jyp/profiles/project-default.md`(사내 표준 프로필)를 먼저 읽는다.** 프로필이 체크리스트의 기본 답안이므로, 35개를 순서대로 다 묻지 않는다:
+1. **확인**: **`~/.claude/jyp/profiles/project-default.md`(사내 표준 프로필)를 먼저 읽는다.** 프로필이 체크리스트의 기본 답안이므로, 36개를 순서대로 다 묻지 않는다:
    1. **프로필의 [확인] 항목만 묻는다 (4개)**: 프로젝트명·목적 / 인증 소스 / 사내 API 연동 / 특수 요구(멀티테넌트·다국어·배치).
    2. **[고정] 항목은 확정값을 표로 보여주고 이견만 받는다** — 묻지 않되 숨기지도 않는다.
    3. 프로필 미적용 신호(대외 서비스·비표준 스택·규제 요건)에 해당하면 **프로필을 버리고 체크리스트 전체**를 확인한다.
@@ -56,6 +56,7 @@
 | 33 | **본인확인(실명) 여부** — 1인 1계정·성인 확인·만 14세 미만 가입 허용 여부, 본인확인 대행사 | 없음(휴대폰 소유 확인만 필요하면 6자리 코드 — account-lifecycle.md 3-4절). 있으면 **서버가 결과를 받는 연동 + 결과 1회 사용 + CI 블라인드 인덱스 UNIQUE + 한국 날짜 만 나이**, 14세 미만은 받지 않음이 기본 | features/identity-verification.md — 중복 판정 키·가입 시 확인 여부는 기존 회원에게 소급할 수 없다 |
 | 34 | **검색 요구 수준** — 검색 대상 행 규모(수백만 이상?), 부분 일치로 충분한지·형태소 분석·오타 허용이 필요한지 | DB `LIKE` 부분 일치 + `ESCAPE '!'` + 범위 조건 (FULLTEXT 기본 파서는 한글 2글자를 못 찾는다) | features/korean-search.md — 검색 전용 저장소는 색인 동기화·권한 필터가 함께 붙어 나중에 바꾸기 어렵다 |
 | 35 | **금액 계산 정책** — 원 미만 처리(절사·반올림), 세액 계산 단위(합계·줄별), 할인 배분 규칙 | 금액을 다루면 회계팀과 확정 — 기본 제안: 원 정수(`BIGINT`), 세액 원 미만 절사, 합계 공급가액 기준 1회 계산 | features/money-calc.md — 이미 발행한 문서와 계산이 달라지면 되돌릴 수 없다 |
+| 36 | **백업 사본 위치 — 반드시 묻는다**: (a) 사내 백업 체계·NAS에 위임 / (b) 다른 서버로 직접 복사 | (a) 사내 체계가 있으면 위임, 없으면 (b) — **운영 개시 전 확정**, 위치·보관 기간·키 보관처를 CLAUDE.md에 기록 | ops.md 6절 — 같은 서버의 백업은 서버와 함께 사라진다 |
 
 ## 기본 구조
 
@@ -98,6 +99,7 @@
 │   └── release.yml              # 태그 push → ghcr.io 이미지 빌드·push
 ├── docs/                        # 공유 (dev_log/, incidents/, 설계 문서)
 ├── migrations/                  # DB 마이그레이션 (공유 — migrate 서비스가 읽는다)
+├── scripts/backup.sh            # DB·업로드 백업 — backup 서비스가 실행 (ops.md 6절)
 ├── client/                      # React — package.json, Dockerfile, nginx.conf(정적 서빙)
 └── server/                      # Express TS 또는 Spring Boot — 빌드 파일, Dockerfile
 ```
@@ -105,13 +107,13 @@
 - 패키지 관리는 client/·server/ 각자 개별 수행 (루트 package.json 없이 시작 — 필요해지면 워크스페이스 도입).
 - Dockerfile은 각 서비스별로, compose가 전체를 조립한다 (docker.md).
 - **정적 서빙은 client(nginx) 컨테이너, 프록시는 라우팅(+ Caddy 채택 시 HTTPS 종단)** (docker.md 2-3·7절). 프록시 서비스와 그 설정 파일은 반드시 포함 — 없으면 배포 모드에 외부 접근 경로가 없다. 로컬 개발 모드는 프록시 없이 Vite `server.proxy`로 `/api/*`를 서버에 연결해 동일 출처를 유지한다.
-- **compose·프록시 설정(nginx-proxy.conf 또는 Caddyfile — 체크리스트 15)·nginx.conf는 `~/.claude/jyp/scaffolds/templates/`에서 복사**하고 프로젝트 결정값(스택·DB 위치·테스트 DB·배치 유무)에 맞게 불필요한 서비스를 지운다.
+- **compose·프록시 설정(nginx-proxy.conf 또는 Caddyfile — 체크리스트 15)·nginx.conf·backup.sh(→ `scripts/`)는 `~/.claude/jyp/scaffolds/templates/`에서 복사**하고 프로젝트 결정값(스택·DB 위치·테스트 DB·배치 유무)에 맞게 불필요한 서비스를 지운다.
 - CLAUDE.md·docs·migrations는 루트에서 공유 — "작업 정리"도 저장소 단위 1회.
 
 ## 기초 테이블 (DB 사용 프로젝트)
 
 - `~/.claude/jyp/schemas/`의 표준 스키마(schema_migrations / 인증·권한 / 공통코드 / 파일 메타 / 감사 로그 / company)를 `migrations/001_core_tables.sql`(DDL이므로 필요 시 분할)로 복사해 첫 마이그레이션으로 삼는다.
-- 프로젝트 요구에 맞게 조정한다: **멀티테넌트면 `05_company.sql` 포함 + 전 업무 테이블에 스코프 컬럼**(database.md 3절), 불필요한 테이블(예: 파일 업로드 없는 프로젝트의 files)은 제외. **다국어면 코드성 테이블에 `_i18n` 번역 테이블 동반 + `user`에 `locale VARCHAR(10) NULL` 추가** (i18n.md 3·4절 — 사용자 선호 locale은 fallback 사슬의 첫 층이다. 법인 기본값 `company.locale`은 05_company.sql에 이미 있다). **인증 소스가 위임·SSO면(체크리스트 19) user 테이블 조정** — `password_hash` 제거 + `external_user_key` 추가. **위임(b)은 잠금 컬럼(`failed_login_count`·`locked_at`) 유지, SSO(c)는 함께 제거** (auth.md 0절). **정기 배치가 있으면(체크리스트 20) `06_batch_history.sql` 포함** (batch.md 3절). **쓰기 연동이 있으면(체크리스트 18) `07_outbox.sql` 포함** (features/outbox.md 3절). **기본 포함: `12_error_event.sql`(error-alert.md 3절)·`13_app_setting.sql`(maintenance-mode.md 3절)·`15_user_session.sql`(session-control.md 3절)**. 개인정보를 처리하면(체크리스트 27) `14_personal_data_access_log.sql`을 **별도 DB에**(personal-data.md 3-4절), 장시간 작업이 있으면 `11_async_job.sql`(long-running-job.md 3절). 변경 이력을 보여줄 업무 문서가 있으면 `08_change_log.sql`(change-history.md 3절), **자체 결재면(체크리스트 26) `09_approval.sql`**(approval.md 3절), 화면 알림이 있으면 `10_notification.sql`(notification.md 3절). **이용자 자체 가입·비밀번호 재설정이 있으면 `16_account_token.sql` + `user`에 `email_verified_at DATETIME NULL` 추가**(account-lifecycle.md 3절), 2단계 인증이 있으면 `17_user_mfa.sql`(mfa.md 3절). **소셜 로그인이면 `18_user_identity.sql` + `user.password_hash` NULL 허용**(social-login.md 3-3절), **대외 자체 가입이면 `19_terms_consent.sql`**(consent.md 3절)과 `20_retained_personal_data.sql`을 **별도 스키마 `{DB_NAME}_retention`에**(account-withdrawal.md 3절) + `user`에 `withdrawn_at DATETIME NULL`, 문의·신고가 있으면 `21_inquiry.sql`(inquiry.md 3절). **대외 서비스면 `25_privacy_request.sql`**(열람등요구 접수·기한 — privacy-rights.md 3절), 개인정보를 처리하면 `26_privacy_breach.sql`(유출 대응 기록 — privacy-breach.md 3절), **본인확인이면(체크리스트 33) `27_identity_verification.sql`**(identity-verification.md 3절), **기한·영업일 계산이 있으면(열람등요구·환급 포함) `28_holiday.sql`**(holiday.md 3절), 웹훅을 받으면 `22_webhook_inbox.sql`(webhook-receive.md 3절), **결제면(체크리스트 31) `24_payment.sql`**(payment.md 3절), **공개 API면(체크리스트 32) `23_api_client.sql`**(public-api.md 3절).
+- 프로젝트 요구에 맞게 조정한다: **멀티테넌트면 `05_company.sql` 포함 + 전 업무 테이블에 스코프 컬럼**(database.md 3절), 불필요한 테이블(예: 파일 업로드 없는 프로젝트의 files)은 제외. **다국어면 코드성 테이블에 `_i18n` 번역 테이블 동반 + `user`에 `locale VARCHAR(10) NULL` 추가** (i18n.md 3·4절 — 사용자 선호 locale은 fallback 사슬의 첫 층이다. 법인 기본값 `company.locale`은 05_company.sql에 이미 있다). **인증 소스가 위임·SSO면(체크리스트 19) user 테이블 조정** — `password_hash` 제거 + `external_user_key` 추가. **위임(b)은 잠금 컬럼(`failed_login_count`·`locked_at`) 유지, SSO(c)는 함께 제거** (auth.md 0절). **정기 배치가 있거나 백업 서비스를 쓰면(DB 위치 (a)의 기본 — ops.md 6절) `06_batch_history.sql` 포함** (batch.md 3절 — 백업 성공도 여기에 기록된다). **쓰기 연동이 있으면(체크리스트 18) `07_outbox.sql` 포함** (features/outbox.md 3절). **기본 포함: `12_error_event.sql`(error-alert.md 3절)·`13_app_setting.sql`(maintenance-mode.md 3절)·`15_user_session.sql`(session-control.md 3절)**. 개인정보를 처리하면(체크리스트 27) `14_personal_data_access_log.sql`을 **별도 DB에**(personal-data.md 3-4절), 장시간 작업이 있으면 `11_async_job.sql`(long-running-job.md 3절). 변경 이력을 보여줄 업무 문서가 있으면 `08_change_log.sql`(change-history.md 3절), **자체 결재면(체크리스트 26) `09_approval.sql`**(approval.md 3절), 화면 알림이 있으면 `10_notification.sql`(notification.md 3절). **이용자 자체 가입·비밀번호 재설정이 있으면 `16_account_token.sql` + `user`에 `email_verified_at DATETIME NULL` 추가**(account-lifecycle.md 3절), 2단계 인증이 있으면 `17_user_mfa.sql`(mfa.md 3절). **소셜 로그인이면 `18_user_identity.sql` + `user.password_hash` NULL 허용**(social-login.md 3-3절), **대외 자체 가입이면 `19_terms_consent.sql`**(consent.md 3절)과 `20_retained_personal_data.sql`을 **별도 스키마 `{DB_NAME}_retention`에**(account-withdrawal.md 3절) + `user`에 `withdrawn_at DATETIME NULL`, 문의·신고가 있으면 `21_inquiry.sql`(inquiry.md 3절). **대외 서비스면 `25_privacy_request.sql`**(열람등요구 접수·기한 — privacy-rights.md 3절), 개인정보를 처리하면 `26_privacy_breach.sql`(유출 대응 기록 — privacy-breach.md 3절), **본인확인이면(체크리스트 33) `27_identity_verification.sql`**(identity-verification.md 3절), **기한·영업일 계산이 있으면(열람등요구·환급 포함) `28_holiday.sql`**(holiday.md 3절), 웹훅을 받으면 `22_webhook_inbox.sql`(webhook-receive.md 3절), **결제면(체크리스트 31) `24_payment.sql`**(payment.md 3절), **공개 API면(체크리스트 32) `23_api_client.sql`**(public-api.md 3절).
 - JVM(Flyway) 채택 시 `00_schema_migrations.sql`은 복사하지 않고, 파일명은 Flyway 규약(`V001__core_tables.sql`)을 따른다 (migration.md 5절).
 - 초기 관리자 계정·기본 역할(ADMIN 등) 시드는 별도 마이그레이션 파일로, `NOT EXISTS` 가드와 함께.
 
@@ -239,6 +241,13 @@ APP_BASE_URL=
 TOKEN_HMAC_KEY=
 # 2단계 인증 비밀 암호화 키(32바이트 base64) — 2단계 인증 프로젝트만 (features/mfa.md 3-4절). 생성: openssl rand -base64 32. 분실하면 모든 등록이 무효
 MFA_ENC_KEY=
+# 백업 (배포 모드 — ops.md 6절). 키 생성: openssl rand -base64 32 — 잃으면 백업을 복원할 수 없다. 원본은 패스워드 매니저(ops.md 1절), 백업 사본과 같은 곳에 두지 않는다
+BACKUP_DIR=/srv/backup/<프로젝트명>
+BACKUP_KEY=
+BACKUP_KEEP_DAYS=30
+# 백업 파일 소유자 = 배포 계정 (id -u / id -g) — 다른 호스트로 복사하는 계정
+BACKUP_UID=1000
+BACKUP_GID=1000
 ```
 
 ### .github/workflows/test.yml
