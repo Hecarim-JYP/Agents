@@ -52,9 +52,35 @@
 | 6 | 시크릿 | `.env` 커밋 이력 없음, `.gitignore` 적용, 운영 시크릿은 개발과 분리 |
 | 7 | 파일 업로드 | 경로 트래버설 방어, 확장자/크기 제한, 업로드 폴더 비추적, 형식은 내용으로 판정·inline은 래스터 이미지만 (features/upload-security.md) |
 | 8 | 에러 노출 | 운영 에러 응답에 스택 트레이스·내부 경로 미노출 |
-| 9 | 의존성 | `npm audit` high 이상 취약점 0건 (불가피하면 사유 기록) |
+| 9 | 의존성 | high 이상 취약점 0건 — 검사 방법은 5-1절(npm·Gradle), 불가피하면 사유 기록 |
 | 10 | 컨테이너 | 이미지에 `.env`/시크릿 미포함(`.dockerignore` 확인), **우리가 빌드하는 이미지·프록시 non-root 실행**(벤더 이미지는 벤더 권한 설계 — docker.md 2절, Caddy 채택 시 예외 기록 확인), 운영 이미지 `latest` 태그 미사용 |
 | 11 | 실제 IP·빈도 제한 | 배포 구성에서 `X-Forwarded-For` 위조 요청 → 앱이 기록한 IP가 실제 IP인지(프록시 덮어쓰기 + `trust proxy 1`), 대외는 로그인·발송 빈도 제한 (features/rate-limit.md 3-1절) |
+
+### 5-1. 의존성 취약점·갱신 (MANDATORY, 2026-10-21 확정)
+
+- **최신 프레임워크를 써도 전이 의존성은 취약할 수 있다.** 실측(2026-10-21, OSV 데이터): 템플릿 그대로 Spring Boot 4.1.1(현행 최신) + `spring-boot-starter-webmvc`만 둔 프로젝트에서 **알려진 취약점 10건(Critical 3)** — Boot가 관리하는 Tomcat 11.0.24(인증 우회 등 — 11.0.25에서 수정)와 Jackson 3.1.5. Boot의 다음 패치를 기다리지 않고 **Boot 관리 버전 프로퍼티를 덮어써** 올린다 → 재검사 0건:
+
+```groovy
+// 보안 패치만 Boot 관리 버전 위로 올린다 — Boot가 이 버전 이상을 관리하게 되면 지운다 (사유: 취약점 ID를 적는다)
+ext['tomcat.version'] = '11.0.27'
+ext['jackson-bom.version'] = '3.1.8'
+```
+
+| 원격 저장소 | 감지 | 갱신 |
+|---|---|---|
+| GitHub (체크리스트 16 기본) | 저장소 설정에서 **Dependabot alerts·security updates**를 켠다. **Gradle은 Dependency graph의 "Automatic dependency submission"도 켠다** — GitHub는 Gradle을 정적으로 분석하지 않아, 이것이 없으면 위 Tomcat 같은 전이 의존성이 알림 대상이 아니다 (GitHub 문서 원문, 2026-10-20 판) | `.github/dependabot.yml`(스캐폴드) — 주 1회, 메이저가 아닌 갱신은 PR 하나로 묶는다 |
+| 없음 (사내 전용) | **배포 준비 때 + 배포가 없어도 월 1회**: npm은 `npm audit --audit-level=high`, Gradle은 아래 osv-scanner | 수동 |
+
+```bash
+# Gradle — 빌드 설정은 그대로 두고 검사할 때만 잠금 파일을 만든다 (server/에서)
+./gradlew -q -I $HOME/.claude/jyp/scaffolds/templates/osv-lock.gradle dependencies --write-locks
+osv-scanner scan source -r .     # 잠금 파일이 없으면 "No package sources found" — build.gradle만으로는 검사되지 않는다 (실측)
+rm gradle.lockfile               # 잠금을 켜지 않은 빌드는 이 파일을 무시하지만(실측) 커밋하지 않는다
+```
+
+- osv-scanner: Google의 오픈소스 검사 도구(단일 실행 파일, GitHub 릴리스). npm의 `package-lock.json`도 읽는다 — 실측에서 `npm audit`과 같은 취약점(lodash 4.17.20)을 찾았다.
+- Docker 이미지는 Dependabot 대상에서 뺀다 — 메이저(DB는 마이너) 태그 고정 + 재빌드로 베이스 이미지 패치를 받고(docker.md 2절), 메이저 전환은 LTS 정책 결정(general.md 8-1절)이라 자동 PR로 받지 않는다.
+- ⚠ 미검증: Dependabot·자동 의존성 제출의 실제 동작은 GitHub 저장소에서만 확인된다. 첫 GitHub 프로젝트에서 알림·PR이 오는지 확인하고 이 표시를 지운다.
 
 ## 6. 백업
 

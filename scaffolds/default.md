@@ -36,7 +36,7 @@
 | 13 | API 응답 봉투 계약 | 단일 봉투 (모든 응답 `data` 키) | api.md 5절 |
 | 14 | 테스트 파일 위치 | `tests/` 미러링 | testing.md 4절 |
 | 15 | **외부 노출·도메인·프록시 — 반드시 묻는다**: ①서버가 인터넷에서 접근 가능한가 ②도메인 유무 ③프록시 선택(nginx / Caddy) | 사내망 전용 — **nginx-unprivileged 프록시**(HTTP, non-root). **외부 노출 + 도메인이면 Caddy 권장**(자동 HTTPS — ACME 검증은 인터넷에서 80 도달 가능할 때만 동작). 외부 노출인데 nginx를 택하면 certbot 갱신 운영을 CLAUDE.md에 기록 | docker.md 7절 |
-| 16 | GitHub 원격/CI 사용 여부 | 사용 (test.yml + release.yml 생성) | 아래 CI 절 |
+| 16 | GitHub 원격/CI 사용 여부 | 사용 (test.yml + release.yml + dependabot.yml 생성, 저장소 보안 설정 — ops.md 5-1절) | 아래 CI 절 |
 | 17 | **가동 모니터링/알림 구현 여부 — 반드시 묻는다**: (a) 사내 인프라팀 위임 / (b) 자체 구축(Uptime Kuma) | (a) 인프라팀 위임 — 헬스 URL·연락처 전달, CLAUDE.md 기록 | ops.md 7절 |
 | 18 | **사내 API서버 연동 여부** — 있으면 대상·주소(env 키)·인증 방식·담당 창구를 CLAUDE.md에 기록. **쓰기 연동이 있으면 outbox**(`07_outbox.sql` + relay 워커) + 수신 측 멱등 방식 기록 | 미연동 (연동 시 `external/` 계층 + `INTERNAL_API_URL` 추가) | integration.md 4절 / features/outbox.md |
 | 19 | **인증 소스 — 반드시 묻는다**: (a) 자체 로그인 / (b) 사내 인증 위임 / (c) SSO(OIDC·SAML) | (a) 자체 로그인 — 표준 스키마 그대로. (b)(c)는 user 테이블 조정(`password_hash` 제거 + `external_user_key`) + 계정 프로비저닝(JIT/사전등록) 결정 필요. **(b)는 잠금 컬럼 유지 + 시도 제한 구현**(우리가 ID/PW를 받는다), (c)는 잠금 컬럼도 제거 | auth.md 0·1절 |
@@ -71,8 +71,9 @@
 ├── .dockerignore      # node_modules, .env*, .git 등
 ├── docker-compose.yml           # base + dev/deploy override — 규칙: docker.md 4-1절
 ├── .github/
-│   └── workflows/
-│       └── test.yml   # CI — push/PR마다 테스트 자동 실행 (아래 CI 절 — 스택별 job)
+│   ├── workflows/
+│   │   └── test.yml   # CI — push/PR마다 테스트 자동 실행 (아래 CI 절 — 스택별 job)
+│   └── dependabot.yml # 의존성 갱신 PR (아래 — ops.md 5-1절)
 ├── docs/              # 설계 문서, 결정 기록
 │   ├── dev_log/       # 작업 이력 ("작업 정리" 명령이 changelog를 여기에 생성)
 │   └── incidents/     # 장애 기록 (운영 프로젝트만 — incident 템플릿)
@@ -94,9 +95,11 @@
 ├── docker-compose.deploy.yml    # 배포 모드        ┘
 ├── proxy/
 │   └── nginx.conf | Caddyfile   # 프록시 설정 — 체크리스트 15 선택 (정적 서빙은 client가 담당)
-├── .github/workflows/
-│   ├── test.yml                 # 스택별 job (+ 테스트 DB 서비스)
-│   └── release.yml              # 태그 push → ghcr.io 이미지 빌드·push
+├── .github/
+│   ├── workflows/
+│   │   ├── test.yml             # 스택별 job (+ 테스트 DB 서비스)
+│   │   └── release.yml          # 태그 push → ghcr.io 이미지 빌드·push
+│   └── dependabot.yml           # 의존성 갱신 PR (ops.md 5-1절)
 ├── docs/                        # 공유 (dev_log/, incidents/, 설계 문서)
 ├── migrations/                  # DB 마이그레이션 (공유 — migrate 서비스가 읽는다)
 ├── scripts/backup.sh            # DB·업로드 백업 — backup 서비스가 실행 (ops.md 6절)
@@ -313,7 +316,7 @@ jobs:
 - **테스트 DB를 쓰지 않기로 했으면(체크리스트 21-b) `services:`·`env:` 블록을 제거**한다 — 대신 쿼리 목킹으로 테스트한다.
 - Python 프로젝트는 `setup-python` + `pip install -e .[dev]` + `pytest`로 대체.
 - docker job은 이미지 빌드 성공만 검증한다 — Dockerfile이 깨진 채 배포 시점까지 가는 것을 방지 (push/실행은 하지 않음).
-- **Actions는 메이저 태그로 고정하고, 실행 런타임이 Node 24인 메이저를 쓴다** (2026-10-21 확정). Node 20 런타임 액션(`checkout@v4`·`setup-node@v4`·`setup-java@v4`·`login-action@v3`)은 2026-06-16부터 Node 24로 강제 실행되며 매 실행 경고가 붙고, 러너의 Node 20은 2026-09-23 제거 일정이다(actions/runner `Constants.cs`).
+- **Actions는 메이저 태그로 고정하고, 실행 런타임이 Node 24인 메이저를 쓴다** (2026-10-21 확정). Node 20 런타임 액션(`checkout@v4`·`setup-node@v4`·`setup-java@v4`·`login-action@v3`)은 2026-06-16부터 Node 24로 강제 실행되며 매 실행 경고가 붙고, 러너의 Node 20은 2026-09-23 제거 일정이다(actions/runner `Constants.cs`). 메이저가 바뀌면 Dependabot(아래 dependabot.yml)이 PR로 알린다.
 
 ### .github/workflows/release.yml
 
@@ -346,6 +349,36 @@ jobs:
 
 - 단일 구조는 이미지 하나로 축소 (`docker build .`). deploy override의 `image:`는 같은 ghcr 경로를 참조한다.
 - 서버 최초 셋업 시 `docker login ghcr.io`(`read:packages` 토큰) 1회 — 토큰 보관은 ops.md 1절 시크릿 규칙.
+
+### .github/dependabot.yml
+
+GitHub 원격 프로젝트에 생성하고, **저장소 Settings의 보안 설정(Dependabot alerts·security updates, Gradle이면 Automatic dependency submission)을 함께 켠다** — 이 파일만으로는 버전 갱신 PR만 온다 (ops.md 5-1절):
+
+```yaml
+# 의존성 갱신 PR — 주 1회. 취약점 알림·보안 PR은 저장소 설정에서 켠다 (ops.md 5-1절)
+version: 2
+updates:
+  - package-ecosystem: npm
+    directories: ["/client", "/server"]   # Node 서버만 /server — Spring 서버면 ["/client"]
+    schedule: { interval: weekly }
+    groups:
+      minor-patch:                        # 메이저가 아닌 갱신은 PR 하나로 — 패키지마다 PR이 열리면 아무도 안 본다
+        update-types: [minor, patch]
+  - package-ecosystem: gradle             # Spring 서버만
+    directory: /server
+    schedule: { interval: weekly }
+    groups:
+      minor-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions     # .github/workflows의 uses: 메이저 갱신
+    directory: /
+    schedule: { interval: weekly }
+  # Docker 이미지는 넣지 않는다 — 태그 고정 + 재빌드로 패치, 메이저 전환은 LTS 정책 결정 (ops.md 5-1절)
+```
+
+- 단일 구조 프로젝트는 `directories`를 `["/"]`(또는 `directory: /`)로.
+- 메이저 갱신 PR은 하나씩 열린다 — CI가 깨지면(예: TypeScript 메이저가 ESLint 호환 범위 밖) 닫고 사유를 CLAUDE.md에 적는다.
+
 ## 주의
 
 - 이미 파일이 있는 폴더에는 생성하지 않는다. 먼저 사용자에게 확인한다.

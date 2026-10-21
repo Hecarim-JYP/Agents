@@ -9,7 +9,7 @@ description: 배포 준비 — 테스트·빌드·취약점·마이그레이션�
 
 1. **테스트** — `npm test`(또는 pytest) 전체 실행. 실패 시 여기서 중단하고 보고.
 2. **빌드** — 프로덕션 빌드(`tsc`, `vite build` 등)와 **Docker 이미지 빌드**(`docker build`) 성공 확인. 이미지 태그가 배포 태그와 일치하는지 확인 (`~/.claude/jyp/conventions/docker.md` 5절).
-3. **의존성 취약점** — `npm audit` 실행, high 이상 취약점 보고 (불가피하면 사유 기록).
+3. **의존성 취약점** — `~/.claude/jyp/conventions/ops.md` 5-1절 방법으로 검사(npm: `npm audit`, Gradle: osv-scanner), high 이상 취약점 보고 (불가피하면 사유 기록).
 4. **마이그레이션** — `migrations/`의 미적용 파일 확인(적용 기록과 대조), 적용 순서와 멱등성 확인 (`~/.claude/jyp/conventions/migration.md`).
 5. **환경변수 대조** — 이번 변경에서 추가된 환경변수가 `.env.example`과 운영 환경에 반영됐는지 확인.
 6. **보안 체크리스트** — `~/.claude/jyp/conventions/ops.md` 5절 보안 체크리스트 점검 (첫 배포는 전 항목, 이후는 변경 영역만).

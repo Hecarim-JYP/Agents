@@ -1,0 +1,8 @@
+// 의존성 취약점 검사용 init 스크립트 — 검사할 때만 잠금 파일(gradle.lockfile)을 만든다 (ops.md 5-1절)
+//   ./gradlew -q -I $HOME/.claude/jyp/scaffolds/templates/osv-lock.gradle dependencies --write-locks
+// osv-scanner는 build.gradle을 읽지 못한다("No package sources found" — 실측). 잠금 파일에는 전이 의존성까지
+// 실제 해석된 버전이 적히므로, Boot가 관리하는 Tomcat·Jackson 같은 간접 의존성도 검사 대상이 된다.
+// 프로젝트 빌드 설정은 바꾸지 않는다 — 잠금을 켜지 않은 빌드는 남은 gradle.lockfile을 무시한다(실측). 검사 후 삭제.
+allprojects {
+    dependencyLocking { lockAllConfigurations() }
+}
