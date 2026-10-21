@@ -55,3 +55,58 @@
 ■ GDPR: 권리 요구 1개월(+2개월), 감독기관 72시간(저위험 면제), 정보주체는 높은 위험일 때
 ■ 한국 적정성 결정 제외 범위(금융위 감독 개인신용정보 등), ePrivacy 쿠키 동의
 ```
+
+---
+---
+
+# 2부 — 7차: 정비 (템플릿 버전 점검 · 레시피 목록 단일화)
+
+> 사용자 요청 "7차 내용 보고해" → 권고안(레시피 3+1종·업체 문서 원문화·버전 점검) → "상용 웹앱 개발에 필요한 내용이 맞는지부터 다시 검토해봐, 너무 오버하는 것 같은데" → 재검토 결과 **새 레시피·업체 문서 원문화는 빼기**(재고·예약은 sql.md 8절과 중복, 집계는 프로젝트별, 제조번호·사용기한은 업무 로직, 업체 문서는 착수 시 재확인 규칙이 이미 있음) → "1번·2번만, 레시피는 늘 유연하게 추가할 수 있어야 한다"
+> 레시피 추가를 제한하는 규칙은 만들지 않았다 — 오히려 추가할 때 고칠 곳을 줄였다(2절).
+
+## 1. 템플릿 고정 버전 점검 (fix)
+
+| 대상 | 고정값 | 현행 (2026-10-21) | 조치 |
+|---|---|---|---|
+| Spring Boot · dependency-management · Spotless · Checkstyle · ArchUnit · Gradle | 4.1.1 · 1.1.7 · 8.10.4 · 14.3.0 · 1.5.1 · 9.8.2 | 같음 (Boot 4.2는 마일스톤) | 유지 |
+| MyBatis 스타터 · QueryDSL 포크 | 4.1.0 · 7.7 | 같음 | 유지 |
+| TypeScript | `~6.0.3` 고정 | 최신 7.0.2, typescript-eslint 8.72 peer `<6.1.0` 그대로 | **고정 유지**(사유 그대로 유효) |
+| **ESLint** | **9** + `eslint-plugin-import` | **10.13.0** — **ESLint 9는 2026-08-06 지원 종료**(eslint.org version-support 원본), `eslint-plugin-import` 2.32(2025-06 이후 출시 없음)는 peer `~^9`로 10 미지원 | **ESLint 10 + `eslint-plugin-import-x` 4.17.1**로 교체 |
+| nginx · MariaDB · Caddy · Playwright 이미지 | 1.30 · 11.4 · 2 · v1.64.1 | 1.30.6 안정판 · 11.4.13 · 2.11.7 · 1.64.1 | 유지 |
+| Flyway 이미지 | 12 | 최신 13.10.3 | **유지** — Spring Boot 4.1.1이 관리하는 Flyway가 12.4.0이라 같은 메이저로 맞춘다(사유를 compose 주석에) |
+
+### ESLint 10 + import-x 검증 (CLAUDE.md "규칙마다 하나씩")
+
+- 템플릿 4종을 저장소에서 그대로 복사한 하네스: 순환(상대경로·`.js` 확장자 경로·`@/` 별칭)·정상 import, `any`, axios 직접 import(+ `shared/api` 허용), `=== 200`, hex·팔레트 색상, alert, 토큰 스토리지, react-hooks, 환경변수 폴백, `console.error(err)`, SQL 템플릿 보간(+ `scripts/` 제외), 정상 코드 → **62건 전부 기대대로**(Node 24.22·26.12 모두)
+- 대조군: TS에서 `import-x/parsers`를 빼면 **순환 0건**(조용히 꺼짐), JS에서 TS 리졸버를 빼면 `@/` 별칭 순환을 놓친다 — 템플릿 주석대로
+- 설치 순서 그대로(새 폴더): TS = `typescript@~6.0.3` 먼저 → ESLint 묶음, JS = ESLint 묶음만 — 둘 다 ERESOLVE 없음
+- 훅(`post-edit-check.mjs`): 위반 파일 exit 2(메시지 포함), 정상 파일 exit 0
+- 바뀐 곳: 템플릿 4종(설치 줄·import·`import-x/resolver-next`·`import-x/no-cycle`·사유 주석), scaffolds/default.md 설치 절, CLAUDE.md 검증 규칙의 규칙 이름
+
+## 2. 레시피 목록 단일화 (refactor)
+
+- `dev-rules.md`(모든 프로젝트에 항상 로드): 기능 이름 50개 가까운 나열 → **"기능을 구현하기 전에 catalog.md에서 레시피가 있는지 먼저 확인한다"** 한 줄 (10,817 → 10,118바이트). 목록이 하던 "레시피가 있다"는 신호는 규칙 자체로 대신한다
+- `README.md`: 기능 나열 → catalog.md 링크
+- `catalog.md` 1절: 레시피를 추가할 때 고칠 곳 = **레시피 파일 + 표 한 줄**(스키마·시작 결정이 있으면 해당 인덱스)
+- `CLAUDE.md` SSOT: "레시피 목록은 catalog.md 한 곳에만" (2026-10-21 확정)
+
+## 검증
+
+| 항목 | 결과 |
+|---|---|
+| ESLint 하네스 | 62/62 (Node 24·26) |
+| `verify-templates.sh` | 통과 |
+| `check-refs.mjs` | 통과 |
+| `install.sh` 임시 HOME | 설치본 = 저장소 (conventions·rules·scaffolds) |
+| `install.ps1` 실행 | **미수행** — PowerShell 없음. 회사 PC에서 `git pull` 후 실행 필요 |
+
+## 커밋 코멘트
+
+```
+@@ 2026-10-21 (2부) @@
+7차 — 정비만 (재검토 결과 새 레시피·업체 문서 원문화는 하지 않음)
+
+■ ESLint 9(2026-08-06 지원 종료) → 10, eslint-plugin-import(10 미지원) → import-x — 템플릿 4종 × 전 규칙 62건 재검증
+■ TS 6.0 고정·Flyway 12 고정은 사유 유효(typescript-eslint peer, Boot 관리 버전) — 그대로
+■ 레시피 목록은 catalog.md 한 곳 — dev-rules·README 나열 제거, 추가 시 고칠 곳 = 레시피 + 표 한 줄
+```
