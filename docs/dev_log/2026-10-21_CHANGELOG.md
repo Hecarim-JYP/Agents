@@ -330,3 +330,84 @@
 ■ 취약점: audit.yml이 release 전에 high 이상 차단 + 주 1회, Boot 4.1.1 템플릿 취약점 10건 → 덮어쓰기로 0건
 ■ Windows: verify-windows.yml — install.ps1·verify-templates.ps1을 5.1로 처음 실행, BOM 대조군으로 검사 자체를 검증
 ```
+
+---
+
+# 5부 — 10차: 9차 장치를 끝까지 연결 (운영 감시 엔드포인트 · 템플릿 취약점 검사 · 비밀값)
+
+> 사용자 요청 "10차 내용 보고해" → 권고안(A 운영 감시 엔드포인트 / B 템플릿 자체 취약점 검사 / C 비밀값 경로, 새 레시피 없음) → "권장대로 진행해"
+> 확인 질문 2개는 권장안으로 진행했다: 감시 경로는 응답에 배치명·판정만 두고 프록시에서 사내 대역으로 제한, gitleaks는 PR·push마다 차단.
+
+## A. 운영 감시 엔드포인트 — batch.md 3-1절 (feat)
+
+- 근거: batch.md 3절 층 2는 "정상 시간 내에 성공했나를 200/비200으로 답한다"뿐이었다. 9차부터 모든 기본 프로젝트의 백업·디스크 결과가 이 엔드포인트에 의존하는데, 판정 기준도 구현도 없었다.
+- `GET /api/ops/status` 하나로 배치 + outbox 적체를 판정한다(outbox.md 3-5절은 별도 URL 대신 이 엔드포인트의 `OUTBOX` 항목).
+- 판정: 기록 없음, 마지막 실행 FAILED, RUNNING 120분 초과, 허용 간격 초과, 조회 실패 → 503.
+- 실측 (MariaDB 11.4, 앱 TZ=UTC·DB TZ=KST — 문서의 코드 그대로):
+
+| 시나리오 | Express | Spring |
+|---|---|---|
+| 기록 없음 / 30시간 전 성공 / 마지막 실패 / RUNNING 3시간째 | 503 | 503 |
+| 3시간 전 성공 / RUNNING 10분째 | 200 | 200 |
+| outbox 지연 PENDING / FAILED / 정상 | 503 / 503 / 200 | 같음 |
+| DB 중지 | 503 (21ms) | 503 (첫 요청 40ms, 이후 Hikari 대기 30,025ms) |
+| 503인 동안 `/health`·`/actuator/health` | 200 | UP |
+
+- 함정 1 — **경과 시간을 앱에서 계산하면 시간대만큼 밀린다**: 앱이 UTC이고 DB가 KST일 때 180분 전 성공이 -360분으로 계산됐다(mysql2 기본 `timezone: 'local'`). 그래서 `TIMESTAMPDIFF`로 DB에서 계산한다.
+- 함정 2 — **경로 대소문자 우회**: 같은 IP 제한을 nginx 접두 location(`/api/ops/`)으로 걸면, 외부 대역에서 `/api/OPS/status`가 `/api/`로 빠지고 Express가 대소문자를 무시해 그대로 응답했다.
+  - 템플릿은 대소문자 무시 정규식(`~*`)으로 막는다. 외부 대역에서 대소문자·이중 슬래시·`%6f` 인코딩·`/./` 경로 전부 403, 일반 API는 영향 없음.
+  - Caddy는 `path` 매처 자체가 대소문자를 무시했다. nginx와 같은 정규식으로 맞췄다.
+- 함정 3 — 판정 기준은 프록시가 보는 접속 IP다. Docker 기본(iptables)으로 포트를 공개하면 접속 IP가 보존된다(호스트의 비사설 IP 192.0.2.2 → 403). 호스트 자신의 127.0.0.1 접속은 docker-proxy를 거쳐 게이트웨이(172.30.0.1)로 보인다. 앞단 NAT·LB 구성에서는 제한이 무력하므로, ops.md 5절 12번에 "사외 회선에서 403 확인"을 넣었다.
+- Spring 코드는 템플릿 build.gradle 프로젝트에서 `./gradlew check`(Spotless·Checkstyle·ArchUnit) 통과, Express는 `tsc --strict` 통과. JdbcClient `:names`에 List를 넘기면 IN 목록으로 펼친다.
+- 연결: 프로필·체크리스트 17(감시 URL 등록 + 수신자 개발팀), ops.md 6·7·8절, outbox.md 3-5절.
+- 별도 관찰 (이번에 고치지 않음): Spring `/actuator/health`는 DB가 죽으면 DOWN이 된다(기본 db 인디케이터). docker.md의 HEALTHCHECK가 이 경로를 본다 — 다음 차수 후보.
+
+## B. 템플릿 자체 취약점 검사 — template-audit (ci)
+
+- 근거: 생성된 프로젝트는 각자 audit.yml이 검사하지만, 템플릿의 고정값은 아무도 검사하지 않았다. check-versions는 새 릴리스가 나와야 알린다.
+- `scripts/template-audit.mjs`가 build.gradle 템플릿을 조립하고, default.md의 audit.yml에서 audit-server 단계(run 블록)를 **그대로 꺼내** 같은 셸 옵션으로 실행한다. 검사 로직을 다시 쓰지 않는다.
+- 대조군 `--control`은 log4j-core 2.14.1을 넣은 조립본이다. 마지막 단계가 exit 1(검출)로 끝나야 통과하고, 통과하거나 도구 오류면 고장으로 실패한다.
+- 실측:
+  - 로컬(오프라인 DB): 현재 템플릿 통과, 덮어쓰기를 지우면 Tomcat·Jackson 검출로 실패, 대조군 검출, 도구를 일부러 고장 내면(잘못된 플래그) 대조군이 "도구 오류 exit 127"로 실패.
+  - **GitHub 러너(run 39578707863)**: 온라인 조회로 통과, 대조군 CVSS 10.0 포함 3건 검출 → ops.md 5-1절의 "온라인 조회 미검증" 표시를 지웠다(Dependabot은 미검증 유지).
+- 실행 시점: 주 1회(월 09:29 KST) + build.gradle·osv-lock·default.md·spring.md·스크립트·워크플로 변경 때. 실행 약 70초.
+
+## C. 비밀값이 저장소에 들어가는 경로 (fix)
+
+- **결함**: 스캐폴드 `.gitignore`가 `.env`만 제외했다. Gradle 표준 gitignore와 합치면 `.env.production`·`.env.development`·`.env.local`·`client/.env.production.local`이 모두 커밋 대상이었다(실측). ops.md 1절이 권하는 바로 그 파일들이다. → `.env` + `.env.*` + `!.env.example`.
+- test.yml 템플릿에 `secrets` job을 추가했다(gitleaks 8.30.1, `fetch-depth: 0`, `--redact`). 공식 Action은 조직 계정에서 라이선스 키를 요구해서 실행 파일을 직접 받는다. 버전은 check-versions가 추적한다.
+- 실측 (형식에 맞게 생성한 가짜 비밀값):
+  - **검출**: 지운 env 파일의 JWT 키(이력), AWS 액세스·비밀 키, GitHub 토큰, Slack 웹훅, SMTP 비밀번호(hex), PEM 개인 키.
+  - **미검출**: 사람이 정한 비밀번호(`Pa55w0rd!2026`, `S3cr3tPassw0rd`).
+  - **얕은 체크아웃(depth 1)**: 지운 파일을 놓친다.
+  - **스캐폴드 그대로의 표본**: 0건.
+  - **`.gitleaksignore` 지문**: 그 건만 빠지고 나머지는 그대로 검출.
+  - **act**: 심은 저장소는 커밋 8개 검사·6건으로 실패, 깨끗한 저장소는 통과.
+  - ⚠ 첫 측정에서 무작위 바이트를 문자 필터로 거르다 토큰이 실제 형식보다 짧아져 "미검출"로 보였다 → 길이를 맞춰 재측정한 결과만 적었다.
+- 연결: ops.md 1절(STRICT)·5절 6번, default.md CI 절.
+
+## 검증
+
+| 항목 | 결과 |
+|---|---|
+| `check-refs.mjs` | 통과 (커밋마다) |
+| `check-versions.mjs` | 고정값 84 / 낡음 0 / 보류 5 (gitleaks·template-audit 워크플로 고정값 포함) |
+| `verify-templates.sh` | 통과 (커밋마다) |
+| 운영 감시 | Express·Spring 시나리오 9종 + DB 중지, nginx·Caddy 대역 2종 × 우회 경로 8종 |
+| 템플릿 취약점 | 로컬 4종(통과·회귀·대조군·도구 고장), GitHub 온라인 |
+| 비밀값 | 표본 2종 + 얕은 체크아웃 + ignore 지문 + act 2종 |
+| GitHub CI | verify · verify-windows · **template-audit** 성공 |
+| 인코딩 | 변경 파일 BOM·CR 없음 |
+| `install.sh` 임시 HOME | 설치본 = 저장소 |
+
+## 커밋 코멘트
+
+```
+@@ 2026-10-21 (5부) @@
+10차 — 9차 장치를 끝까지 연결 (새 레시피 없음)
+
+■ 운영 감시: GET /api/ops/status(배치·백업·디스크·outbox) — 경과 시간은 DB에서(앱에서 빼면 -360분),
+  프록시는 대소문자 무시 정규식으로 사내 대역만(접두 location이면 /api/OPS/status로 우회 — 실측)
+■ 템플릿 취약점: template-audit — audit.yml 단계를 그대로 꺼내 주 1회, 대조군으로 검사 자체를 검증, 온라인 조회 확인
+■ 비밀값: .gitignore가 .env만 막아 .env.production이 커밋되던 결함 수정 + gitleaks secrets job(이력 전체)
+```
