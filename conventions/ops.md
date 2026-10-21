@@ -94,7 +94,8 @@ rm gradle.lockfile                           # 잠금을 켜지 않은 빌드는
 - osv-scanner: Google의 오픈소스 검사 도구(단일 실행 파일, GitHub 릴리스 — `audit.yml`이 받는 버전은 `check-versions.mjs`가 추적한다). 등급 기준 옵션이 없어 `audit.yml`은 결과의 CVSS로 high 이상을 거른다. npm의 `package-lock.json`도 읽는다 — 실측에서 `npm audit`과 같은 취약점(lodash 4.17.20)을 찾았다.
 - `server/gradle/osv-lock.gradle`은 스캐폴드가 템플릿에서 복사한다 — CI와 로컬이 같은 파일을 쓴다.
 - Docker 이미지는 Dependabot 대상에서 뺀다 — 메이저(DB는 마이너) 태그 고정 + 재빌드로 베이스 이미지 패치를 받고(docker.md 2절), 메이저 전환은 LTS 정책 결정(general.md 8-1절)이라 자동 PR로 받지 않는다.
-- ⚠ 미검증: Dependabot·자동 의존성 제출의 실제 동작, `audit.yml`의 온라인 조회(api.osv.dev — 이 저장소의 검증 환경에서는 막혀 있어 같은 판정을 오프라인 DB로 확인했다)는 GitHub 저장소에서만 확인된다. 첫 GitHub 프로젝트에서 확인하고 이 표시를 지운다.
+- `audit.yml`의 검사 단계는 이 저장소의 `template-audit.yml`이 템플릿을 조립해 그대로 돌린다 — GitHub 러너에서 온라인 조회(api.osv.dev)로 통과, 대조군(log4j-core 2.14.1) 검출 확인 (2026-10-21).
+- ⚠ 미검증: Dependabot·자동 의존성 제출의 실제 동작은 GitHub 저장소에서만 확인된다. 첫 GitHub 프로젝트에서 알림·PR이 오는지 확인하고 이 표시를 지운다.
 
 ## 6. 백업
 
