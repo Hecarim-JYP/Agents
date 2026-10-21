@@ -11,6 +11,18 @@
 - 시크릿에 하드코딩 폴백 금지, 미설정 시 기동 실패 (patterns.md 4절).
 - **시크릿 보관·전달**: 원본은 패스워드 매니저(또는 암호화 저장소) **한 곳**에 보관하고, 보관 위치를 인수인계 문서(handover)에 기록한다. 새 기기·운영 서버 전달은 그 경로로만 — 메신저·메일 평문 전송 금지. `.env` 파일도 암호화 백업 대상에 포함한다 (git에 없으므로 기기가 죽으면 유일본이 사라진다).
 - 유출이 의심되면 즉시 해당 시크릿을 로테이션(재발급)하고 incident로 기록한다.
+- **비밀값이 저장소에 들어가는 경로를 도구로 막는다 (STRICT, 2026-10-21 확정)**:
+  - `.gitignore`는 `.env` + `.env.*` + `!.env.example` (scaffolds/default.md). 실측: `.env`만 적은 기존 템플릿 + Gradle 표준 gitignore에서 `.env.production`·`.env.development`·`.env.local`·`client/.env.production.local`이 **전부 커밋 대상**이었다 — 위 첫 줄이 권하는 바로 그 파일들이다.
+  - CI의 `secrets` job(gitleaks — scaffolds/default.md test.yml)이 **이력 전체**를 PR·push마다 검사해 막는다.
+
+| 실측 (gitleaks 8.30.1) | 결과 |
+|---|---|
+| 검출 | 커밋 후 **지운** env 파일의 JWT 키(이력), AWS 액세스 키·비밀 키, GitHub 토큰, Slack 웹훅, SMTP 비밀번호(무작위 hex), 개인 키(PEM) |
+| **검출 안 됨** | 사람이 정한 비밀번호 — `DB_PASSWORD=Pa55w0rd!2026`, `password: S3cr3tPassw0rd` (무작위성이 낮다) → 비밀값은 환경변수로만(patterns.md 4절), 리뷰에서 본다 |
+| 체크아웃 깊이 | Actions 기본(`fetch-depth: 1`)이면 지운 파일의 비밀값을 못 본다 — `fetch-depth: 0` 필수 |
+| 오탐 | 스캐폴드 템플릿 그대로(.env.example·compose·백업 스크립트·build.gradle·`${DB_PASSWORD}` 참조 yml) 0건 |
+
+  - 검출되면 그 비밀값은 **이미 유출된 것으로 보고 재발급한다** — 커밋을 지우거나 이력을 고쳐도 다른 사람의 클론·포크·CI 로그에 남는다. 오탐(테스트 픽스처 등)은 `.gitleaksignore`에 그 건의 지문(Fingerprint)만 적는다(실측: 그 건만 빠지고 나머지는 그대로 검출) — 규칙을 끄지 않는다.
 
 ## 2. 배포 원칙
 
@@ -49,12 +61,13 @@
 | 3 | 인증 토큰 | 만료 시간이 합리적인가(장기 토큰 금지), 로그아웃/세션 무효화 동작 |
 | 4 | 권한 게이트 | 관리/설정 엔드포인트에 역할·권한 미들웨어 부착 확인 (로그인 여부만으로 불충분) |
 | 5 | 신뢰값 주입 | 테넌트/행위자 값 서버 강제 주입 동작 확인 (express.md 5절) |
-| 6 | 시크릿 | `.env` 커밋 이력 없음, `.gitignore` 적용, 운영 시크릿은 개발과 분리 |
+| 6 | 시크릿 | CI `secrets` job(gitleaks — 이력 전체) 통과, `.gitignore`에 `.env.*` 포함, 운영 시크릿은 개발과 분리 (1절) |
 | 7 | 파일 업로드 | 경로 트래버설 방어, 확장자/크기 제한, 업로드 폴더 비추적, 형식은 내용으로 판정·inline은 래스터 이미지만 (features/upload-security.md) |
 | 8 | 에러 노출 | 운영 에러 응답에 스택 트레이스·내부 경로 미노출 |
 | 9 | 의존성 | high 이상 취약점 0건 — 검사 방법은 5-1절(npm·Gradle), 불가피하면 사유 기록 |
 | 10 | 컨테이너 | 이미지에 `.env`/시크릿 미포함(`.dockerignore` 확인), **우리가 빌드하는 이미지·프록시 non-root 실행**(벤더 이미지는 벤더 권한 설계 — docker.md 2절, Caddy 채택 시 예외 기록 확인), 운영 이미지 `latest` 태그 미사용 |
 | 11 | 실제 IP·빈도 제한 | 배포 구성에서 `X-Forwarded-For` 위조 요청 → 앱이 기록한 IP가 실제 IP인지(프록시 덮어쓰기 + `trust proxy 1`), 대외는 로그인·발송 빈도 제한 (features/rate-limit.md 3-1절) |
+| 12 | 운영 감시 경로 | 사외 회선(휴대폰 테더링 등)에서 `/api/ops/status`가 403, 사내에서는 200/503 — 프록시가 실제 접속 IP를 보는지 확인 (batch.md 3-1절) |
 
 ### 5-1. 의존성 취약점·갱신 (MANDATORY, 2026-10-21 확정)
 
@@ -67,7 +80,6 @@
 | 원격 저장소 | 감지 | 갱신 |
 |---|---|---|
 | GitHub (체크리스트 16 기본) | `audit.yml`(배포 차단 + 주 1회) + 저장소 설정의 **Dependabot alerts·security updates**. **Gradle은 Dependency graph의 "Automatic dependency submission"도 켠다** — GitHub는 Gradle을 정적으로 분석하지 않아, 이것이 없으면 위 Tomcat 같은 전이 의존성이 알림 대상이 아니다 (GitHub 문서 원문, 2026-10-20 판) | `.github/dependabot.yml`(스캐폴드) — 주 1회, 메이저가 아닌 갱신은 PR 하나로 묶는다 |
-| 12 | 운영 감시 경로 | 사외 회선(휴대폰 테더링 등)에서 `/api/ops/status`가 403, 사내에서는 200/503 — 프록시가 실제 접속 IP를 보는지 확인 (batch.md 3-1절) |
 | 없음 (사내 전용) | **배포 준비 때 + 배포가 없어도 월 1회**: 아래 명령 — `audit.yml`과 같은 판정 | 수동 |
 
 ```bash

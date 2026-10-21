@@ -195,9 +195,13 @@
 ### .gitignore
 언어별 표준 gitignore(github/gitignore 기준)에 다음을 항상 포함:
 ```
+# 환경 파일 — .env만 적으면 .env.production·.env.development·.env.local이 커밋된다 (ops.md 1절, 2026-10-21 실측)
 .env
+.env.*
+!.env.example
 *.log
 ```
+- Node 표준 gitignore에는 같은 세 줄이 있지만 **Gradle·Java 표준에는 `.env` 규칙이 없다** — Spring 서버·모노레포 루트에서 특히 빠뜨린다.
 
 ### .env.example
 결정된 값을 변수로 — 최소한 다음을 포함. 각 항목의 규칙: 모드·포트는 docker.md 4-1절, DB 접속은 4-3절 매트릭스, SITE_ADDRESS·DEPLOY_TAG는 5·7절, 테스트 DB는 testing.md 0절. compose에서는 폴백 없이 `${VAR:?}`로 참조한다.
@@ -313,12 +317,24 @@ jobs:
       - uses: actions/checkout@v7
       - run: docker build -t ci-client-check client/
       - run: docker build -t ci-server-check server/
+
+  # 비밀값 검사 — 이력 전체에서 키·토큰·개인 키를 찾는다 (ops.md 1절). PR·push마다 막는다
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0        # 이력 전체 — 기본(1)이면 지운 파일에 남은 비밀값을 못 본다 (실측)
+      - run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz | tar -xz -C "$RUNNER_TEMP" gitleaks
+          "$RUNNER_TEMP/gitleaks" git --redact --no-banner .   # --redact: CI 로그에 비밀값을 다시 찍지 않는다
 ```
 
 - 단일 구조 프로젝트는 해당 스택 job 하나 + docker job으로 축소 (`working-directory` 제거, `docker build .`). 서버가 Node면 test-server도 Node job 형태로 하되 **`services:`와 `env:` 블록은 그대로 유지**한다.
 - **테스트 DB를 쓰지 않기로 했으면(체크리스트 21-b) `services:`·`env:` 블록을 제거**한다 — 대신 쿼리 목킹으로 테스트한다.
 - Python 프로젝트는 `setup-python` + `pip install -e .[dev]` + `pytest`로 대체.
 - docker job은 이미지 빌드 성공만 검증한다 — Dockerfile이 깨진 채 배포 시점까지 가는 것을 방지 (push/실행은 하지 않음).
+- secrets job은 gitleaks(MIT) 실행 파일을 직접 받는다 — 공식 Action은 조직 계정에서 라이선스 키를 요구한다. 버전을 올릴 때 URL의 두 곳(`v8.30.1`·`8.30.1`)을 함께 바꾼다(`check-versions.mjs`가 앞쪽을 추적). 비공개 저장소는 GitHub의 비밀값 검사가 유료라 이 job이 유일한 자동 검사다.
 - **Actions는 메이저 태그로 고정하고, 실행 런타임이 Node 24인 메이저를 쓴다** (2026-10-21 확정). Node 20 런타임 액션(`checkout@v4`·`setup-node@v4`·`setup-java@v4`·`login-action@v3`)은 2026-06-16부터 Node 24로 강제 실행되며 매 실행 경고가 붙고, 러너의 Node 20은 2026-09-23 제거 일정이다(actions/runner `Constants.cs`). 메이저가 바뀌면 Dependabot(아래 dependabot.yml)이 PR로 알린다.
 
 ### .github/workflows/release.yml
