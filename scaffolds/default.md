@@ -252,6 +252,8 @@ BACKUP_KEEP_DAYS=30
 BACKUP_UID=1000
 BACKUP_GID=1000
 ```
+# 디스크 사용률 기준(%) — 백업 실행 때 재서 넘으면 DISK_CHECK 실패 → 배치 감시 빨간불 (ops.md 8절)
+DISK_ALERT_PCT=85
 
 ### .github/workflows/test.yml
 GitHub 원격 저장소를 쓰는 프로젝트에 생성 (사내 전용/무원격이면 생략하고 사용자에게 고지). **job은 스택별로 구성한다** — 모노레포는 디렉토리별 job, 이종 스택(예: React + Spring)이면 툴체인도 job마다 다르다:

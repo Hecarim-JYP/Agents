@@ -186,7 +186,10 @@ services:
 ## 6. 로그
 
 - 컨테이너 앱은 **stdout/stderr로만 로그를 출력**한다 — 파일로 직접 쓰지 않는다 (`docker logs`가 수집). 로그 내용 규칙은 ops.md 3절.
-- 운영은 로깅 드라이버 옵션으로 로테이션 설정 (`max-size`, `max-file`) — 디스크 풀 방지.
+- **운영은 로그 크기를 제한한다 (STRICT, 2026-10-21 확정)** — deploy override 템플릿의 `x-logging` 앵커(json-file, `max-size: 10m`·`max-file: 5` → 컨테이너당 최대 50MB)를 모든 서비스에 건다. 서비스를 추가하면 `logging: *default-logging`도 함께.
+  - 근거 (실측, Docker 29.8): 기본 json-file은 제한이 없다 — 40만 줄이 103MB로 그대로 쌓였고, `max-size 10m·max-file 3`이면 26MB(파일 3개)에서 멈췄다. `docker logs`는 두 경우 모두 최근분을 정상 출력한다(제한 쪽은 마지막 약 10만 줄만 남는다 — 장기 보관은 수집기 몫).
+  - json-file을 유지하는 이유: 사내 로그 수집기는 대개 `/var/lib/docker/containers/*/*-json.log`를 읽는다. 수집기가 없으면 `local` 드라이버(압축 — 같은 측정에서 0.8MB)도 된다.
+  - 설정은 **컨테이너를 만들 때** 적용된다 — compose의 `logging:`을 바꾸면 `up -d`가 재생성한다(실측). 호스트 `daemon.json`의 기본값을 바꿔도 기존 컨테이너에는 적용되지 않는다.
 
 ## 7. 리버스 프록시·HTTPS
 
