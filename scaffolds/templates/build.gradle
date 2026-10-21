@@ -4,7 +4,8 @@
 // ⚠ 생성 시 아래 버전을 Maven Central·Gradle Plugin Portal의 최신 GA로 갱신하고 CLAUDE.md에 기록한다.
 //   실빌드 검증: Boot 4.1.1 · Gradle 9.8.2 · Spotless 8.10.4 · Checkstyle 14.3.0 · ArchUnit 1.5.1 — Java 21(2026-10-19)·Java 25(2026-10-20)
 //   Java는 LTS만 (general.md 8-1절) — 25(2031-09 지원 종료). 선택한 버전·지원 종료일을 CLAUDE.md에 기록한다
-// 함께 만드는 파일: config/checkstyle/checkstyle.xml(템플릿), config/header.txt(파일 헤더 주석), .gitattributes(* text=auto eol=lf)
+// 함께 만드는 파일: config/checkstyle/checkstyle.xml(템플릿), config/header.txt(파일 헤더 주석), .gitattributes(* text=auto eol=lf),
+//   gradle/osv-lock.gradle(템플릿 — 취약점 검사용, ops.md 5-1절)
 
 plugins {
     id 'java'
@@ -26,6 +27,13 @@ java {
 repositories {
     mavenCentral()
 }
+
+// 보안 패치 덮어쓰기 — Boot가 관리하는 버전에 알려진 취약점이 있을 때만, 같은 계열의 최신 패치로 (ops.md 5-1절)
+// Boot가 이 버전 이상을 관리하게 되면 지운다 — check-versions.mjs가 "덮어쓰기 삭제"로 알린다. 지운 뒤 취약점 검사(audit.yml)를 다시 돌린다
+// 2026-10-21 Boot 4.1.1 기준 (OSV): Tomcat 11.0.24 — GHSA-9xv2-5v5q-p794·GHSA-gcx9-497g-6cp6·GHSA-h3x4-894j-xpx5 (인증 우회 등, CVSS 9.1~9.8, 11.0.25 수정)
+//                                  Jackson 3.1.5 — jackson-core GHSA-7hhh-6rmp-j9qf·GHSA-p6pp-m3f8-5c89, databind GHSA-cxp5-3px4-pw24 외 4건 (CVSS 최고 7.5, 3.1.7 수정)
+ext['tomcat.version'] = '11.0.27'
+ext['jackson-bom.version'] = '3.1.8'
 
 dependencies {
     // Boot 4는 스타터 이름이 바뀌었다 — web이 아니라 webmvc, 테스트도 기술별 스타터(webmvc-test)

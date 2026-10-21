@@ -36,7 +36,7 @@
 | 13 | API 응답 봉투 계약 | 단일 봉투 (모든 응답 `data` 키) | api.md 5절 |
 | 14 | 테스트 파일 위치 | `tests/` 미러링 | testing.md 4절 |
 | 15 | **외부 노출·도메인·프록시 — 반드시 묻는다**: ①서버가 인터넷에서 접근 가능한가 ②도메인 유무 ③프록시 선택(nginx / Caddy) | 사내망 전용 — **nginx-unprivileged 프록시**(HTTP, non-root). **외부 노출 + 도메인이면 Caddy 권장**(자동 HTTPS — ACME 검증은 인터넷에서 80 도달 가능할 때만 동작). 외부 노출인데 nginx를 택하면 certbot 갱신 운영을 CLAUDE.md에 기록 | docker.md 7절 |
-| 16 | GitHub 원격/CI 사용 여부 | 사용 (test.yml + release.yml + dependabot.yml 생성, 저장소 보안 설정 — ops.md 5-1절) | 아래 CI 절 |
+| 16 | GitHub 원격/CI 사용 여부 | 사용 (test.yml + release.yml + audit.yml + dependabot.yml 생성, 저장소 보안 설정 — ops.md 5-1절) | 아래 CI 절 |
 | 17 | **가동 모니터링/알림 구현 여부 — 반드시 묻는다**: (a) 사내 인프라팀 위임 / (b) 자체 구축(Uptime Kuma) | (a) 인프라팀 위임 — 헬스 URL·연락처 전달, CLAUDE.md 기록 | ops.md 7절 |
 | 18 | **사내 API서버 연동 여부** — 있으면 대상·주소(env 키)·인증 방식·담당 창구를 CLAUDE.md에 기록. **쓰기 연동이 있으면 outbox**(`07_outbox.sql` + relay 워커) + 수신 측 멱등 방식 기록 | 미연동 (연동 시 `external/` 계층 + `INTERNAL_API_URL` 추가) | integration.md 4절 / features/outbox.md |
 | 19 | **인증 소스 — 반드시 묻는다**: (a) 자체 로그인 / (b) 사내 인증 위임 / (c) SSO(OIDC·SAML) | (a) 자체 로그인 — 표준 스키마 그대로. (b)(c)는 user 테이블 조정(`password_hash` 제거 + `external_user_key`) + 계정 프로비저닝(JIT/사전등록) 결정 필요. **(b)는 잠금 컬럼 유지 + 시도 제한 구현**(우리가 ID/PW를 받는다), (c)는 잠금 컬럼도 제거 | auth.md 0·1절 |
@@ -98,7 +98,8 @@
 ├── .github/
 │   ├── workflows/
 │   │   ├── test.yml             # 스택별 job (+ 테스트 DB 서비스)
-│   │   └── release.yml          # 태그 push → ghcr.io 이미지 빌드·push
+│   │   ├── release.yml          # 태그 push → 취약점 검사 → ghcr.io 이미지 빌드·push
+│   │   └── audit.yml            # 의존성 취약점 검사 — release가 호출 + 주 1회 (ops.md 5-1절)
 │   └── dependabot.yml           # 의존성 갱신 PR (ops.md 5-1절)
 ├── docs/                        # 공유 (dev_log/, incidents/, 설계 문서)
 ├── migrations/                  # DB 마이그레이션 (공유 — migrate 서비스가 읽는다)
@@ -126,7 +127,7 @@
 |---|---|
 | Python | `pyproject.toml` 추가, `src/<패키지명>/` 레이아웃, `src/<패키지명>/__init__.py`. 테스트: **pytest** |
 | Node/Express 서버 | **언어는 체크리스트 1에서 확인** — `package.json`(`"type": "module"`). TS면 `tsconfig.json`(`strict: true`) + 개발 `tsx watch` / 배포 `tsc` 빌드 — **TypeScript는 `typescript@~6.0.3`으로 고정**(린트 절 — `npm i -D typescript`는 7.x를 설치해 ESLint 설치가 ERESOLVE로 깨진다), JS면 개발 `node --watch` / 빌드 없음. 계층 구조는 `conventions/express.md` 1절, 경계 검증은 **zod**. 테스트: **Vitest + supertest** — 의존성 설치 + `"test"` 스크립트 등록까지 스캐폴드가 한다. DB 사용 시 **마이그레이션 러너**(`npm run migrate` — migration.md 5절) 포함 |
-| Spring Boot 서버 | **Java 25(LTS) + Spring Boot 4.x + Gradle 9.x — Boot 3.x로 시작하지 않는다**(spring.md 0절 STRICT). 구조·패턴은 `conventions/spring.md`. Spring Initializr 산출물로 시작(webmvc, validation, actuator, flyway + DB 드라이버) — **Initializr에 접근할 수 없으면 `~/.claude/jyp/scaffolds/templates/build.gradle`을 복사**하고 버전을 Maven Central 최신 GA로 갱신한다(기억으로 쓰지 않는다 — 학습 데이터 기본값이 Boot 3.x다). `config/checkstyle/checkstyle.xml`은 템플릿 `checkstyle.xml`, `config/header.txt`(파일 헤더 주석)도 함께. **데이터 접근 의존성은 체크리스트 24 선택에 따른다**: JdbcClient=`spring-boot-starter-jdbc`(별도 ORM 없음) / JPA=`spring-boot-starter-data-jpa`(+ QueryDSL 포크 `io.github.openfeign.querydsl`) / MyBatis=`mybatis-spring-boot-starter`(⚠ Boot 대응 버전 — 4.0.x↔4.0, 4.1.x↔4.1). **Gradle wrapper jar 확보 필수**(Initializr 산출물, 또는 로컬 Gradle로 `gradle wrapper --gradle-version 9.x`, 둘 다 없으면 spring.md 0절 컨테이너 방식) + `git update-index --chmod=+x gradlew`(Windows 실행 비트 유실 — spring.md 0절). 마이그레이션: **Flyway**(`spring.flyway.enabled=false` + 별도 단계). 테스트: **JUnit Jupiter(Boot 4 관리) + `@MockitoBean`**, `./gradlew test` + **패키지 순환 검사 `ArchitectureTest`(ArchUnit — spring.md 7절)**. **자동 강제: Spotless + Checkstyle을 `check`에 연결**(템플릿에 포함) |
+| Spring Boot 서버 | **Java 25(LTS) + Spring Boot 4.x + Gradle 9.x — Boot 3.x로 시작하지 않는다**(spring.md 0절 STRICT). 구조·패턴은 `conventions/spring.md`. Spring Initializr 산출물로 시작(webmvc, validation, actuator, flyway + DB 드라이버) — **Initializr에 접근할 수 없으면 `~/.claude/jyp/scaffolds/templates/build.gradle`을 복사**하고 버전을 Maven Central 최신 GA로 갱신한다(기억으로 쓰지 않는다 — 학습 데이터 기본값이 Boot 3.x다). `config/checkstyle/checkstyle.xml`은 템플릿 `checkstyle.xml`, `config/header.txt`(파일 헤더 주석), `gradle/osv-lock.gradle`(취약점 검사용 — 템플릿 `osv-lock.gradle`, ops.md 5-1절)도 함께. **데이터 접근 의존성은 체크리스트 24 선택에 따른다**: JdbcClient=`spring-boot-starter-jdbc`(별도 ORM 없음) / JPA=`spring-boot-starter-data-jpa`(+ QueryDSL 포크 `io.github.openfeign.querydsl`) / MyBatis=`mybatis-spring-boot-starter`(⚠ Boot 대응 버전 — 4.0.x↔4.0, 4.1.x↔4.1). **Gradle wrapper jar 확보 필수**(Initializr 산출물, 또는 로컬 Gradle로 `gradle wrapper --gradle-version 9.x`, 둘 다 없으면 spring.md 0절 컨테이너 방식) + `git update-index --chmod=+x gradlew`(Windows 실행 비트 유실 — spring.md 0절). 마이그레이션: **Flyway**(`spring.flyway.enabled=false` + 별도 단계). 테스트: **JUnit Jupiter(Boot 4 관리) + `@MockitoBean`**, `./gradlew test` + **패키지 순환 검사 `ArchitectureTest`(ArchUnit — spring.md 7절)**. **자동 강제: Spotless + Checkstyle을 `check`에 연결**(템플릿에 포함) |
 | React/Next.js | **언어는 체크리스트 1에서 확인** — TS면 Vite `react-ts` 템플릿 / Next.js `create-next-app --typescript` + `strict: true` 고정, JS면 Vite `react` 템플릿 / `create-next-app`(TS 미지정). **CLI 산출물 위에 얹은 뒤 데모 잔재를 정리한다**: ⚠ 최신 Vite 템플릿(create-vite 9.x, 2026-10-19 확인)은 **린트가 oxlint(`"lint": "oxlint"`)이고 TypeScript가 `~7.0`이다** — `oxlint` 의존성을 지우고 `lint` 스크립트를 ESLint로 바꾸며(린트 절), **TS는 `~6.0.3`으로 내린다**(TS 7이면 ESLint 설치가 ERESOLVE). 데모 App/CSS/로고 에셋 제거, `index.html`의 `<title>`·메타를 프로젝트명으로 치환, favicon 결정. 스타일링: **Tailwind + shadcn/ui — `design.md` 8절 셋업 레시피의 체크리스트 전 항목 수행**(JS 프로젝트면 `components.json`의 `tsx: false` 포함). 테스트: **Vitest + Testing Library** — ⚠ Vite 템플릿에는 test 스크립트가 없다: 의존성 설치 + `"test": "vitest run --passWithNoTests"` 등록까지 해야 CI `npm test`가 깨지지 않는다 |
 | 기타 | 해당 언어 커뮤니티의 표준 레이아웃을 조사해서 따르고, CLAUDE.md/docs/는 항상 추가. 테스트 도구는 해당 언어 표준 채택 |
 
@@ -251,9 +252,9 @@ BACKUP_KEEP_DAYS=30
 # 백업 파일 소유자 = 배포 계정 (id -u / id -g) — 다른 호스트로 복사하는 계정
 BACKUP_UID=1000
 BACKUP_GID=1000
-```
 # 디스크 사용률 기준(%) — 백업 실행 때 재서 넘으면 DISK_CHECK 실패 → 배치 감시 빨간불 (ops.md 8절)
 DISK_ALERT_PCT=85
+```
 
 ### .github/workflows/test.yml
 GitHub 원격 저장소를 쓰는 프로젝트에 생성 (사내 전용/무원격이면 생략하고 사용자에게 고지). **job은 스택별로 구성한다** — 모노레포는 디렉토리별 job, 이종 스택(예: React + Spring)이면 툴체인도 job마다 다르다:
@@ -322,7 +323,7 @@ jobs:
 
 ### .github/workflows/release.yml
 
-배포 태그(`v*`) push 시 이미지를 빌드해 ghcr.io로 push한다 — 서버는 pull만 (docker.md 5절 배포 절차의 2단계):
+배포 태그(`v*`) push 시 이미지를 빌드해 ghcr.io로 push한다 — 서버는 pull만 (docker.md 5절 배포 절차의 2단계). **push 전에 취약점 검사(아래 audit.yml)를 통과해야 한다**:
 
 ```yaml
 name: release
@@ -330,7 +331,10 @@ on:
   push:
     tags: ['v*']
 jobs:
+  audit:
+    uses: ./.github/workflows/audit.yml   # high 이상 취약점이 있으면 이미지를 만들지 않는다 (ops.md 5-1절)
   build-push:
+    needs: audit
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -351,6 +355,61 @@ jobs:
 
 - 단일 구조는 이미지 하나로 축소 (`docker build .`). deploy override의 `image:`는 같은 ghcr 경로를 참조한다.
 - 서버 최초 셋업 시 `docker login ghcr.io`(`read:packages` 토큰) 1회 — 토큰 보관은 ops.md 1절 시크릿 규칙.
+
+### .github/workflows/audit.yml
+
+운영에 실리는 의존성의 알려진 취약점 검사 — **release가 호출해 high 이상(CVSS 7.0+)이면 배포를 막고, 주 1회 예약 실행으로 배포가 없어도 알린다** (ops.md 5-1절). 정의는 이 파일 하나다:
+
+```yaml
+# 의존성 취약점 검사 (ops.md 5-1절) — release.yml이 이미지 push 전에 호출 + 주 1회 예약 + 수동
+# PR·push마다 돌리지 않는다 — 결과가 코드가 아니라 새 취약점 공개에 달려 있어, 무관한 PR이 빨개진다
+name: audit
+on:
+  workflow_call:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 0 * * 1'      # 매주 월 09:23 KST — 예약 실행은 기본 브랜치 기준, 실패 알림은 이 cron을 마지막으로 고친 사람에게
+jobs:
+  audit-client:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: client } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      # 운영에 실리는 의존성만(--omit=dev) — 빌드 도구(vite·eslint)의 취약점은 Dependabot 알림으로 받는다
+      - run: npm audit --omit=dev --audit-level=high
+
+  audit-server:               # Spring 서버 — Node 서버면 audit-client와 같은 형태로 working-directory만 server
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: server } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 25
+      # osv-scanner는 build.gradle을 읽지 못한다 — 실제 해석된 운영 의존성(전이 포함)을 잠금 파일로 적어서 넘긴다
+      - run: |
+          chmod +x gradlew
+          ./gradlew -q -I gradle/osv-lock.gradle dependencies --configuration runtimeClasspath --write-locks --no-daemon
+      - run: |
+          curl -sSfL -o "$RUNNER_TEMP/osv-scanner" https://github.com/google/osv-scanner/releases/download/v2.7.0/osv-scanner_linux_amd64
+          chmod +x "$RUNNER_TEMP/osv-scanner"
+          rc=0
+          "$RUNNER_TEMP/osv-scanner" scan source -L gradle.lockfile --format json > "$RUNNER_TEMP/osv.json" || rc=$?
+          [ "$rc" -le 1 ] || exit "$rc"   # 0 없음 · 1 있음 — 그 밖(128 잠금 파일 없음 등)은 도구 오류로 실패
+          # osv-scanner에는 등급 기준 옵션이 없다 — 결과의 max_severity(CVSS)로 high 이상만 거른다. 등급 미상은 경고만
+          jq -r '.results[]?.packages[]? | .package as $p | .groups[] | [($p.name + "@" + $p.version), (.max_severity // ""), (.ids | join(","))] | @tsv' \
+            "$RUNNER_TEMP/osv.json" > "$RUNNER_TEMP/found.tsv"
+          awk -F'\t' '$2 == "" { print "::warning::등급 미상 " $1 " " $3 }' "$RUNNER_TEMP/found.tsv"
+          awk -F'\t' '$2 != "" && $2 + 0 >= 7.0 { print "::error::" $1 " CVSS " $2 " " $3; bad = 1 } END { exit bad }' "$RUNNER_TEMP/found.tsv"
+```
+
+- 단일 구조 프로젝트는 `working-directory`를 지우고 스택에 맞는 job 하나만 남긴다.
+- `server/gradle/osv-lock.gradle`은 `~/.claude/jyp/scaffolds/templates/osv-lock.gradle`을 복사한다 — 로컬 검사(ops.md 5-1절)도 같은 파일을 쓴다.
+- 실패하면: 고칠 수 있는 버전이 나와 있으면 올린다(Spring은 Boot 관리 버전 덮어쓰기 — `build.gradle` 템플릿의 예), 아직 없으면 영향 여부를 판단해 사유를 CLAUDE.md에 적는다. 막힌 배포를 풀려고 검사를 끄지 않는다.
 
 ### .github/dependabot.yml
 

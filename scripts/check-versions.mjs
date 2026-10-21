@@ -10,6 +10,8 @@
 //   --gradle-version X                       → Gradle 최신
 //   npm i -D 패키지@X                         → npm 최신 메이저
 //   node-version / java-version / JavaLanguageVersion.of(N) → Node·Java 최신 LTS
+//   github.com/owner/repo/releases/download/vX.Y.Z/ → GitHub 태그의 최신 정식 (CI가 받는 도구 — osv-scanner)
+//   ext['X.version'] = 'V' (Boot 관리 버전 덮어쓰기) → Boot가 V 이상을 관리하게 되면 "덮어쓰기 삭제"
 // LTS·지원 종료 정보는 endoflife.date의 원본 데이터(GitHub 저장소)를 읽는다 — API 도메인이 막힌 환경에서도 같은 결과.
 //
 // 일부러 최신이 아닌 값(호환성 고정)은 "고정 사유"를 조회해 비교한다 — 사유가 사라지면 다시 빨간불이 켜진다:
@@ -86,13 +88,15 @@ const gradleLatest = async () => (await get('https://services.gradle.org/version
 
 // GitHub 태그는 git으로 읽는다 — API 토큰·호출 한도와 무관
 const tagCache = new Map();
-function githubLatestMajor(name) {
+function githubTags(name) {
   if (!tagCache.has(name)) {
     const out = execFileSync('git', ['ls-remote', '--tags', `https://github.com/${name}.git`], { encoding: 'utf8' });
-    tagCache.set(name, Math.max(...[...out.matchAll(/refs\/tags\/v(\d+)\.\d+\.\d+$/gm)].map((m) => Number(m[1]))));
+    tagCache.set(name, [...out.matchAll(/refs\/tags\/v(\d+\.\d+\.\d+)$/gm)].map((m) => m[1]));
   }
   return tagCache.get(name);
 }
+const githubLatestMajor = (name) => Math.max(...githubTags(name).map(major));
+const githubLatestRelease = (name) => `v${newest(githubTags(name))}`;
 
 // endoflife.date 원본: products/<제품>.md 앞머리의 releases 목록 (releaseCycle·lts·eol 등)
 async function releases(product) {
@@ -157,6 +161,12 @@ const RULES = {
   },
   node: async () => latestLts('nodejs'),
   java: async () => latestLts('eclipse-temurin'),
+  release: async (name) => githubLatestRelease(name),
+  // 보안 패치 덮어쓰기는 Boot가 따라잡으면 지운다 — 남겨 두면 다음 Boot 갱신 때 더 새 버전을 낮은 버전으로 끌어내린다
+  'boot-override': async (name, cur) => {
+    const managed = await bootManaged(name);
+    return cmp(managed, cur) >= 0 ? `덮어쓰기 삭제 (Boot 관리 버전 ${managed})` : cur;
+  },
 };
 
 // ── 고정값 찾기 ───────────────────────────────────────────────────────────
@@ -171,6 +181,8 @@ const PATTERNS = [                            // [종류, 정규식, 이름 그�
   ['gradle', /--gradle-version\s+(\d+(?:\.\d+)+)(?![\w.])/g, false],   // '9.x' 같은 서술은 제외
   ['node', /node-version:\s*'?(\d+)/g, false],
   ['java', /java-version:\s*'?(\d+)|JavaLanguageVersion\.of\((\d+)\)/g, false],
+  ['release', /github\.com\/([\w.-]+\/[\w.-]+)\/releases\/download\/(v\d+\.\d+\.\d+)\//g, true],
+  ['boot-override', /ext\['([\w.-]+\.version)'\]\s*=\s*'([^']+)'/g, true],
 ];
 
 function* walk(rel) {

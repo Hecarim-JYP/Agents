@@ -58,29 +58,30 @@
 
 ### 5-1. 의존성 취약점·갱신 (MANDATORY, 2026-10-21 확정)
 
-- **최신 프레임워크를 써도 전이 의존성은 취약할 수 있다.** 실측(2026-10-21, OSV 데이터): 템플릿 그대로 Spring Boot 4.1.1(현행 최신) + `spring-boot-starter-webmvc`만 둔 프로젝트에서 **알려진 취약점 10건(Critical 3)** — Boot가 관리하는 Tomcat 11.0.24(인증 우회 등 — 11.0.25에서 수정)와 Jackson 3.1.5. Boot의 다음 패치를 기다리지 않고 **Boot 관리 버전 프로퍼티를 덮어써** 올린다 → 재검사 0건:
-
-```groovy
-// 보안 패치만 Boot 관리 버전 위로 올린다 — Boot가 이 버전 이상을 관리하게 되면 지운다 (사유: 취약점 ID를 적는다)
-ext['tomcat.version'] = '11.0.27'
-ext['jackson-bom.version'] = '3.1.8'
-```
+- **최신 프레임워크를 써도 전이 의존성은 취약할 수 있다.** 실측(2026-10-21, OSV 데이터): 템플릿 그대로 Spring Boot 4.1.1(현행 최신)로 만든 프로젝트의 운영 의존성에 **알려진 취약점 10건(Critical 3)** — Boot가 관리하는 Tomcat 11.0.24(인증 우회 등 — 11.0.25에서 수정)와 Jackson 3.1.5. Boot의 다음 패치를 기다리지 않고 **Boot 관리 버전 프로퍼티를 덮어써** 올린다 → 재검사 0건, `./gradlew check`·기동·JSON 직렬화 정상. 덮어쓰기는 `build.gradle` 템플릿에 취약점 ID와 함께 들어 있다.
+  - 덮어쓰기는 **Boot가 따라잡으면 지운다** — 남겨 두면 다음 Boot 갱신 때 더 새 버전을 낮은 버전으로 끌어내린다. 템플릿은 `check-versions.mjs`가 "덮어쓰기 삭제"로 알리고, 생성된 프로젝트는 Boot를 올릴 때 확인한다.
+- **검사는 도구로 강제한다 (STRICT, 2026-10-21 확정)** — 스캐폴드의 `audit.yml`(scaffolds/default.md CI 절)을 release가 이미지 push 전에 호출해 **운영에 실리는 의존성에 high 이상(CVSS 7.0+)이 있으면 배포를 막는다**. 같은 파일이 주 1회 예약으로 돌아 배포가 없어도 알린다. PR·push마다 돌리지 않는다 — 새 취약점 공개 하나로 무관한 PR이 빨개진다.
+  - 실측 (act — 템플릿 그대로 넣은 표본): 운영 의존성 lodash 4.17.20 + 덮어쓰기를 뺀 Spring → 두 job 실패, 이미지 push 0건. 깨끗한 표본 → push까지 성공. 개발 의존성에만 있는 취약점은 통과(`--omit=dev`), 중간 등급(CVSS 5.3·5.6)은 막지 않고, 잠금 파일이 없으면 도구 오류로 실패한다.
+  - 막혔을 때: 고친 버전이 있으면 올린다. 없으면 영향 여부를 판단해 사유를 CLAUDE.md에 적고 사용자에게 알린다 — 검사를 끄거나 건너뛰지 않는다.
 
 | 원격 저장소 | 감지 | 갱신 |
 |---|---|---|
-| GitHub (체크리스트 16 기본) | 저장소 설정에서 **Dependabot alerts·security updates**를 켠다. **Gradle은 Dependency graph의 "Automatic dependency submission"도 켠다** — GitHub는 Gradle을 정적으로 분석하지 않아, 이것이 없으면 위 Tomcat 같은 전이 의존성이 알림 대상이 아니다 (GitHub 문서 원문, 2026-10-20 판) | `.github/dependabot.yml`(스캐폴드) — 주 1회, 메이저가 아닌 갱신은 PR 하나로 묶는다 |
-| 없음 (사내 전용) | **배포 준비 때 + 배포가 없어도 월 1회**: npm은 `npm audit --audit-level=high`, Gradle은 아래 osv-scanner | 수동 |
+| GitHub (체크리스트 16 기본) | `audit.yml`(배포 차단 + 주 1회) + 저장소 설정의 **Dependabot alerts·security updates**. **Gradle은 Dependency graph의 "Automatic dependency submission"도 켠다** — GitHub는 Gradle을 정적으로 분석하지 않아, 이것이 없으면 위 Tomcat 같은 전이 의존성이 알림 대상이 아니다 (GitHub 문서 원문, 2026-10-20 판) | `.github/dependabot.yml`(스캐폴드) — 주 1회, 메이저가 아닌 갱신은 PR 하나로 묶는다 |
+| 없음 (사내 전용) | **배포 준비 때 + 배포가 없어도 월 1회**: 아래 명령 — `audit.yml`과 같은 판정 | 수동 |
 
 ```bash
-# Gradle — 빌드 설정은 그대로 두고 검사할 때만 잠금 파일을 만든다 (server/에서)
-./gradlew -q -I $HOME/.claude/jyp/scaffolds/templates/osv-lock.gradle dependencies --write-locks
-osv-scanner scan source -r .     # 잠금 파일이 없으면 "No package sources found" — build.gradle만으로는 검사되지 않는다 (실측)
-rm gradle.lockfile               # 잠금을 켜지 않은 빌드는 이 파일을 무시하지만(실측) 커밋하지 않는다
+# npm (client/, Node 서버면 server/에서) — 운영 의존성만
+npm audit --omit=dev --audit-level=high
+# Gradle (server/에서) — 빌드 설정은 그대로 두고 검사할 때만 잠금 파일을 만든다
+./gradlew -q -I gradle/osv-lock.gradle dependencies --configuration runtimeClasspath --write-locks
+osv-scanner scan source -L gradle.lockfile   # 잠금 파일 없이 build.gradle만으로는 "No package sources found" (실측)
+rm gradle.lockfile                           # 잠금을 켜지 않은 빌드는 이 파일을 무시하지만(실측) 커밋하지 않는다
 ```
 
-- osv-scanner: Google의 오픈소스 검사 도구(단일 실행 파일, GitHub 릴리스). npm의 `package-lock.json`도 읽는다 — 실측에서 `npm audit`과 같은 취약점(lodash 4.17.20)을 찾았다.
+- osv-scanner: Google의 오픈소스 검사 도구(단일 실행 파일, GitHub 릴리스 — `audit.yml`이 받는 버전은 `check-versions.mjs`가 추적한다). 등급 기준 옵션이 없어 `audit.yml`은 결과의 CVSS로 high 이상을 거른다. npm의 `package-lock.json`도 읽는다 — 실측에서 `npm audit`과 같은 취약점(lodash 4.17.20)을 찾았다.
+- `server/gradle/osv-lock.gradle`은 스캐폴드가 템플릿에서 복사한다 — CI와 로컬이 같은 파일을 쓴다.
 - Docker 이미지는 Dependabot 대상에서 뺀다 — 메이저(DB는 마이너) 태그 고정 + 재빌드로 베이스 이미지 패치를 받고(docker.md 2절), 메이저 전환은 LTS 정책 결정(general.md 8-1절)이라 자동 PR로 받지 않는다.
-- ⚠ 미검증: Dependabot·자동 의존성 제출의 실제 동작은 GitHub 저장소에서만 확인된다. 첫 GitHub 프로젝트에서 알림·PR이 오는지 확인하고 이 표시를 지운다.
+- ⚠ 미검증: Dependabot·자동 의존성 제출의 실제 동작, `audit.yml`의 온라인 조회(api.osv.dev — 이 저장소의 검증 환경에서는 막혀 있어 같은 판정을 오프라인 DB로 확인했다)는 GitHub 저장소에서만 확인된다. 첫 GitHub 프로젝트에서 확인하고 이 표시를 지운다.
 
 ## 6. 백업
 
