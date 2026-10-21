@@ -49,6 +49,7 @@ Claude Code의 규칙·컨벤션·스킬·훅을 버전 관리하는 저장소. 
 - **백업 스크립트**(`backup.sh`·compose `backup` 서비스): 바꾸면 템플릿 그대로 조립한 프로젝트에서 백업 → 복원(체크섬 대조)과 실패 경로(DB 비밀번호 오류·기록 테이블 없음·디스크 기준 초과·디스크 가득 참)의 종료 코드를 확인한다
 - **취약점 검사 템플릿**(`audit.yml`·`osv-lock.gradle`·`build.gradle`의 보안 패치 덮어쓰기): 바꾸면 act로 표본 프로젝트에 돌려 **취약한 대조군은 실패하고 release가 push하지 않는지 + 깨끗한 쪽은 push까지 가는지** 둘 다 확인한다
 - **운영 감시 엔드포인트**(batch.md 3-1절 코드·프록시 템플릿의 `/api/ops/` 제한): 바꾸면 두 스택을 실제 DB에 붙여 판정 시나리오(기록 없음·오래됨·마지막 실패·실행 중 멈춤·정상·outbox)와, 외부 대역에서 우회 경로(대소문자·이중 슬래시·인코딩)까지 403인지 확인한다
+- **템플릿 취약점 검사**(`template-audit.mjs`·`template-audit.yml`): 템플릿 `build.gradle`·audit.yml 템플릿을 바꾸면 push 때 자동 실행된다 — 대조군(알려진 취약 의존성)이 검출되는지까지 본다
 - **PowerShell 스크립트**(`*.ps1`): 이 환경에 5.1이 없으면 push 후 `verify-windows.yml`(Windows 러너의 5.1 — 인코딩·install 결과의 install.sh 대조·verify-templates.ps1) 결과로 확인한다 — push·PR마다 자동 실행된다(약 30초)
 - **훅**: 깨진 코드로 exit 2(검출), 정상 코드로 exit 0(오탐 없음)을 각각 확인. 훅에 stdin으로 넣는 JSON은 **BOM 없이** 만든다(BOM이면 파싱 실패로 조용히 통과한다)
 - 스택별 규칙(Dockerfile·빌드·헬스체크)을 바꾸면 그 스택을 실제로 기동해 확인한다

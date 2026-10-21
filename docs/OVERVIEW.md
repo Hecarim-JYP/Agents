@@ -1,6 +1,6 @@
 # JYP Agents 전체 기능 통합 가이드
 
-> 최종 수정: 2026-10-21 | 버전: 1.14 | 대상 독자: 이 저장소를 처음 보는 개발자, 그리고 전체 구조를 한눈에 복기하려는 관리자(박진영)
+> 최종 수정: 2026-10-21 | 버전: 1.15 | 대상 독자: 이 저장소를 처음 보는 개발자, 그리고 전체 구조를 한눈에 복기하려는 관리자(박진영)
 
 ## 1. 개요
 
@@ -56,8 +56,8 @@ Agents/
 ├── templates/         # 문서 템플릿 8종 (doc-claude용 6 + 개발용 2)
 ├── hooks/             # 자동 검증 훅 스크립트 2종 (post-edit-check, stop-test)
 ├── docs/              # 저장소 자체 문서 (이 파일)
-├── scripts/           # 검증·설치 보조 (check-refs, check-versions, verify-templates(ps1/sh), register-hooks)
-├── .github/workflows/ # CI — push/PR마다 check-refs, 주 1회 check-versions, push/PR마다 Windows PowerShell 5.1 검증(verify-windows)
+├── scripts/           # 검증·설치 보조 (check-refs, check-versions, template-audit, verify-templates(ps1/sh), register-hooks)
+├── .github/workflows/ # CI — push/PR마다 check-refs, 주 1회 check-versions, push/PR마다 Windows PowerShell 5.1 검증(verify-windows), 주 1회·관련 변경 시 템플릿 취약점 검사(template-audit)
 ├── install.ps1        # Windows 설치 스크립트
 ├── install.sh         # Mac/Linux 설치 스크립트
 ├── CLAUDE.md          # 이 저장소를 고칠 때의 규칙 (수정 사이클·SSOT·인코딩·검증)
