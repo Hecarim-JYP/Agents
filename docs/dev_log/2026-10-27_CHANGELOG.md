@@ -217,3 +217,27 @@ install은 `~/.claude`만 갱신한다 — 프로젝트에 복사해 둔 템플�
 | 실제 ESLint 10.13 (예전 템플릿 Node 서버 표본) | 예전 템플릿 설정 → 적용 예정(`no-undef: scripts/migrate.mjs` + B2가 만들 파일 3개) / Vite식 설정(`npx eslint scripts/migrate.mjs` exit 0) → 해당 없음 / `.mjs`에 규칙이 걸리는 비템플릿 설정(exit 1) → [수동] + 파일 목록 |
 | 회귀 — 예전 템플릿 Node 서버에 적용 | `npm run lint` 통과, `npm test` 2회 22개 통과(vitest 설정 `.env` 경로 `../.env`) |
 | check-refs · check-rules-sync | 통과 |
+
+## 8. 서버 ESLint SQL 보간 규칙 교체 + 템플릿 자기 시험 (fix) — 사용자 보고(기존 프로젝트에서 오탐 대량 발생)
+
+| 문제 | 증상 | 수정 |
+|---|---|---|
+| 이전 선택자가 "첫 조각에 SQL 문장 단어 + `${}` 하나라도"를 잡았다 | 기존 프로젝트 실측 **81건, 실제 위반 0** — 코드에 고정된 조건절 조각(`${cond ? 'AND k = :k' : ''}`)·자리표시 목록(`IN (:id_0, …)`)·숫자 LIMIT·로그·화면 주소까지. 기준선으로 남으면 진짜 위반이 묻힌다 | 서버 템플릿 2종(JS·TS): **요청 값(`params`·`queryParams`·`body`·`query`의 속성, `req.*.x`)을 SQL 문자열에 직접 끼운 경우만** 잡는다. SQL 단어는 모든 글자 조각에서, 절 단어(AND·LIKE·ORDER BY…)까지, 대문자만(sql.md 1절) |
+| 같은 선택자의 빈틈 | `${}`가 SQL 단어보다 앞인 문자열, 조건절 조각에 넣은 값(`q += \` AND name LIKE '%${params.keyword}%'\``)을 놓쳤다 | 위 선택자가 둘 다 잡는다. 메시지에 "컬럼·정렬 방향은 허용 목록에서" 추가 — `ORDER BY ${params.sort}`는 바인딩할 수 없어 "바인딩으로"만으로는 고칠 방법이 안 보였다 |
+| **(자기 시험에서 발견)** JS 클라이언트 템플릿이 `.jsx` 사이 순환을 못 잡았다 | `import-x`는 `import-x/extensions`(기본 `.js`·`.mjs`·`.cjs`)에 없는 의존 파일을 읽지 않는다 — `A.jsx` ↔ `B.jsx` 순환 0건, `.js` ↔ `.jsx`는 한쪽만. 오류 없이 꺼져 있었다(2026-10-19 TS `no-cycle` 무력과 같은 유형) | `eslint.config.client-js.mjs` settings에 `'import-x/extensions': ['.js', '.jsx', '.mjs']` |
+
+- **템플릿 자기 시험** `scripts/test-eslint-templates.mjs` (신규) — 템플릿 4종을 실제 ESLint로 돌려 규칙마다 위반은 걸리고 정상은 **어떤 규칙에도** 안 걸리는지 본다(사례 88개 — 템플릿마다: SQL 위험 9·안전 9·알려진 한계 2·스크립트 예외, 환경변수 폴백·console.error·순환·`.mjs` Node 전역·any, 클라이언트 7개 규칙). 설치 패키지는 템플릿 머리 주석의 `npm i -D` 줄에서 읽어 설치 안내 자체도 검증한다. 템플릿마다 eslint CLI를 따로 띄운다 — 한 프로세스에서 TS 설정 둘을 불러오면 typescript-eslint가 `tsconfigRootDir` 후보가 여럿이라며 파싱을 거부한다(시험 방식 문제)
+- CI `eslint-templates.yml` (신규) — 템플릿·검사 스크립트가 바뀔 때 + 주 1회. 버전 미고정 패키지를 설치하므로 push마다 돌리지 않는다(check-versions와 같은 이유)
+- `/project-upgrade`: **B3** SQL 보간 규칙 — 이전 선택자가 템플릿 원문일 때만 템플릿 블록으로 교체, 새 메시지가 있으면(프로젝트가 직접 고친 규칙 포함) 이미 적용, 주변 형태가 다르면 [수동], `no-restricted-syntax` 끄기 주석이 있으면 [참고](ESLint의 `Unused eslint-disable directive` 경고가 지울 곳을 가리킨다). **B4** `.jsx` 순환 — `.jsx`가 있고 템플릿 형태면 설정 추가. 블록은 설치된 템플릿에서 읽는다(SSOT). SKILL.md: [수동]·검증(새로 잡힌 위반은 원래 있던 문제 — 고치지 말고 보고)·커밋 분할에 B3·B4
+- 문서: sql.md 7절 — 바인딩할 수 없는 식별자는 코드의 허용 목록에서, 고정 조각 끼우기는 조립이 아님, 린트의 한계(지역 변수·소문자 SQL·요청 키 컬럼)는 리뷰. default.md·korean-search.md 표현을 "SQL에 요청 값 직접 보간 금지"로. CLAUDE.md ESLint 템플릿 검증 항목에 자기 시험과 "규칙을 바꾸면 사례를 넣는다"
+- 시험 하네스 `commitAll`이 바뀐 것이 없어도 실패하지 않게(`--allow-empty`) — 대조군 실행이 중간에 죽었다
+
+### 검증
+
+| 확인 | 결과 |
+|---|---|
+| 보고서의 사례 10개 + 추가 9개 (JS·TS 템플릿, ESLint 10.13·typescript-eslint 8.72) | 현재 선택자: 위험 10개 중 8개(`${}`가 앞인 것·조건절 조각 누락), 안전 9개 중 7개 오탐 → **수정 후: 위험 10/10, 오탐 0**. 보고서에서 미실행이던 TS 템플릿도 같다. 한계 사례(지역 변수·소문자)는 잡지 않음 — 주석의 ⚠와 일치 |
+| `test-eslint-templates.mjs` | 88항목 통과. **대조군**: 변경 전 템플릿은 38건 실패(SQL 오탐·누락 + `.jsx` 순환) |
+| `test-upgrade.mjs` | 43항목 통과(신규 10: B3 JS·TS 적용 뒤 파일 전체가 현재 템플릿과 같음, 끄기 주석 [참고], 재실행 이미 적용, 직접 고친 규칙 유지, 형태 다름 [수동], B4 적용·재실행·`.jsx` 없음). **대조군**: B3·B4 없는 스크립트는 신규 9건 실패 |
+| 실제 표본(예전 템플릿 서버·JS 클라이언트, 실 ESLint) | 적용 전: 서버 1건(실제 위반), 클라이언트 `.jsx` 순환 **0건**. 적용 후: 서버 실제 위반 1건 + 이전 오탐용 끄기 주석에 `Unused eslint-disable directive` 경고, 클라이언트 순환 2건. 재실행 모두 이미 적용·변경 없음 |
+| check-refs · check-rules-sync · test-hooks · install.sh 설치본 대조 | 통과 · 동일 |
