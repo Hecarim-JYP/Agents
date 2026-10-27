@@ -159,3 +159,31 @@ Vitest는 테스트 파일을 워커(프로세스)마다 병렬로 돌린다(기
 | 대조군 — DB 테스트 잠금 제거 / `cyc.a` ↔ `cyc.b` 순환 | `dbTestsHoldTestDbLock() FAILED` / `noCycles() FAILED`, 되돌리면 `check` 통과 |
 | `check-versions` | 고정값 86건, 낡음 0건 |
 | 의존성 취약점 (OSV) | 이 환경에서는 OSV API가 프록시에 막혀(403) CI로 확인 — `template-audit` run 8 통과(spring-boot 4.1.2·jackson-databind 3.1.8로 해석된 운영 의존성 70개, 알려진 취약점 없음), 대조군(log4j-core 2.14.1) 검출 정상 |
+
+---
+
+## 5. 기존 프로젝트 업그레이드 명령 `/project-upgrade` (feat)
+
+### 5-1. 배경
+
+install은 `~/.claude`만 갱신한다 — 프로젝트에 복사해 둔 템플릿(build.gradle·eslint 설정 등)은 그대로 남아, 1~4부의 개선이 기존 프로젝트에는 들어가지 않는다. 이관 목록을 사람이 손으로 옮기는 대신 명령 하나로 한다.
+
+### 5-2. 구성
+
+- `skills/project-upgrade/upgrade.mjs` — 단계마다 "해당 여부 → 이미 적용 → 적용"을 판정(멱등). 기본은 미리보기, `--apply`로 적용(**git 작업 트리가 깨끗해야 한다** — 업그레이드 변경과 기존 미커밋 변경이 섞이지 않게). 템플릿 코드는 설치 경로의 템플릿·spring.md에서 읽는다(사본 없음). CRLF·BOM 보존
+  - 2026-10-27 묶음: A lint 스크립트 형태 확인 / B1 ESLint `.mjs` Node 전역(JS·TS) / B2 워커별 테스트 DB(파일 3개·`.env(.example)`의 `TEST_DB_HOST`·compose·CI·`TEST_DB_*` 직접 읽는 코드 점검) / C1 Boot 4.1.2(Tomcat 덮어쓰기와 근거 주석 정리·CLAUDE.md 운영 정보) / C2 테스트 병렬(build.gradle·ArchitectureTest 교체 또는 덧붙이기·DB 테스트에 `@ResourceLock`)
+  - 판단이 필요한 것은 [수동]: 같은 컨트롤러 `@WebMvcTest` 합치기, 기존 vitest 설정과 합치기, CI env, lint 스크립트 단순화
+- `skills/project-upgrade/SKILL.md` — 미리보기 → 적용 → [수동] 처리 → 검증(`gradlew spotlessApply`·`check` 2회 / `npm run lint`·`npm test` 2회) → 단계별 커밋 제안
+- `scripts/test-upgrade.mjs` + CI(verify.yml `test-upgrade`, verify-windows 스텝) — 예전 템플릿 형태 표본 20항목
+- 저장소 CLAUDE.md: 기존 프로젝트에도 필요한 변경이면 이 스크립트에 날짜 묶음 단계를 추가한다(MANDATORY), 검증 항목 추가. OVERVIEW·README·install 안내에 명령 추가
+
+### 5-3. 검증
+
+| 확인 | 결과 |
+|---|---|
+| 예전 템플릿(2498847)으로 만든 Spring 프로젝트 | 미리보기: 적용 예정 5 · 수동 1(같은 컨트롤러 `@WebMvcTest`), 파일 변경 없음 → 적용 → 수동 처리 → `spotlessApply` + `check` **2회 통과**(DB 테스트끼리 직렬·나머지 병렬). build.gradle은 머리 주석 외에 현재 템플릿과 같음. 재실행: 전부 이미 적용 |
+| 사용자 규칙이 있는 ArchitectureTest | 기존 규칙 2개 유지 + 병렬 규칙 2개 덧붙임(쓰는 import만) → `check` 통과(테스트 4개) |
+| 예전 템플릿 Node 서버(Express·테스트 DB) | 적용 전 공유 DB 22개 중 18개 실패 → 적용(+ CI env 수동 처리) → `npm run lint` 통과(예전 ESLint 템플릿은 `scripts/migrate.mjs`조차 `no-undef` 12건), `npm test` **2회 22개 통과**, 재실행: 전부 이미 적용 |
+| 작업 트리에 미추적 파일 | `--apply` 거부(exit 2) — 실제로 표본 안에 로그를 만들었다가 걸렸다 |
+| 설치본(`$HOME/.claude/skills/project-upgrade/upgrade.mjs`, 설치 경로 템플릿) | 문서의 명령 그대로 동작 |
+| `test-upgrade.mjs` 20항목 | 통과. 대조군(Tomcat 삭제 단계를 끈 스크립트) → 2건 실패로 검출 |
