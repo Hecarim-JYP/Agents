@@ -138,3 +138,24 @@ Vitest는 테스트 파일을 워커(프로세스)마다 병렬로 돌린다(기
 - Windows에서 globalSetup의 `npm run migrate` 실행(`shell: true`)은 이 환경에서 확인하지 못했다 — **미검증**
 - 기존 프로젝트에는 install로 반영되지 않는다(템플릿) — 파일 3개 복사 + `.env`에 `TEST_DB_HOST` + ESLint 설정의 `.mjs` 대상 추가
 - (무관) `check-versions`: Spring Boot 4.1.2 출시로 템플릿 4.1.1이 낡음 1건 — 다음 주 정기 실행이 실패한다
+
+---
+
+## 4. Spring Boot 4.1.1 → 4.1.2 (chore)
+
+- 계기: `check-versions` — `org.springframework.boot 4.1.1 → 4.1.2` (외부 출시, 다음 주 정기 실행이 실패할 항목)
+- Boot 4.1.2가 관리하는 버전 (Maven Central BOM): Tomcat 11.0.24 → **11.0.27**, Jackson 3.1.5 → **3.1.7**, Flyway 12.4.0(그대로), JUnit Jupiter 6.0.3(그대로)
+- 변경
+  - 템플릿 `build.gradle`: 플러그인 4.1.2, **Tomcat 덮어쓰기 삭제** — Boot가 같은 11.0.27을 관리(`check-versions` "덮어쓰기 삭제"). Jackson 덮어쓰기 3.1.8은 유지(Boot 3.1.7 < 3.1.8 — 템플릿 규칙: Boot가 이 값 이상을 관리하면 지운다)
+  - 현재 고정값 서술만 갱신: build.gradle 머리 주석, spring.md 0·7절("Boot 4.1.2 실빌드 검증"), deploy compose의 Flyway 주석. 날짜가 붙은 과거 실측 기록(4.1.1)은 그대로 둔다
+- 검증 (Java 25, 템플릿 그대로 + spring.md ArchitectureTest 코드 + 병렬 규칙 표본)
+
+| 확인 | 결과 |
+|---|---|
+| `./gradlew check bootJar` | 통과 (테스트 클래스 9개) — 첫 시도는 Maven Central 429(요청 과다)로 의존성 내려받기 실패, 재시도 통과 |
+| 실제 해석 버전 (`dependencyInsight`) | spring-boot 4.1.2 · tomcat-embed-core 11.0.27 · jackson-databind 3.1.8 |
+| jar 기동 | `/actuator/health` → `UP` |
+| 병렬 실행 | DB 테스트끼리 겹치지 않고 나머지와 겹침 (결과 XML 시작 시각) |
+| 대조군 — DB 테스트 잠금 제거 / `cyc.a` ↔ `cyc.b` 순환 | `dbTestsHoldTestDbLock() FAILED` / `noCycles() FAILED`, 되돌리면 `check` 통과 |
+| `check-versions` | 고정값 86건, 낡음 0건 |
+| 의존성 취약점 (OSV) | 이 환경에서는 OSV API가 프록시에 막혀(403) 확인 불가 — push 후 `template-audit`(CI)로 확인 |
