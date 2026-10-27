@@ -120,7 +120,7 @@ const template = (name) => readFileSync(path.join(TEMPLATES, name), 'utf8').repl
 const findFile = (d, name) => [...new Set([d, REPO])].map((x) => path.join(x, name)).find((p) => load(p) !== null) ?? null;
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════
-// 2026-10-27 묶음 (변경 이력 docs/dev_log/2026-10-27_CHANGELOG.md 1~4부·8부)
+// 2026-10-27 묶음 (변경 이력 docs/dev_log/2026-10-27_CHANGELOG.md 1~4부·8~9부)
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 
 // A. lint 스크립트 — 편집 훅은 단일 eslint 호출(경로 외 옵션은 --max-warnings만)일 때만 편집한 파일만 lint한다
@@ -283,28 +283,40 @@ for (const d of nodePkgs) {
 const reindent = (m, indent) => m[0].split('\n').map((l) => (l.startsWith(m[1]) ? indent + l.slice(m[1].length) : l)).join('\n');
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+// 서버 eslint 설정의 no-restricted-syntax 규칙 블록("// <절> …" 주석 + selector + message)을 템플릿 블록으로 바꾼다 — B3·B5 공용.
+// 이전 선택자 줄이 템플릿 원문 그대로일 때만 바꾼다. 새 블록의 표지(mark)가 있으면 — 프로젝트가 직접 고친 규칙 포함 — 건드리지 않는다.
+// 반환: 바꿨으면 true
+function upgradeRuleBlock(step, d, { section, oldSelector, mark, done }) {
+  if (!isNodeServer(d)) { report(step, 'skip', 'Node 서버가 아니다 (서버 프레임워크 의존성 없음)'); return false; }
+  const file = eslintFile(d);
+  if (!file) { report(step, 'skip', 'eslint 설정 없음'); return false; }
+  const text = load(file);
+  if (text.includes(mark)) { report(step, 'done', rel(file)); return false; }
+  const comment = escapeRe(`// ${section}`);
+  const old = text.match(new RegExp(String.raw`^([ \t]*)${comment}[^\n]*\n(?:[ \t]*//[^\n]*\n)*[ \t]*${escapeRe(oldSelector)}\n[ \t]*message: '[^\n]*\n`, 'm'));
+  if (!old) {
+    if (text.includes(oldSelector)) report(step, 'manual', `${rel(file)} — 이전 선택자가 있지만 주석·메시지 형태가 템플릿과 달라 자동으로 못 바꾼다 — 템플릿 eslint.config.server(-js).mjs의 ${section} 블록으로 교체`);
+    else report(step, 'skip', `${rel(file)} — 템플릿의 이 규칙이 없다 (프로젝트가 바꾼 규칙이면 그대로 둔다)`);
+    return false;
+  }
+  // JS·TS 서버 템플릿의 규칙 블록은 같다 (scripts/test-eslint-templates.mjs가 둘 다 확인). 블록은 주석부터 첫 message 줄까지
+  const fresh = template('eslint.config.server-js.mjs').match(new RegExp(String.raw`^([ \t]*)${comment}[^\n]*\n[\s\S]*?^[ \t]*message: [^\n]*\n`, 'm'));
+  save(file, text.replace(old[0], () => reindent(fresh, old[1])));   // 함수로 넘긴다 — 문자열이면 블록 안의 $' 같은 치환 패턴이 해석된다
+  report(step, 'apply', `${rel(file)} — ${done}`);
+  return true;
+}
+
 // B3. ESLint 서버 설정 — SQL 보간 규칙을 "요청 값을 SQL에 직접 끼운 경우"로 (sql.md 7절, 변경 이력 8부)
 // 이전 선택자는 코드에 고정된 조건절 조각·자리표시 목록까지 잡아 정상 코드가 끄기 주석으로 쌓였고, `${}`가 SQL 단어보다 앞인 문자열·
-// 조건절 조각에 넣은 값은 놓쳤다. 템플릿 원문일 때만 바꾼다 — 새 메시지가 있으면(프로젝트가 직접 고친 규칙 포함) 건드리지 않는다
+// 조건절 조각에 넣은 값은 놓쳤다
 const OLD_SQL_SELECTOR = String.raw`selector: "TemplateLiteral[expressions.length>0][quasis.0.value.raw=/\\b(select|insert|update|delete)\\b/i]",`;
-const SQL_RULE_MARK = 'SQL에 요청 값 직접 보간 금지';
 for (const d of nodePkgs) {
   const step = `B3 ESLint SQL 보간 규칙 (${rel(d)})`;
-  if (!isNodeServer(d)) { report(step, 'skip', 'Node 서버가 아니다 (서버 프레임워크 의존성 없음)'); continue; }
-  const file = eslintFile(d);
-  if (!file) { report(step, 'skip', 'eslint 설정 없음'); continue; }
-  const text = load(file);
-  if (text.includes(SQL_RULE_MARK)) { report(step, 'done', rel(file)); continue; }
-  const old = text.match(new RegExp(String.raw`^([ \t]*)// sql\.md 7절[^\n]*\n(?:[ \t]*//[^\n]*\n)*[ \t]*${escapeRe(OLD_SQL_SELECTOR)}\n[ \t]*message: '[^\n]*\n`, 'm'));
-  if (!old) {
-    if (text.includes(OLD_SQL_SELECTOR)) report(step, 'manual', `${rel(file)} — 이전 SQL 선택자가 있지만 주석·메시지 형태가 템플릿과 달라 자동으로 못 바꾼다 — 템플릿 eslint.config.server(-js).mjs의 sql.md 7절 블록으로 교체`);
-    else report(step, 'skip', `${rel(file)} — 템플릿의 SQL 보간 규칙이 없다 (프로젝트가 바꾼 규칙이면 그대로 둔다)`);
-    continue;
-  }
-  // JS·TS 서버 템플릿의 규칙 블록은 같다 (scripts/test-eslint-templates.mjs가 둘 다 확인)
-  const fresh = template('eslint.config.server-js.mjs').match(/^([ \t]*)\/\/ sql\.md 7절[^\n]*\n[\s\S]*?^[ \t]*message: 'SQL에 요청 값 직접 보간 금지[^\n]*\n/m);
-  save(file, text.replace(old[0], () => reindent(fresh, old[1])));   // 함수로 넘긴다 — 문자열이면 블록 안의 $' 같은 치환 패턴이 해석된다
-  report(step, 'apply', `${rel(file)} — 요청 값(params.x·body.x·req.*.x)을 SQL에 직접 끼운 경우만 잡는 선택자로 교체. lint가 새로 잡는 것은 실제 보간이다`);
+  const applied = upgradeRuleBlock(step, d, {
+    section: 'sql.md 7절', oldSelector: OLD_SQL_SELECTOR, mark: 'SQL에 요청 값 직접 보간 금지',
+    done: '요청 값(params.x·body.x·req.*.x)을 SQL에 직접 끼운 경우만 잡는 선택자로 교체. lint가 새로 잡는 것은 실제 보간이다',
+  });
+  if (!applied) continue;
   // 이전 규칙의 오탐을 끈 주석은 이제 필요 없을 수 있다 — ESLint가 'Unused eslint-disable directive' 경고로 정확히 가리킨다
   const disabled = walk(d, (n) => /\.(c|m)?[jt]sx?$/.test(n)).filter((f) => /eslint-disable[^\n]*no-restricted-syntax/.test(load(f)));
   if (disabled.length) report(step, 'note', `no-restricted-syntax 끄기 주석이 있는 파일 ${disabled.length}개 — npm run lint의 'Unused eslint-disable directive' 경고가 가리키는 것은 지운다`);
@@ -327,6 +339,16 @@ for (const d of nodePkgs) {
   const fresh = template('eslint.config.client-js.mjs').match(/^([ \t]*)\/\/ import-x는 이 목록[^\n]*\n[ \t]*'import-x\/extensions'[^\n]*\n/m);
   save(file, text.replace(at[0], () => reindent(fresh, at[1]) + at[0]));
   report(step, 'apply', `${rel(file)} — settings에 'import-x/extensions' (.jsx 포함). lint가 새로 잡는 순환은 실제 순환이다`);
+}
+
+// B5. ESLint 서버 설정 — 환경변수 폴백 규칙이 변환을 거친 폴백·구조 분해 기본값도 잡게 (patterns.md 4절, 변경 이력 9부)
+// 이전 선택자는 process.env.X || 값 · ?? 값만 잡아 Number(process.env.X) || 50000 · const { PORT = 3000 } = process.env가 오류 없이 통과했다
+const OLD_ENV_SELECTOR = String.raw`selector: "LogicalExpression[operator=/^(\\|\\||\\?\\?)$/][left.object.object.name='process'][left.object.property.name='env']",`;
+for (const d of nodePkgs) {
+  upgradeRuleBlock(`B5 ESLint 환경변수 폴백 규칙 (${rel(d)})`, d, {
+    section: 'patterns.md 4절', oldSelector: OLD_ENV_SELECTOR, mark: '> ObjectPattern > Property > AssignmentPattern',
+    done: '변환을 거친 폴백(Number(process.env.X) || 값)·구조 분해 기본값도 잡는 선택자로 교체. lint가 새로 잡는 것은 실제 폴백이다',
+  });
 }
 
 // C1. Spring Boot 4.1.1 → 4.1.2 — Boot가 Tomcat 11.0.27을 관리하게 돼 Tomcat 덮어쓰기를 지운다 (Jackson 3.1.8 덮어쓰기는 유지)

@@ -136,6 +136,13 @@ const OLD_SQL_BLOCK = [
   '',
 ].join('\n');
 const oldSql = (n) => tplText(n).replace(/^ *\/\/ sql\.md 7절[^\n]*\n[\s\S]*?^ *message: 'SQL에 요청 값 직접 보간 금지[^\n]*\n/m, () => OLD_SQL_BLOCK);
+const OLD_ENV_BLOCK = [
+  '          // patterns.md 4절 — 시크릿·내부 주소에 하드코딩 폴백 금지 (미설정이면 기동 실패로 드러나야 한다)',
+  String.raw`          selector: "LogicalExpression[operator=/^(\\|\\||\\?\\?)$/][left.object.object.name='process'][left.object.property.name='env']",`,
+  "          message: '환경변수에 하드코딩 폴백 금지 — 미설정이면 기동 실패로 즉시 드러나게 한다 (patterns.md 4절).',",
+  '',
+].join('\n');
+const oldEnv = (text) => text.replace(/^ *\/\/ patterns\.md 4절[^\n]*\n[\s\S]*?^ *message: [^\n]*\n/m, () => OLD_ENV_BLOCK);
 const oldJsx = () => tplText('eslint.config.client-js.mjs').replace(/^ *\/\/ import-x는 이 목록[^\n]*\n *'import-x\/extensions'[^\n]*\n/m, '');
 const CLIENT_PKG = JSON.stringify({ name: 'client', scripts: { lint: 'eslint .' }, dependencies: { react: '^19.0.0' } });
 
@@ -237,8 +244,8 @@ try {
   r = run(s3);
   check('no-undef가 나고 템플릿 형태면 적용 예정 + 원인 파일 표시', /\[적용 예정\] B1 [^\n]*'\*\*\/\*\.js' → '\*\*\/\*\.\{js,mjs\}' \(no-undef: server\/scripts\/migrate\.mjs/.test(r.out), r.out);
 
-  console.log('ESLint 규칙 교체 — B3 SQL 보간 · B4 .jsx 순환');
-  check('표본 전제: 이전 템플릿 형태가 현재 템플릿과 다르다', oldSql('eslint.config.server-js.mjs') !== tplText('eslint.config.server-js.mjs') && oldJsx() !== tplText('eslint.config.client-js.mjs'));
+  console.log('ESLint 규칙 교체 — B3 SQL 보간 · B4 .jsx 순환 · B5 환경변수 폴백');
+  check('표본 전제: 이전 템플릿 형태가 현재 템플릿과 다르다', oldSql('eslint.config.server-js.mjs') !== tplText('eslint.config.server-js.mjs') && oldEnv(tplText('eslint.config.server-js.mjs')) !== tplText('eslint.config.server-js.mjs') && oldJsx() !== tplText('eslint.config.client-js.mjs'));
   const b3 = project('b3-js', {
     'server/package.json': NODE_JS['server/package.json'],
     'server/eslint.config.mjs': oldSql('eslint.config.server-js.mjs'),
@@ -253,6 +260,14 @@ try {
   const b3t = project('b3-ts', { 'server/package.json': NODE_JS['server/package.json'], 'server/eslint.config.mjs': oldSql('eslint.config.server.mjs') });
   r = run(b3t, '--apply');
   check('이전 SQL 선택자(TS) → 현재 템플릿과 같다', read(b3t, 'server/eslint.config.mjs') === tplText('eslint.config.server.mjs'), r.out);
+  for (const [name, f] of [['b5-js', 'eslint.config.server-js.mjs'], ['b5-ts', 'eslint.config.server.mjs']]) {
+    const b5 = project(name, { 'server/package.json': NODE_JS['server/package.json'], 'server/eslint.config.mjs': oldEnv(oldSql(f)) });
+    r = run(b5, '--apply');
+    check(`이전 SQL·환경변수 선택자 둘 다(${f}) → B3·B5 적용 뒤 현재 템플릿과 같다`, read(b5, 'server/eslint.config.mjs') === tplText(f) && /\[적용\] B5 /.test(r.out), r.out);
+    commitAll(b5);
+    r = run(b5);
+    check(`재실행 → B5 이미 적용 (${f})`, /\[이미 적용\] B5 /.test(r.out) && clean(b5), r.out);
+  }
   const custom = project('b3-custom', {
     'server/package.json': NODE_JS['server/package.json'],
     'server/eslint.config.mjs': oldSql('eslint.config.server-js.mjs').replace(OLD_SQL_BLOCK, () => "          // 프로젝트가 고친 규칙\n          selector: 'TemplateLiteral > MemberExpression[object.name=\"queryParams\"]',\n          message: 'SQL에 요청 값 직접 보간 금지 — 프로젝트 문구',\n"),
@@ -261,7 +276,7 @@ try {
   check('프로젝트가 직접 고친 규칙(새 메시지)은 되돌리지 않음 → 이미 적용', /\[이미 적용\] B3 /.test(r.out) && clean(custom), r.out);
   const odd = project('b3-odd', { 'server/package.json': NODE_JS['server/package.json'], 'server/eslint.config.mjs': oldSql('eslint.config.server-js.mjs').replace('// sql.md 7절 — 문자열 연결로 쿼리를 조립하지 않는다 (인젝션)', '// 인젝션 방지') });
   r = run(odd);
-  check('이전 선택자는 있는데 주변 형태가 다르면 [수동]', /\[수동\] B3 [^\n]*이전 SQL 선택자가 있지만/.test(r.out), r.out);
+  check('이전 선택자는 있는데 주변 형태가 다르면 [수동]', /\[수동\] B3 [^\n]*이전 선택자가 있지만/.test(r.out), r.out);
   const b4 = project('b4', { 'client/package.json': CLIENT_PKG, 'client/eslint.config.mjs': oldJsx(), 'client/src/App.jsx': 'export const App = () => null;\n' });
   r = run(b4, '--apply');
   check('.jsx가 있는 JS 클라이언트 → import-x/extensions 추가 (현재 템플릿과 같다)', read(b4, 'client/eslint.config.mjs') === tplText('eslint.config.client-js.mjs') && /\[적용\] B4 /.test(r.out), r.out);
