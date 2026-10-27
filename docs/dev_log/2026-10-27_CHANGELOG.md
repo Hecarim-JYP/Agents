@@ -204,15 +204,16 @@ install은 `~/.claude`만 갱신한다 — 프로젝트에 복사해 둔 템플�
 | 1 | 하위 프로젝트를 고정 이름(`server/`·`client/`·루트)으로만 찾았다 | 하위 폴더 이름이 다른 저장소(예: `*-server/`·`*-web/`)의 루트에서 exit 2. 하위 폴더를 인자로 주면 그 폴더를 루트로 써서 CLAUDE.md·`.github`·compose를 하위에서 찾아 **조용히 "해당 없음"**이 됐다 | 저장소 루트 = `git rev-parse --show-toplevel`(저장소 단위 파일은 항상 여기서). 하위 프로젝트 = 시작 폴더와 그 한 단계 아래의 `package.json`·`build.gradle` 폴더 전부. `.env(.example)`은 프로젝트 폴더 → 저장소 루트 순, vitest 설정의 `.env` 경로는 실제 위치에서 계산. compose는 루트의 `docker-compose*.yml` 전부 |
 | 2 | eslint 설정에 `globals.node` 글자가 있으면 Node 서버로 봤다 | 설정 파일에만 Node 전역을 주는 Vite React 클라이언트가 서버로 오판돼 B1 [수동]이 남고, 다시 돌려도 없어지지 않았다(없애려면 의미 없는 설정 변경뿐) | 서버 판정은 의존성으로만(express·fastify·koa·@nestjs/core·@hapi/hapi). **B1은 증상 기반** — 프로젝트의 ESLint를 실제로 돌려 `.mjs`(B2가 만들 파일은 `--stdin`으로 미리)에서 `no-undef`가 나는지로 판정. 안 나면 "해당 없음", 나면 템플릿 형태일 때 적용·아니면 [수동] + 파일 목록. ESLint를 못 돌리면(미설치·설정 로드 실패) 기존처럼 템플릿 형태로 판정 |
 
-- 함께 고친 것: BOM 처리 정규식에 보이지 않는 U+FEFF 문자가 그대로 들어가 있던 것을 `﻿` 이스케이프로. `.env`가 프로젝트 폴더에 있을 때 상대 경로가 `./.env`가 아니라 `.env`로 계산되던 것(보강한 시험이 검출 — 동작은 같았지만 템플릿 표기와 달랐다)
+- 함께 고친 것: BOM 처리 정규식에 보이지 않는 U+FEFF 문자가 그대로 들어가 있던 것을 `\uFEFF` 이스케이프로. `.env`가 프로젝트 폴더에 있을 때 상대 경로가 `./.env`가 아니라 `.env`로 계산되던 것(보강한 시험이 검출 — 동작은 같았지만 템플릿 표기와 달랐다)
 - SKILL.md 1단계: 저장소 루트에서 실행, 폴더 이름과 무관하게 탐색, 저장소 단위 파일은 루트 기준
+- **push 후 Windows CI에서 추가 결함 발견·수정**: 시작 경로는 8.3 짧은 이름(`RUNNER~1`)인데 `git rev-parse --show-toplevel`은 긴 이름을 돌려줘, 저장소 기준 상대 경로가 `../../../../RUNNER~1/...`로 어긋났다(`verify-windows` 8건 실패 — Linux CI는 통과). macOS의 `/var` → `/private/var` 링크에서도 같다. 시작 경로·저장소 루트를 둘 다 `realpathSync.native`로 정규화(`.native`만 Windows 짧은 이름을 펼친다). 시험: 링크(Windows는 junction) 경로로 실행 — 수정 전 스크립트는 Linux에서도 같은 증상으로 실패(대조군)
 
 ### 검증
 
 | 확인 | 결과 |
 |---|---|
 | 보고된 구조 재현(`lims-server/`=Express·eslint 없음, `lims-dev/`=Vite React·설정 파일에만 Node 전역, 루트 CLAUDE.md) | 수정 전: 루트 exit 2 / 인자 우회 시 클라이언트 B1 [수동]. 수정 후: **루트에서 인자 없이 exit 0**, 두 하위 프로젝트 모두 표에(A 해당 없음·이미 적용, B1·B2 해당 없음), [수동] 0건, 2회 실행 결과 동일, 파일 변경 없음 — 보고서의 기대 결과와 같다 |
-| `test-upgrade.mjs` | 32항목 통과(기존 20 + 신규 12: 위 구조, 하위 폴더 Spring의 루트 CLAUDE.md 갱신(루트·인자 둘 다), 프로젝트 폴더 `.env`, 루트 테스트 DB + 클라이언트, B1 증상 판정 3종). **대조군**: 수정 전 스크립트는 신규 10건 실패 |
+| `test-upgrade.mjs` | 33항목 통과(기존 20 + 신규 13: 링크 경로 실행, 위 구조, 하위 폴더 Spring의 루트 CLAUDE.md 갱신(루트·인자 둘 다), 프로젝트 폴더 `.env`, 루트 테스트 DB + 클라이언트, B1 증상 판정 3종). **대조군**: 수정 전 스크립트는 신규 10건 실패 |
 | 실제 ESLint 10.13 (예전 템플릿 Node 서버 표본) | 예전 템플릿 설정 → 적용 예정(`no-undef: scripts/migrate.mjs` + B2가 만들 파일 3개) / Vite식 설정(`npx eslint scripts/migrate.mjs` exit 0) → 해당 없음 / `.mjs`에 규칙이 걸리는 비템플릿 설정(exit 1) → [수동] + 파일 목록 |
 | 회귀 — 예전 템플릿 Node 서버에 적용 | `npm run lint` 통과, `npm test` 2회 22개 통과(vitest 설정 `.env` 경로 `../.env`) |
 | check-refs · check-rules-sync | 통과 |
