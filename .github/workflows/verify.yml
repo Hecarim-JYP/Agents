@@ -39,6 +39,17 @@ jobs:
           node-version: '24'
       - run: node scripts/test-hooks.mjs   # 의존성 없음 — ESLint는 가짜 패키지로 대신한다 (약 20초)
 
+  # 기존 프로젝트 업그레이드(/project-upgrade) — 예전 템플릿 형태 표본에 적용해 판정·적용·멱등성을 본다
+  test-upgrade:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - run: node scripts/test-upgrade.mjs
+
   # push마다 돌리지 않는다 — 결과가 코드가 아니라 외부 배포 상황에 달려 있어, 새 릴리스 하나로 무관한 push가 빨개진다
   check-versions:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'

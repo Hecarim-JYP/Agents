@@ -75,3 +75,7 @@ jobs:
       - name: installed hooks (after install.ps1)
         shell: powershell
         run: node scripts/test-hooks.mjs "$env:USERPROFILE\.claude\hooks"
+
+      # 5) 기존 프로젝트 업그레이드 — Windows 작업 트리의 CRLF·경로 구분자에서 같은 결과인지
+      - name: project upgrade script (CRLF, paths)
+        run: node scripts/test-upgrade.mjs
