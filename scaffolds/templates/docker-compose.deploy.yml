@@ -66,7 +66,7 @@ services:
     logging: *default-logging
     profiles: ["tools"]                 # 기본 up 대상에서 제외 — 명시적으로만 실행
     image: flyway/flyway:12             # JVM/Flyway 프로젝트 — 10은 MariaDB 11.4를 "지원 검증 안 된 버전"으로 경고(최신 지원 11.2), 12는 경고 없음 (2026-10-19 실측)
-                                        # 13이 최신(2026-10-21: 13.10.3)이지만 Spring Boot 4.1.1이 관리하는 Flyway가 12.4.0이라 같은 메이저로 맞춘다 — Boot가 13으로 올리면 함께
+                                        # 13이 최신(2026-10-21: 13.10.3)이지만 Spring Boot 4.1.2가 관리하는 Flyway가 12.4.0이라(4.1.1과 같음, 2026-10-27 확인) 같은 메이저로 맞춘다 — Boot가 13으로 올리면 함께
     command: >
       -url=jdbc:mariadb://db:3306/${DB_NAME}
       -user=${DB_USER} -password=${DB_PASSWORD}
