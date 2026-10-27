@@ -89,3 +89,52 @@ Spring 템플릿에 병렬 설정이 없어 Gradle·JUnit 기본값(테스트 JV
 - **기존 Spring 프로젝트에는 install로 반영되지 않는다** — 템플릿이라 새 프로젝트에만 적용된다. 기존 프로젝트는 build.gradle 3줄 + ArchitectureTest 두 테스트 + DB 테스트 잠금을 직접 옮긴다
 - Node(Vitest)도 파일 단위 병렬이 기본이라, 테스트 DB를 쓰는 테스트 파일끼리 같은 문제가 생길 수 있다 — 이번 범위 밖(확인·규칙 미정)
 - 테스트 JVM 힙 기본값 512MB — 컨텍스트가 많은 프로젝트에서 부족하면 `maxHeapSize`(build.gradle 주석에 안내)
+
+---
+
+## 3. Node(Vitest) 테스트 — 워커마다 테스트 DB (feat)
+
+### 3-1. 문제 (재현)
+
+Vitest는 테스트 파일을 워커(프로세스)마다 병렬로 돌린다(기본값). 테스트 DB 하나를 공유하면 파일마다 하는 데이터 초기화가 다른 파일의 데이터를 지운다 — Vitest 5.0.5·MariaDB 11.4, 같은 테이블을 초기화·삽입하는 파일 6개: **18개 중 16~17개 실패**(`expected 3 to be 2`, 3회).
+
+### 3-2. 방법 비교 (DB 테스트 파일 6 + 단위 테스트 파일 4, 4코어)
+
+| 방법 | 결과 | 소요 |
+|---|---|---|
+| 현재 (공유) | 16~17건 실패 | 5.5초 |
+| A. `fileParallelism: false` | 통과 | 12.5초 |
+| B. DB 테스트만 직렬 (`*.db.test.*` + projects) | 통과 — 이름을 빠뜨리면 다시 깨지고 린트로 못 잡는다 | 10.1초 |
+| **C. 워커마다 테스트 DB (채택)** | **통과** | **5.6~6.2초** |
+
+### 3-3. 변경
+
+- 템플릿 3종 신설 (`scaffolds/templates/`) — Express 서버 + 테스트 DB 사용(체크리스트 21-a)일 때 복사
+  - `vitest.config.server.mjs` → `server/vitest.config.mjs`: `pool: 'forks'`, globalSetup·setupFiles 연결, 저장소 루트 `.env`를 `process.loadEnvFile`로 읽음(이미 있는 환경변수가 우선 — 실측)
+  - `vitest-test-db.global.mjs` → `server/test/setup/test-db.global.mjs`: 워커 수(`maxWorkers`)만큼 `{TEST_DB_NAME}_{n}` 생성(있으면 유지)·권한(root = `TEST_DB_PASSWORD`) → 프로젝트의 `npm run migrate`를 DB마다(미적용분만). `TEST_DB_*`가 하나라도 없으면 실패
+  - `vitest-test-db.worker.mjs` → `server/test/setup/test-db.worker.mjs`: 테스트 파일마다 앱의 `DB_*`를 `{TEST_DB_NAME}_{VITEST_POOL_ID}`로 덮어씀 — 앱 코드는 운영과 같은 `DB_*`만 읽는다
+  - ⚠ Vitest 5(Vite 모듈 러너)는 globalSetup 안의 오류 스택을 소스맵으로 바꾸다 스스로 실패한다 — mysql2 접속 오류는 catch 전에 `code.charCodeAt is not a function`으로 죽고, 던진 오류는 "No test files found"만 남겼다. 설정 동안 `Error.prepareStackTrace`를 끄고 원인을 `[test-db]`로 먼저 찍는다
+- **ESLint 서버 템플릿 결함 수정**: Node 전역(`process`·`console`)이 `**/*.js`(TS는 `**/*.ts`)에만 있어 `.mjs`가 `no-undef`로 실패했다(TS 템플릿 대조군 16건). JS 템플릿은 대상을 `**/*.{js,mjs}`로(사용자 정의 규칙도 `.mjs`에 적용), TS 템플릿은 `**/*.{js,mjs}`에 Node 전역 블록 추가
+- `.env.example`에 `TEST_DB_HOST=127.0.0.1`(환경변수 폴백 금지 규칙 — 템플릿이 기본값을 두지 않는다. CI env에는 이미 있음)
+- 문서: testing.md 0절(규칙 STRICT 2026-10-27 — Node·Spring 방식 차이와 실측), default.md(Express 생성 절차·test.yml 안내 — `MARIADB_ROOT_PASSWORD` = `TEST_DB_PASSWORD`), express.md 7절(앱은 `DB_*`만, 테스트 분기 금지), dev-rules 금지 항목명, OVERVIEW 템플릿 인덱스
+
+### 3-4. 검증 (스캐폴드와 같은 구조 — 루트 `.env`·`migrations/`, `server/`에 앱·러너·테스트)
+
+| 확인 | 결과 |
+|---|---|
+| 대조군: 공유 테스트 DB | 22개 중 16~17개 실패 (2회) |
+| 템플릿 적용 | 3회 모두 22개 통과, 5.9~6.2초. 워커 DB 3개 생성, 각 `schema_migrations`에 2건(재실행해도 중복 없음), 개발 DB 이름(`probe_dev`)으로는 아무것도 만들지 않음 |
+| CI형 (`.env` 없이 job env만) | 통과 |
+| 환경변수 우선순위 (`.env` 비밀번호 틀림 + env 정상) | 통과 — env 우선 / 대조: `.env`만 틀리면 실패 |
+| `--maxWorkers=2` · `--no-file-parallelism` | 통과 |
+| 실패 경로 — 설정 없음 · `TEST_DB_HOST` 없음 · 비밀번호 틀림 · DB 미기동 · 마이그레이션 SQL 오류 | 모두 exit 1 + `[test-db] 테스트 DB 준비 실패: …` 한 줄로 원인 (마이그레이션은 러너 출력 포함) |
+| ESLint — JS 서버 템플릿, `eslint .` (템플릿 3종 + 앱·러너·테스트) | 통과. `.mjs`의 폴백·`console.error` 한 줄 위반 검출. 기존 `.js` 동작(파일 400개 통과·순환 검출) 유지 |
+| ESLint — TS 서버 템플릿 | 수정 전 `no-undef` 16건(대조군) → 수정 후 통과, `.ts` 위반 검출 유지 |
+| 종료 훅(설치본) | 정상 → exit 0(6초) / 실패 테스트 → exit 2 + `행 수가_맞다` |
+| check-refs · check-rules-sync · verify-templates.sh | 통과 |
+
+### 3-5. 남은 것
+
+- Windows에서 globalSetup의 `npm run migrate` 실행(`shell: true`)은 이 환경에서 확인하지 못했다 — **미검증**
+- 기존 프로젝트에는 install로 반영되지 않는다(템플릿) — 파일 3개 복사 + `.env`에 `TEST_DB_HOST` + ESLint 설정의 `.mjs` 대상 추가
+- (무관) `check-versions`: Spring Boot 4.1.2 출시로 템플릿 4.1.1이 낡음 1건 — 다음 주 정기 실행이 실패한다
