@@ -158,4 +158,4 @@ Vitest는 테스트 파일을 워커(프로세스)마다 병렬로 돌린다(기
 | 병렬 실행 | DB 테스트끼리 겹치지 않고 나머지와 겹침 (결과 XML 시작 시각) |
 | 대조군 — DB 테스트 잠금 제거 / `cyc.a` ↔ `cyc.b` 순환 | `dbTestsHoldTestDbLock() FAILED` / `noCycles() FAILED`, 되돌리면 `check` 통과 |
 | `check-versions` | 고정값 86건, 낡음 0건 |
-| 의존성 취약점 (OSV) | 이 환경에서는 OSV API가 프록시에 막혀(403) 확인 불가 — push 후 `template-audit`(CI)로 확인 |
+| 의존성 취약점 (OSV) | 이 환경에서는 OSV API가 프록시에 막혀(403) CI로 확인 — `template-audit` run 8 통과(spring-boot 4.1.2·jackson-databind 3.1.8로 해석된 운영 의존성 70개, 알려진 취약점 없음), 대조군(log4j-core 2.14.1) 검출 정상 |
