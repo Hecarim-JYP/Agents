@@ -24,6 +24,8 @@ export default [
     },
     // import-x/no-cycle이 확장자 없는 경로·jsconfig paths 별칭(@/)까지 따라가게 한다 (2026-10-21 실측)
     settings: {
+      // import-x는 이 목록(기본 .js·.mjs·.cjs)에 없는 의존 파일을 읽지 않는다 — 빠지면 .jsx 컴포넌트 사이 순환을 오류 없이 놓친다 (2026-10-27 실측)
+      'import-x/extensions': ['.js', '.jsx', '.mjs'],
       'import-x/resolver-next': [createTypeScriptImportResolver(), createNodeResolver({ extensions: ['.js', '.jsx', '.mjs'] })],
     },
     plugins: { 'react-hooks': reactHooks, 'import-x': importX },
