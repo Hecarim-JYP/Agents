@@ -4,14 +4,15 @@
 // 정해진 변경만 한다 — 판단이 필요한 것(같은 컨트롤러 @WebMvcTest 합치기, 기존 vitest 설정과 합치기 등)은 [수동]으로 보고한다.
 // 템플릿 코드는 설치 경로(~/.claude/jyp)의 템플릿·spring.md에서 읽는다 — 이 파일에 코드 사본을 두지 않는다(SSOT).
 //
-// 사용법: 프로젝트 루트에서
+// 사용법: 저장소 루트에서 (하위 프로젝트 폴더 이름은 가리지 않는다 — 루트와 그 한 단계 아래를 모두 찾는다)
 //   node "$HOME/.claude/skills/project-upgrade/upgrade.mjs"           미리보기 (파일을 바꾸지 않는다)
 //   node "$HOME/.claude/skills/project-upgrade/upgrade.mjs" --apply   적용 — git 작업 트리가 깨끗해야 한다 (--force로 무시)
-//   그 밖의 인자: [프로젝트 경로]  --jyp <설치 경로 대신 읽을 저장소 경로(시험용)>
+//   그 밖의 인자: [시작 폴더 — 그 폴더와 한 단계 아래만 대상으로. 저장소 단위 파일은 여전히 저장소 루트에서 찾는다]
+//                 --jyp <설치 경로 대신 읽을 저장소 경로(시험용)>
 // 종료 코드: 0 수동 항목 없음 / 1 수동 항목 있음 / 2 실행할 수 없음 (작업 트리 더러움·설치 경로 없음·프로젝트 아님)
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -20,8 +21,14 @@ const APPLY = args.includes('--apply');
 const FORCE = args.includes('--force');
 const jypArg = args.indexOf('--jyp');
 const JYP = path.resolve(jypArg >= 0 ? args[jypArg + 1] : path.join(os.homedir(), '.claude', 'jyp'));
-const ROOT = path.resolve(args.find((a, i) => !a.startsWith('--') && (jypArg < 0 || i !== jypArg + 1)) ?? '.');
+const START = path.resolve(args.find((a, i) => !a.startsWith('--') && (jypArg < 0 || i !== jypArg + 1)) ?? '.');
 const TEMPLATES = path.join(JYP, 'scaffolds', 'templates');
+// 저장소 루트 — 저장소 단위 파일(CLAUDE.md·.github·docker-compose*)은 항상 여기서 찾는다
+// (2026-10-27 결함: 인자로 준 하위 폴더를 루트로 써서, 그 아래에서 CLAUDE.md·.github를 찾다가 "해당 없음"처럼 조용히 빠졌다)
+let REPO = START;
+try {
+  REPO = path.resolve(execFileSync('git', ['-C', START, 'rev-parse', '--show-toplevel'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim());
+} catch { /* git 저장소가 아니다 — 시작 폴더를 루트로 본다 (--apply는 --force일 때만) */ }
 
 // ── 파일 읽기·쓰기: 바꿀 내용을 메모리에 모았다가 --apply일 때만 쓴다 (미리보기와 적용이 같은 계산을 거친다) ──
 // 줄바꿈 보존 — Windows 작업 트리는 CRLF일 수 있다. 안에서는 LF로 다루고, 쓸 때 원래 줄바꿈(과 BOM)으로 되돌린다
@@ -31,9 +38,9 @@ function load(file) {
     if (!existsSync(file)) return null;
     const raw = readFileSync(file, 'utf8');
     files.set(file, {
-      text: raw.replace(/^﻿/, '').replace(/\r\n/g, '\n'),
+      text: raw.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n'),
       eol: raw.includes('\r\n') ? '\r\n' : '\n',
-      bom: raw.startsWith('﻿') ? '﻿' : '',
+      bom: raw.startsWith('\uFEFF') ? '\uFEFF' : '',
       changed: false,
       created: false,
     });
@@ -44,17 +51,19 @@ function save(file, text) {
   const f = files.get(file) ?? { eol: '\n', bom: '', created: true };
   files.set(file, { ...f, text, changed: true });
 }
-const rel = (p) => path.relative(ROOT, p).split(path.sep).join('/') || '.';
+const rel = (p) => path.relative(REPO, p).split(path.sep).join('/') || '.';
 const readJson = (file) => { try { return JSON.parse(load(file)); } catch { return null; } };
 const cmp = (a, b) => {
   const x = a.split('.').map(Number), y = b.split('.').map(Number);
   for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) - (y[i] ?? 0);
   return 0;
 };
+// 탐색에서 빼는 폴더 — 의존성·빌드 산출물·숨김 폴더
+const skipDir = (name) => name === 'node_modules' || name === 'build' || name === 'dist' || name.startsWith('.');
 function walk(dir, pred, out = []) {
   if (!existsSync(dir)) return out;
   for (const name of readdirSync(dir).sort()) {   // 정렬 — 디렉터리 목록 순서는 OS마다 달라 보고 순서가 흔들린다
-    if (name === 'node_modules' || name === 'build' || name.startsWith('.')) continue;
+    if (skipDir(name)) continue;
     const p = path.join(dir, name);
     if (statSync(p).isDirectory()) walk(p, pred, out);
     else if (pred(name)) out.push(p);
@@ -75,7 +84,7 @@ if (!existsSync(TEMPLATES)) {
 if (APPLY && !FORCE) {
   // 바꾼 내용을 git diff로 보고 되돌릴 수 있어야 한다 — 미커밋 변경과 섞이면 둘 다 구분이 안 된다
   let status;
-  try { status = execFileSync('git', ['-C', ROOT, 'status', '--porcelain'], { encoding: 'utf8' }); } catch {
+  try { status = execFileSync('git', ['-C', REPO, 'status', '--porcelain'], { encoding: 'utf8' }); } catch {
     console.log('git 저장소가 아니다 — 되돌릴 수 있게 git 저장소에서 실행한다 (그래도 진행하려면 --force)');
     process.exit(2);
   }
@@ -85,18 +94,26 @@ if (APPLY && !FORCE) {
   }
 }
 
-// ── 프로젝트 구조: 스캐폴드 구조(client/·server/) 또는 단일 구조(루트) ──
-const dirs = [...new Set(['server', 'client', '.'].map((d) => path.join(ROOT, d)))].filter((d) => existsSync(d));
+// ── 하위 프로젝트: 시작 폴더와 그 한 단계 아래에서 package.json·build.gradle을 가진 폴더 전부 ──
+// 폴더 이름(server/·client/)을 가정하지 않는다 (2026-10-27 결함: lims-server/·lims-dev/ 구조에서 하나도 못 찾아 exit 2)
+const dirs = existsSync(START)
+  ? [START, ...readdirSync(START).sort().filter((n) => !skipDir(n) && statSync(path.join(START, n)).isDirectory()).map((n) => path.join(START, n))]
+  : [];
 const nodePkgs = dirs.filter((d) => existsSync(path.join(d, 'package.json')));
 const deps = (d) => { const p = readJson(path.join(d, 'package.json')) ?? {}; return { ...p.dependencies, ...p.devDependencies }; };
 const eslintFile = (d) => ['eslint.config.mjs', 'eslint.config.js'].map((f) => path.join(d, f)).find(existsSync);
-const isNodeServer = (d) => 'express' in deps(d) || /globals\.node/.test(eslintFile(d) ? load(eslintFile(d)) : '');
+// Node 서버 판정은 의존성으로만 — eslint 설정의 globals.node 글자로 보면, 설정 파일에만 Node 전역을 주는 Vite 클라이언트를
+// 서버로 오판한다 (2026-10-27 결함: React SPA에 B1 [수동]이 붙어 다시 돌려도 없어지지 않았다)
+const SERVER_DEPS = ['express', 'fastify', 'koa', '@nestjs/core', '@hapi/hapi'];
+const isNodeServer = (d) => SERVER_DEPS.some((n) => n in deps(d));
 const gradleDirs = dirs.filter((d) => /org\.springframework\.boot/.test(load(path.join(d, 'build.gradle')) ?? ''));
 if (!nodePkgs.length && !gradleDirs.length) {
-  console.log(`Node(package.json)·Spring(build.gradle) 프로젝트를 찾지 못했다: ${ROOT}`);
+  console.log(`${START}와 그 한 단계 아래에서 Node(package.json)·Spring(build.gradle) 프로젝트를 찾지 못했다 — 더 깊은 곳이면 그 폴더를 인자로 준다`);
   process.exit(2);
 }
 const template = (name) => readFileSync(path.join(TEMPLATES, name), 'utf8').replace(/\r\n/g, '\n');
+// 프로젝트마다 위치가 다를 수 있는 파일 — 프로젝트 폴더 → 저장소 루트 순 (스캐폴드는 루트 .env, 하위 폴더마다 .env를 두는 구조도 있다)
+const findFile = (d, name) => [...new Set([d, REPO])].map((x) => path.join(x, name)).find((p) => load(p) !== null) ?? null;
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 // 2026-10-27 묶음 (변경 이력 docs/dev_log/2026-10-27_CHANGELOG.md 1~4부)
@@ -114,91 +131,148 @@ for (const d of nodePkgs) {
   else report(step, 'manual', `"${lint}" — 단일 eslint 호출이 아니라 편집 훅이 매번 프로젝트 전체를 lint한다. 가능하면 "eslint ."로 두고 다른 검사는 별도 스크립트로`);
 }
 
+// B2 판정 — 워커별 테스트 DB를 넣을 Express 서버인지. B1이 B2가 만들 .mjs까지 미리 lint하려고 먼저 계산한다
+const VITEST_CONFIGS = ['vitest.config.mjs', 'vitest.config.js', 'vitest.config.ts', 'vitest.config.mts', 'vitest.config.cjs'];
+const SETUP_FILES = [['vitest-test-db.global.mjs', 'test/setup/test-db.global.mjs'], ['vitest-test-db.worker.mjs', 'test/setup/test-db.worker.mjs']];
+function testDbPlan(d) {
+  if (!isNodeServer(d)) return { skip: 'Node 서버가 아니다 (서버 프레임워크 의존성 없음)' };
+  const envExample = findFile(d, '.env.example');
+  const env = findFile(d, '.env');
+  const declares = [envExample, env].filter((f) => f && /^TEST_DB_NAME=/m.test(load(f)));
+  if (!declares.length) return { skip: '테스트 DB를 쓰지 않는다(.env.example·.env에 TEST_DB_NAME 없음) — 목킹 방식이면 해당 없음' };
+  if (!('vitest' in deps(d))) return { skip: 'Vitest가 아니다' };
+  const pkg = readJson(path.join(d, 'package.json')) ?? {};
+  const blockers = [];
+  if (!pkg.scripts?.migrate) blockers.push('package.json에 migrate 스크립트가 없다 (워커 DB에 스키마를 만들 수 없다 — migration.md 5절)');
+  if (!('mysql2' in deps(d))) blockers.push('mysql2 의존성이 없다 (npm i mysql2)');
+  // vitest 설정이 읽을 .env — 실제 .env가 있는 곳(없으면 TEST_DB_NAME을 적은 .env.example이 있는 곳)에서 상대 경로를 계산한다
+  const envDir = path.dirname(env && declares.includes(env) ? env : declares[0]);
+  let envRel = path.relative(d, path.join(envDir, '.env')).split(path.sep).join('/');
+  if (!/^\.\.?\//.test(envRel)) envRel = `./${envRel}`;   // '.env'도 '.'으로 시작한다 — './' 또는 '../'로 시작하는지로 본다
+  const vitestConfig = VITEST_CONFIGS.map((f) => path.join(d, f)).find(existsSync) ?? null;
+  const configText = template('vitest.config.server.mjs').replace("new URL('../.env'", `new URL('${envRel}'`);
+  return { declares, blockers, vitestConfig, configText };
+}
+// B2가 새로 만들 파일 — [절대 경로, 내용]
+function testDbNewFiles(d, plan) {
+  const out = SETUP_FILES.map(([src, dst]) => [path.join(d, dst), template(src)]).filter(([f]) => load(f) === null);
+  if (!plan.vitestConfig) out.push([path.join(d, 'vitest.config.mjs'), plan.configText]);
+  return out;
+}
+
 // B1. ESLint 서버 설정 — .mjs에 Node 전역 (없으면 vitest.config.mjs·test/setup/*.mjs가 'process is not defined'로 실패)
-for (const d of nodePkgs.filter(isNodeServer)) {
-  const file = eslintFile(d);
-  const step = `B1 ESLint .mjs Node 전역 (${rel(d)})`;
-  if (!file) { report(step, 'skip', 'eslint.config 없음'); continue; }
-  const text = load(file);
-  if (text.includes("'**/*.{js,mjs}'")) { report(step, 'done', rel(file)); continue; }
+// 템플릿 형태 정규식에 안 맞는다고 바로 [수동]으로 보내지 않는다 — ESLint를 실제로 돌려 no-undef가 나는지 먼저 본다
+// (2026-10-27: .mjs에 no-undef가 안 걸리는 설정이면 고칠 것이 없는데도 [수동]이 끝없이 남았다)
+function fixEslint(text) {
   if (text.includes('tseslint.config(')) {
     // TS 템플릿 — 템플릿 끝의 .mjs 블록을 그대로 가져와 마지막 ');' 앞에 넣는다
     const t = template('eslint.config.server.mjs');
     const at = t.indexOf("files: ['**/*.{js,mjs}']");
     const block = t.slice(t.lastIndexOf('  {\n', at), t.indexOf('  },\n', at) + 5);
     const end = text.lastIndexOf('\n);');
-    if (at < 0 || end < 0) { report(step, 'manual', `${rel(file)} — 템플릿 형태가 아니다. **/*.{js,mjs}에 globals.node를 주는 블록을 직접 추가`); continue; }
+    if (at < 0 || end < 0) return null;
     // 마지막 블록 뒤에 쉼표가 없으면 붙인다 — 없이 이어 붙이면 인자 사이 쉼표가 빠져 문법 오류
     const before = text.slice(0, end + 1).replace(/\}(\s*)$/, (all, ws) => (/,\s*$/.test(all) ? all : `},${ws}`));
-    save(file, `${before}${block}${text.slice(end + 1)}`);
-    report(step, 'apply', `${rel(file)} — .js/.mjs 파일에 Node 전역 블록 추가`);
-    continue;
+    return { text: `${before}${block}${text.slice(end + 1)}`, note: '.js/.mjs 파일에 Node 전역 블록 추가' };
   }
   const re = /(files:\s*\[\s*)'\*\*\/\*\.js'(\s*\],\s*\n(?:[^\n]*\n){0,3}?[^\n]*globals\.node)/;
-  if (!re.test(text)) { report(step, 'manual', `${rel(file)} — 템플릿 형태가 아니다. Node 전역(globals.node) 블록의 files에 .mjs를 넣는다`); continue; }
-  save(file, text.replace(re, "$1'**/*.{js,mjs}'$2"));
-  report(step, 'apply', `${rel(file)} — 규칙 블록 대상 '**/*.js' → '**/*.{js,mjs}'`);
+  return re.test(text) ? { text: text.replace(re, "$1'**/*.{js,mjs}'$2"), note: "규칙 블록 대상 '**/*.js' → '**/*.{js,mjs}'" } : null;
+}
+// ESLint로 no-undef가 나는 파일 — targets: [절대 경로, 아직 없는 파일이면 내용]. ESLint를 못 돌리면 null
+function noUndefFiles(d, targets) {
+  let bin = null, major = 0;
+  for (let x = d; ; x = path.dirname(x)) {   // 모노레포는 상위 node_modules로 끌어올려져(hoist) 있을 수 있다
+    const pkg = readJson(path.join(x, 'node_modules', 'eslint', 'package.json'));
+    if (pkg) {
+      const b = typeof pkg.bin === 'string' ? pkg.bin : pkg.bin?.eslint;
+      if (b) { bin = path.join(x, 'node_modules', 'eslint', b); major = parseInt(pkg.version, 10); }
+      break;
+    }
+    if (x === REPO || path.dirname(x) === x) break;
+  }
+  if (!bin) return null;
+  const lint = (extra, input) => {
+    const r = spawnSync(process.execPath, [bin, '--format', 'json', ...(major >= 9 ? ['--no-warn-ignored'] : []), ...extra], { cwd: d, input, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+    try { return JSON.parse(r.stdout); } catch { return null; }   // 설정 로드 실패 등 — JSON이 아니면 판정하지 않는다
+  };
+  const failing = [];
+  const existing = targets.filter(([, text]) => text === undefined).map(([f]) => path.relative(d, f));
+  if (existing.length) {
+    const out = lint(existing);
+    if (!out) return null;
+    for (const r of out) if (r.messages.some((m) => m.ruleId === 'no-undef')) failing.push(rel(r.filePath));
+  }
+  for (const [f, text] of targets.filter(([, t]) => t !== undefined)) {
+    const out = lint(['--stdin', '--stdin-filename', path.relative(d, f)], text);   // 아직 없는 파일은 내용을 넘겨 미리 lint한다
+    if (!out) return null;
+    if (out.some((r) => r.messages.some((m) => m.ruleId === 'no-undef'))) failing.push(`${rel(f)}(B2가 만들 파일)`);
+  }
+  return failing;
+}
+for (const d of nodePkgs) {
+  const step = `B1 ESLint .mjs Node 전역 (${rel(d)})`;
+  if (!isNodeServer(d)) { report(step, 'skip', 'Node 서버가 아니다 (서버 프레임워크 의존성 없음)'); continue; }
+  const file = eslintFile(d);
+  if (!file) { report(step, 'skip', 'eslint 설정 없음'); continue; }
+  const text = load(file);
+  if (text.includes("'**/*.{js,mjs}'")) { report(step, 'done', rel(file)); continue; }
+  const plan = testDbPlan(d);
+  const future = plan.skip || plan.blockers.length ? [] : testDbNewFiles(d, plan);
+  const targets = [...walk(d, (n) => n.endsWith('.mjs')).map((f) => [f, undefined]), ...future];
+  if (!targets.length) { report(step, 'skip', 'lint할 .mjs 파일이 없다'); continue; }
+  const failing = noUndefFiles(d, targets);
+  if (failing && !failing.length) { report(step, 'skip', `.mjs ${targets.length}개에서 no-undef가 나지 않는다 — 규칙이 안 걸리거나 Node 전역이 이미 있다 (ESLint 실행 결과)`); continue; }
+  const why = failing ? `no-undef: ${failing.join(', ')}` : 'ESLint를 돌리지 못해(미설치·설정 로드 실패) 템플릿 형태로 판정';
+  const fixed = fixEslint(text);
+  if (fixed) { save(file, fixed.text); report(step, 'apply', `${rel(file)} — ${fixed.note} (${why})`); }
+  else if (failing) report(step, 'manual', `${rel(file)} — ${why}. 템플릿 형태가 아니라 자동으로 못 고친다 — 그 .mjs에 globals.node를 주는 블록을 추가`);
+  else report(step, 'manual', `${rel(file)} — ${why}했는데 템플릿 형태도 아니다 — npm ci로 ESLint를 설치한 뒤 다시 실행`);
 }
 
 // B2. Node 테스트를 워커마다 테스트 DB로 — 테스트 DB를 쓰는 Express 서버만 (testing.md 0절)
-{
-  const envExample = path.join(ROOT, '.env.example');
-  const composeDev = path.join(ROOT, 'docker-compose.dev.yml');
-  const usesTestDb = /^TEST_DB_NAME=/m.test(load(envExample) ?? '') || /^\s+db-test:/m.test(load(composeDev) ?? '');
-  for (const d of nodePkgs.filter(isNodeServer)) {
-    const step = `B2 워커별 테스트 DB (${rel(d)})`;
-    if (!usesTestDb) { report(step, 'skip', '테스트 DB를 쓰지 않는다(.env.example에 TEST_DB_NAME 없음) — 목킹 방식이면 해당 없음'); continue; }
-    if (!('vitest' in deps(d))) { report(step, 'skip', 'Vitest가 아니다'); continue; }
-    const pkg = readJson(path.join(d, 'package.json')) ?? {};
-    const blockers = [];
-    if (!pkg.scripts?.migrate) blockers.push('package.json에 migrate 스크립트가 없다 (워커 DB에 스키마를 만들 수 없다 — migration.md 5절)');
-    if (!('mysql2' in deps(d))) blockers.push('mysql2 의존성이 없다 (npm i mysql2)');
-    if (blockers.length) { report(step, 'manual', `${blockers.join(' / ')} — 해결 후 다시 실행`); continue; }
+for (const d of nodePkgs) {
+  const step = `B2 워커별 테스트 DB (${rel(d)})`;
+  const plan = testDbPlan(d);
+  if (plan.skip) { report(step, 'skip', plan.skip); continue; }
+  if (plan.blockers.length) { report(step, 'manual', `${plan.blockers.join(' / ')} — 해결 후 다시 실행`); continue; }
 
-    const setupDir = path.join(d, 'test', 'setup');
-    const copies = [
-      ['vitest-test-db.global.mjs', path.join(setupDir, 'test-db.global.mjs')],
-      ['vitest-test-db.worker.mjs', path.join(setupDir, 'test-db.worker.mjs')],
-    ];
-    const copied = [];
-    for (const [src, dst] of copies) if (load(dst) === null) { save(dst, template(src)); copied.push(rel(dst)); }
-
-    const existing = ['vitest.config.mjs', 'vitest.config.js', 'vitest.config.ts', 'vitest.config.mts', 'vitest.config.cjs'].map((f) => path.join(d, f)).find(existsSync);
-    if (existing && load(existing).includes('test-db.global.mjs')) {
-      report(step, copied.length ? 'apply' : 'done', copied.length ? `준비 파일 복사: ${copied.join(', ')}` : rel(existing));
-    } else if (existing) {
-      report(step, 'manual', `기존 ${rel(existing)}과 합친다 — pool: 'forks', globalSetup·setupFiles(test/setup/), 맨 위 .env 로드 (템플릿 vitest.config.server.mjs)${copied.length ? ` / 준비 파일은 복사함: ${copied.join(', ')}` : ''}`);
-    } else {
-      // 서버가 저장소 루트에 있는 단일 구조면 .env 경로가 '../.env'가 아니라 './.env'
-      const config = template('vitest.config.server.mjs');
-      save(path.join(d, 'vitest.config.mjs'), d === ROOT ? config.replace("new URL('../.env'", "new URL('./.env'") : config);
-      report(step, 'apply', `${rel(path.join(d, 'vitest.config.mjs'))} + ${copied.join(', ') || '준비 파일(이미 있음)'}`);
-    }
-
-    // 접속 정보 — 템플릿은 TEST_DB_HOST에 기본값을 두지 않는다(환경변수 폴백 금지)
-    for (const envFile of [envExample, path.join(ROOT, '.env')]) {
-      const env = load(envFile);
-      if (env === null || !/^TEST_DB_NAME=/m.test(env) || /^TEST_DB_HOST=/m.test(env)) continue;
-      save(envFile, env.replace(/^TEST_DB_NAME=/m, 'TEST_DB_HOST=127.0.0.1\nTEST_DB_NAME='));
-      report(step, 'apply', `${rel(envFile)}에 TEST_DB_HOST=127.0.0.1${envFile.endsWith('.env') ? ' (.env는 git에 없다 — diff에 안 보인다)' : ''}`);
-    }
-    // 워커 DB는 root로 만든다 — root 비밀번호가 TEST_DB_PASSWORD와 같아야 한다
-    const compose = load(composeDev);
-    if (compose && /db-test:/.test(compose) && !/MARIADB_ROOT_PASSWORD:\s*\$\{TEST_DB_PASSWORD/.test(compose)) {
-      report(step, 'manual', `${rel(composeDev)} db-test의 MARIADB_ROOT_PASSWORD를 \${TEST_DB_PASSWORD}로 (워커 DB를 root로 만든다)`);
-    }
-    for (const wf of walk(path.join(ROOT, '.github', 'workflows'), (n) => /\.ya?ml$/.test(n))) {
-      const y = load(wf);
-      if (!/TEST_DB_NAME:/.test(y)) continue;
-      const root = y.match(/MARIADB_ROOT_PASSWORD:\s*(\S+)/)?.[1];
-      const pw = y.match(/TEST_DB_PASSWORD:\s*(\S+)/)?.[1];
-      if (!/TEST_DB_HOST:/.test(y)) report(step, 'manual', `${rel(wf)} — 테스트 job env에 TEST_DB_HOST 추가 (서비스 컨테이너면 127.0.0.1)`);
-      if (root && pw && root !== pw) report(step, 'manual', `${rel(wf)} — 서비스의 MARIADB_ROOT_PASSWORD(${root})를 TEST_DB_PASSWORD(${pw})와 같게`);
-    }
-    // 앱·테스트 코드가 TEST_DB_*를 직접 읽으면 워커 DB를 우회한다 — 앱은 DB_*만 (express.md 7절)
-    const direct = walk(d, (n) => /\.(m?[jt]s|cjs)$/.test(n)).filter((f) => !f.startsWith(setupDir) && !/vitest\.config/.test(f) && /TEST_DB_/.test(load(f)));
-    if (direct.length) report(step, 'manual', `TEST_DB_*를 직접 읽는 코드 — DB_*만 읽게 바꾼다(워커 설정이 덮어쓴다): ${direct.map(rel).join(', ')}`);
+  const created = testDbNewFiles(d, plan);
+  for (const [f, text] of created) save(f, text);
+  const copied = created.filter(([f]) => !/vitest\.config\.mjs$/.test(f)).map(([f]) => rel(f));
+  if (!plan.vitestConfig) {
+    report(step, 'apply', `${rel(path.join(d, 'vitest.config.mjs'))}(.env: ${plan.configText.match(/new URL\('([^']+)'/)[1]}) + ${copied.join(', ') || '준비 파일(이미 있음)'}`);
+  } else if (load(plan.vitestConfig).includes('test-db.global.mjs')) {
+    report(step, copied.length ? 'apply' : 'done', copied.length ? `준비 파일 복사: ${copied.join(', ')}` : rel(plan.vitestConfig));
+  } else {
+    report(step, 'manual', `기존 ${rel(plan.vitestConfig)}과 합친다 — pool: 'forks', globalSetup·setupFiles(test/setup/), 맨 위 .env 로드 (템플릿 vitest.config.server.mjs)${copied.length ? ` / 준비 파일은 복사함: ${copied.join(', ')}` : ''}`);
   }
+
+  // 접속 정보 — 템플릿은 TEST_DB_HOST에 기본값을 두지 않는다(환경변수 폴백 금지)
+  for (const envFile of plan.declares) {
+    const env = load(envFile);
+    if (/^TEST_DB_HOST=/m.test(env)) continue;
+    save(envFile, env.replace(/^TEST_DB_NAME=/m, 'TEST_DB_HOST=127.0.0.1\nTEST_DB_NAME='));
+    report(step, 'apply', `${rel(envFile)}에 TEST_DB_HOST=127.0.0.1${path.basename(envFile) === '.env' ? ' (.env는 git에 없다 — diff에 안 보인다)' : ''}`);
+  }
+  // 워커 DB는 root로 만든다 — root 비밀번호가 TEST_DB_PASSWORD와 같아야 한다 (저장소 루트의 compose 파일 전부)
+  for (const name of readdirSync(REPO).sort().filter((n) => /^docker-compose.*\.ya?ml$/.test(n))) {
+    const compose = load(path.join(REPO, name));
+    if (/db-test:/.test(compose) && !/MARIADB_ROOT_PASSWORD:\s*\$\{TEST_DB_PASSWORD/.test(compose)) {
+      report(step, 'manual', `${name} db-test의 MARIADB_ROOT_PASSWORD를 \${TEST_DB_PASSWORD}로 (워커 DB를 root로 만든다)`);
+    }
+  }
+  for (const wf of walk(path.join(REPO, '.github', 'workflows'), (n) => /\.ya?ml$/.test(n))) {
+    const y = load(wf);
+    if (!/TEST_DB_NAME:/.test(y)) continue;
+    const root = y.match(/MARIADB_ROOT_PASSWORD:\s*(\S+)/)?.[1];
+    const pw = y.match(/TEST_DB_PASSWORD:\s*(\S+)/)?.[1];
+    if (!/TEST_DB_HOST:/.test(y)) report(step, 'manual', `${rel(wf)} — 테스트 job env에 TEST_DB_HOST 추가 (서비스 컨테이너면 127.0.0.1)`);
+    if (root && pw && root !== pw) report(step, 'manual', `${rel(wf)} — 서비스의 MARIADB_ROOT_PASSWORD(${root})를 TEST_DB_PASSWORD(${pw})와 같게`);
+  }
+  // 앱·테스트 코드가 TEST_DB_*를 직접 읽으면 워커 DB를 우회한다 — 앱은 DB_*만 (express.md 7절)
+  const setupDir = path.join(d, 'test', 'setup');
+  const direct = walk(d, (n) => /\.(m?[jt]s|cjs)$/.test(n)).filter((f) => !f.startsWith(setupDir) && !/vitest\.config/.test(f) && /TEST_DB_/.test(load(f)));
+  if (direct.length) report(step, 'manual', `TEST_DB_*를 직접 읽는 코드 — DB_*만 읽게 바꾼다(워커 설정이 덮어쓴다): ${direct.map(rel).join(', ')}`);
 }
 
 // C1. Spring Boot 4.1.1 → 4.1.2 — Boot가 Tomcat 11.0.27을 관리하게 돼 Tomcat 덮어쓰기를 지운다 (Jackson 3.1.8 덮어쓰기는 유지)
@@ -225,14 +299,18 @@ for (const d of gradleDirs) {
   }
   if (changes.length) { save(file, text); report(step, 'apply', `${rel(file)} — ${changes.join(', ')}`); }
   else report(step, 'done', `${rel(file)} — Boot ${m[2]}`);
-  // 프로젝트 CLAUDE.md의 운영 정보 표에 Boot 버전을 적어 두었으면 같이 올린다
-  const claude = path.join(ROOT, 'CLAUDE.md');
-  const md = load(claude);
-  const section = md?.match(/^## 운영 정보\n[\s\S]*?(?=^## |$(?![\s\S]))/m)?.[0];
-  if (section?.includes(`Boot ${BOOT_FROM}`)) {
+  // 운영 정보 표(CLAUDE.md)에 Boot 버전을 적어 두었으면 같이 올린다 — 프로젝트 폴더 → 저장소 루트 순으로 찾는다
+  const claudes = [...new Set([d, REPO])].map((x) => path.join(x, 'CLAUDE.md')).filter((f) => load(f) !== null);
+  let bumped = false;
+  for (const claude of claudes) {
+    const md = load(claude);
+    const section = md.match(/^## 운영 정보\n[\s\S]*?(?=^## |$(?![\s\S]))/m)?.[0];
+    if (!section?.includes(`Boot ${BOOT_FROM}`)) continue;
     save(claude, md.replace(section, section.replaceAll(`Boot ${BOOT_FROM}`, `Boot ${BOOT_TO}`)));
-    report(step, 'apply', `CLAUDE.md 운영 정보 — Boot ${BOOT_FROM} → ${BOOT_TO}`);
-  } else if (changes.length) report(step, 'note', 'CLAUDE.md 운영 정보의 런타임 버전 행을 확인한다(Boot 버전 기록이 없거나 다른 형식)');
+    report(step, 'apply', `${rel(claude)} 운영 정보 — Boot ${BOOT_FROM} → ${BOOT_TO}`);
+    bumped = true;
+  }
+  if (!bumped && changes.length) report(step, 'note', 'CLAUDE.md 운영 정보의 런타임 버전 행을 확인한다(Boot 버전 기록이 없거나 다른 형식)');
 }
 
 // C2. Spring 테스트 클래스 병렬 + 병렬 안전 규칙 (spring.md 7절)
@@ -373,7 +451,7 @@ if (APPLY) {
     writeFileSync(file, f.bom + (f.eol === '\n' ? f.text : f.text.replace(/\n/g, f.eol)));
   }
 }
-console.log(`JYP 프로젝트 업그레이드 (2026-10-27 묶음) — ${ROOT} [${APPLY ? '적용' : '미리보기 — 바꾸려면 --apply'}]`);
+console.log(`JYP 프로젝트 업그레이드 (2026-10-27 묶음) — ${REPO}${START !== REPO ? ` (대상: ${rel(START)})` : ''} [${APPLY ? '적용' : '미리보기 — 바꾸려면 --apply'}]`);
 for (const r of results) console.log(`  [${LABEL[r.status]}] ${r.step} — ${r.detail}`);
 const count = (s) => results.filter((r) => r.status === s).length;
 console.log(`요약: ${LABEL.apply} ${count('apply')} · 이미 적용 ${count('done')} · 해당 없음 ${count('skip')} · 수동 ${count('manual')}`);

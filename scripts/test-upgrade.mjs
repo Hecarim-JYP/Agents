@@ -69,6 +69,38 @@ const NODE_JS = {
   'server/src/db.js': 'export const name = process.env.DB_NAME;\n',
 };
 const NODE_TS_ESLINT = "import tseslint from 'typescript-eslint';\nimport globals from 'globals';\n\nexport default tseslint.config(\n  {\n    files: ['**/*.ts'],\n    languageOptions: { globals: globals.node },\n  }\n);\n";
+// 하위 폴더 이름이 server/·client/가 아닌 구조 — Express 서버(eslint 없음) + Vite React(설정 파일에만 Node 전역) (2026-10-27 결함 1·2의 재현 구조)
+const VITE_CLIENT_ESLINT = "import js from '@eslint/js';\nimport globals from 'globals';\n\nexport default [\n  { files: ['**/*.{js,jsx}'], ...js.configs.recommended, languageOptions: { globals: globals.browser } },\n  {\n    files: ['*.config.js'],\n    languageOptions: { globals: globals.node },\n  },\n];\n";
+const LTMS = {
+  'CLAUDE.md': '# app\n\n## 운영 정보\n\n| 항목 | 값 |\n|---|---|\n| 런타임 | Node 24 |\n',
+  'docker-compose.yml': 'services: {}\n',
+  'app-server/package.json': JSON.stringify({ name: 'app-server', type: 'module', scripts: { test: 'vitest run' }, dependencies: { express: '^5.0.0' }, devDependencies: { vitest: '^5.0.0' } }),
+  'app-server/.env.example': 'DB_HOST=127.0.0.1\nDB_NAME=app\n',
+  'app-web/package.json': JSON.stringify({ name: 'app-web', type: 'module', scripts: { lint: 'eslint .', test: 'vitest run' }, dependencies: { react: '^19.0.0' }, devDependencies: { eslint: '^10.0.0', vitest: '^5.0.0' } }),
+  'app-web/eslint.config.js': VITE_CLIENT_ESLINT,
+  'app-web/scripts/run-vitest.mjs': 'console.log(process.argv);\n',
+};
+// 가짜 ESLint — 받은 파일(또는 --stdin 내용)에 process.가 있고 프로젝트 설정에 MJS_NODE_GLOBALS 표시가 없으면 no-undef를 낸다.
+// 업그레이드가 ESLint를 실제로 불러 결과(JSON)로 판정하는지 본다 — 진짜 ESLint의 판정은 실표본에서 따로 확인한다
+const FAKE_ESLINT = {
+  'node_modules/eslint/package.json': JSON.stringify({ name: 'eslint', version: '10.0.0', bin: { eslint: 'bin/eslint.js' } }),
+  'node_modules/eslint/bin/eslint.js': `const fs = require('node:fs');
+const path = require('node:path');
+const a = process.argv.slice(2);
+const covered = !fs.readFileSync('eslint.config.js', 'utf8').includes('MJS_NODE_GLOBALS');
+const at = a.indexOf('--stdin-filename');
+const targets = at >= 0 ? [[a[at + 1], fs.readFileSync(0, 'utf8')]] : a.filter((x) => !x.startsWith('--') && x !== 'json').map((f) => [f, fs.readFileSync(f, 'utf8')]);
+const out = targets.map(([f, s]) => ({ filePath: path.resolve(f), messages: covered && s.includes('process.') ? [{ ruleId: 'no-undef', message: "'process' is not defined." }] : [] }));
+process.stdout.write(JSON.stringify(out));
+process.exit(out.some((r) => r.messages.length) ? 1 : 0);
+`,
+};
+const SERVER_NONTEMPLATE = (marker) => ({
+  'package.json': JSON.stringify({ name: 'api', type: 'module', scripts: { lint: 'eslint .', test: 'vitest run', migrate: 'node scripts/migrate.mjs' }, dependencies: { express: '^5.0.0', mysql2: '^3.0.0' }, devDependencies: { vitest: '^5.0.0' } }),
+  'eslint.config.js': `// 템플릿이 아닌 서버 설정${marker ? ' — MJS_NODE_GLOBALS (.mjs에 Node 전역이 이미 있다)' : ''}\nexport default [{ files: ['src/**/*.js'], rules: {} }];\n`,
+  'scripts/migrate.mjs': 'console.log(process.env.DB_NAME);\n',
+  '.env.example': 'TEST_DB_NAME=api_test\nTEST_DB_USER=\nTEST_DB_PASSWORD=\nTEST_DB_PORT=3307\n',
+});
 
 // ── 실행 도구 ──
 const git = (dir, ...a) => execFileSync('git', ['-C', dir, ...a], { encoding: 'utf8' });
@@ -89,7 +121,8 @@ const run = (dir, ...a) => {
   const r = spawnSync(process.execPath, [script, dir, '--jyp', repo, ...a], { encoding: 'utf8' });
   return { code: r.status, out: r.stdout + r.stderr };
 };
-const read = (dir, f) => readFileSync(path.join(dir, f), 'utf8');
+// 없는 파일은 빈 값 — 대조군(수정 전 스크립트)이 파일을 안 만들어도 시험이 죽지 않고 ✗로 남게 한다
+const read = (dir, f) => (existsSync(path.join(dir, f)) ? readFileSync(path.join(dir, f), 'utf8') : '');
 const clean = (dir) => git(dir, 'status', '--porcelain').trim() === '';
 const commitAll = (dir) => { git(dir, 'add', '-A'); git(dir, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'upgrade'); };
 
@@ -148,6 +181,42 @@ try {
   check("TS 설정 끝에 .js/.mjs Node 전역 블록 (앞 블록에 쉼표 보충)", /files: \['\*\*\/\*\.ts'\],\n {4}languageOptions: \{ globals: globals\.node \},\n {2}\},\n {2}\{\n(?: {4}\/\/[^\n]*\n)* {4}files: \['\*\*\/\*\.\{js,mjs\}'\]/.test(ts), ts);
   check('TS 설정 문법 유효 (node --check)', spawnSync(process.execPath, ['--check', path.join(nt, 'server/eslint.config.mjs')]).status === 0);
   check('테스트 DB를 안 쓰면 워커별 DB는 해당 없음', /\[해당 없음\] B2 [^\n]*테스트 DB를 쓰지 않는다/.test(r.out) && !existsSync(path.join(nt, 'server/vitest.config.mjs')), r.out);
+
+  console.log('하위 폴더 이름이 server/·client/가 아닌 구조 (결함 1·2)');
+  const lt = project('ltms', LTMS);
+  r = run(lt);
+  const r2 = run(lt);
+  check('루트에서 인자 없이 → exit 0, 두 하위 프로젝트 모두 표에', r.code === 0 && /\(app-server\)/.test(r.out) && /\(app-web\)/.test(r.out), r.out);
+  check('Vite 클라이언트(설정 파일에만 globals.node)를 서버로 보지 않음 → B1·B2 해당 없음', /\[해당 없음\] B1 [^\n]*\(app-web\) — Node 서버가 아니다/.test(r.out) && /\[해당 없음\] B2 [^\n]*\(app-web\) — Node 서버가 아니다/.test(r.out), r.out);
+  check('eslint 없는 서버 → B1 해당 없음, 테스트 DB 없음 → B2 해당 없음', /\[해당 없음\] B1 [^\n]*\(app-server\) — eslint 설정 없음/.test(r.out) && /\[해당 없음\] B2 [^\n]*\(app-server\) — 테스트 DB를 쓰지 않는다/.test(r.out), r.out);
+  check('[수동] 0건 · 두 번 돌려도 같은 결과 · 파일 변경 없음', !/\[수동\]/.test(r.out) && r.out === r2.out && clean(lt), r.out);
+
+  const sub = project('spring-sub', { ...Object.fromEntries(Object.entries(SPRING).map(([f, s]) => [f === 'CLAUDE.md' ? f : `api/${f}`, s])), '.github/workflows/test.yml': 'name: test\n' });
+  run(sub, '--apply');
+  check('하위 폴더의 Spring → 저장소 루트 CLAUDE.md 운영 정보 갱신', read(sub, 'CLAUDE.md').includes('Spring Boot 4.1.2') && /version '4\.1\.2'/.test(read(sub, 'api/build.gradle')));
+  const sub2 = project('spring-sub-arg', Object.fromEntries(Object.entries(SPRING).map(([f, s]) => [f === 'CLAUDE.md' ? f : `api/${f}`, s])));
+  r = run(path.join(sub2, 'api'), '--apply');
+  check('하위 폴더를 인자로 줘도 저장소 단위 파일(루트 CLAUDE.md)은 루트에서', read(sub2, 'CLAUDE.md').includes('Spring Boot 4.1.2') && /\(대상: api\)/.test(r.out), r.out);
+
+  const envp = project('env-in-project', { 'srv/package.json': NODE_JS['server/package.json'], 'srv/.env.example': 'TEST_DB_NAME=srv_test\nTEST_DB_USER=\nTEST_DB_PASSWORD=\nTEST_DB_PORT=3307\n', 'web/package.json': JSON.stringify({ name: 'web', dependencies: { react: '^19.0.0' } }) });
+  r = run(envp, '--apply');
+  check('.env.example이 프로젝트 폴더에 있으면 거기서 찾고 vitest 설정은 ./.env', read(envp, 'srv/vitest.config.mjs').includes("new URL('./.env'") && /TEST_DB_HOST=127\.0\.0\.1\nTEST_DB_NAME=/.test(read(envp, 'srv/.env.example')), r.out);
+  const envr = project('env-at-root', { ...NODE_JS, 'client/package.json': JSON.stringify({ name: 'client', scripts: { lint: 'eslint .' }, dependencies: { react: '^19.0.0' } }) });
+  r = run(envr);
+  check('루트 .env.example에 테스트 DB가 있어도 클라이언트는 B2 해당 없음(엉뚱한 [수동] 없음)', /\[해당 없음\] B2 [^\n]*\(client\) — Node 서버가 아니다/.test(r.out) && !/\[수동\][^\n]*\(client\)/.test(r.out), r.out);
+
+  console.log('B1 증상 판정 — ESLint를 실제로 불러 no-undef가 나는지로 본다');
+  const s1 = project('b1-covered', { ...SERVER_NONTEMPLATE(true), ...FAKE_ESLINT });
+  r = run(s1);
+  check('템플릿이 아닌 설정이라도 no-undef가 안 나면 B1 해당 없음 ([수동] 아님)', /\[해당 없음\] B1 [^\n]*no-undef가 나지 않는다/.test(r.out) && !/\[수동\] B1/.test(r.out), r.out);
+  const s2 = project('b1-broken', { ...SERVER_NONTEMPLATE(false), ...FAKE_ESLINT });
+  r = run(s2);
+  check('no-undef가 나는데 템플릿 형태가 아니면 [수동] + 파일 목록(B2가 만들 파일 포함)', /\[수동\] B1 [^\n]*no-undef: scripts\/migrate\.mjs, [^\n]*test-db\.global\.mjs\(B2가 만들 파일\)/.test(r.out), r.out);
+  const s3 = project('b1-template', { ...NODE_JS, 'server/scripts/migrate.mjs': 'console.log(process.env.DB_NAME);\n', ...Object.fromEntries(Object.entries(FAKE_ESLINT).map(([f, s]) => [`server/${f}`, s])) });
+  writeFileSync(path.join(s3, 'server', 'eslint.config.js'), NODE_JS['server/eslint.config.mjs']);   // 가짜 ESLint가 읽는 이름
+  commitAll(s3);
+  r = run(s3);
+  check('no-undef가 나고 템플릿 형태면 적용 예정 + 원인 파일 표시', /\[적용 예정\] B1 [^\n]*'\*\*\/\*\.js' → '\*\*\/\*\.\{js,mjs\}' \(no-undef: server\/scripts\/migrate\.mjs/.test(r.out), r.out);
 
   console.log('프로젝트 아님');
   mkdirSync(path.join(work, 'empty'));
