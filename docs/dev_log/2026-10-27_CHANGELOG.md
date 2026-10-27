@@ -43,6 +43,8 @@ Gradle 보충 실측: 클라이언트의 프로세스 그룹에 SIGINT·SIGTERM�
 | check-refs · check-rules-sync | 통과 |
 | Windows(`taskkill` 경로) | verify-windows run 12(windows-latest, Node 24) — `test-hooks.mjs` 16항목 통과(시간 초과 뒤 손자 프로세스까지 종료 포함) |
 | CI | verify run 59(`test-hooks` job 포함)·verify-windows run 12 성공 (커밋 15b1618) |
+| 작업 기기 재현 — 수정 전(2498847) 설치 → `git pull` → `install.sh` | 설치본 시험: 수정 전 **9건 실패** → pull·install 뒤 **통과**, `run-command.mjs` 설치됨, settings.json 훅 등록 1건씩(중복 없음) |
+| 설치본 Windows 시험 (`test-hooks.mjs "$env:USERPROFILE\.claude\hooks"`, verify-windows에 상설 스텝 추가) | run 14 — install.ps1이 설치한 사본 16항목 통과 (커밋 70a4728) |
 
 ### 1-4. 남은 것 (이번에 하지 않음)
 
