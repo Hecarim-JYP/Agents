@@ -42,7 +42,7 @@ Claude Code의 규칙·컨벤션·스킬·훅을 버전 관리하는 저장소. 
 
 이 저장소의 산출물은 **실제로 돌려서** 검증한다. 종이 검증만으로는 안 보이는 결함이 반복해서 나왔다(2026-07-14 실검증에서 12건).
 
-- **문서 참조**: `node scripts\check-refs.mjs` (문서끼리 "X.md N절"로 193곳을 가리킨다 — 절을 개편·삭제하면 조용히 깨진다. 절 번호를 건드렸으면 반드시 실행. **CI(`.github/workflows/verify.yml`)가 push/PR마다 자동 실행하지만, 로컬에서 먼저 돌려 잡는 게 빠르다**)
+- **문서 참조**: `node scripts\check-refs.mjs` (문서끼리 "X.md N절"로 720곳을 가리킨다(2026-10-27 — 현재 수는 실행 출력의 "참조 N건") — 절을 개편·삭제하면 조용히 깨진다. 절 번호를 건드렸으면 반드시 실행. **CI(`.github/workflows/verify.yml`)가 push/PR마다 자동 실행하지만, 로컬에서 먼저 돌려 잡는 게 빠르다**)
 - **compose 템플릿**: `.\scripts\verify-templates.ps1`(Windows) / `./scripts/verify-templates.sh`(Mac/Linux) (임시 폴더 조립 + 두 모드 `docker compose config`)
 - **ESLint 템플릿**: 위반 코드를 일부러 만들어 검출되는지 + 정상 코드에서 오탐이 없는지 둘 다 확인 — **규칙마다 하나씩** 확인한다. `import-x/no-cycle`(2026-10-21 이전 `import/no-cycle`)처럼 설정(파서·리졸버)이 없으면 에러 없이 조용히 꺼지는 규칙이 있다 (2026-07-17 검증이 이 규칙을 빠뜨려 TS에서 3개월간 무력이었다 — 2026-10-19 발견)
 - **Spring 빌드 템플릿**(`build.gradle`·`checkstyle.xml`): 바꾸면 템플릿 그대로 새 프로젝트를 만들어 `./gradlew check`(정상 통과 + 순환·위반 검출)까지 돌린다
