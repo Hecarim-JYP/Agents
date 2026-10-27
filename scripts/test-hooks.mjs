@@ -4,7 +4,9 @@
 // 외부 의존성 없음 — ESLint는 받은 인자만 기록하는 가짜 패키지로 대신한다(어떤 인자로 불렸는지가 검사 대상이다).
 // Gradle 경로(gradlew test·spotlessCheck)는 JDK·의존성 캐시가 필요해 여기서 다루지 않는다 — 변경 시 표본 프로젝트로 직접 확인한다.
 //
-// 사용법: 저장소 루트에서  node scripts/test-hooks.mjs   (CI verify.yml·verify-windows.yml이 push/PR마다 실행)
+// 사용법: 저장소 루트에서  node scripts/test-hooks.mjs [훅 폴더]   (CI verify.yml·verify-windows.yml이 push/PR마다 실행)
+//   훅 폴더를 주면 그 폴더의 훅을 시험한다 — install이 설치한 사본(~/.claude/hooks)이 실제로 고쳐졌는지 확인할 때.
+//   "저장소는 고쳤는데 반영이 안 된다"(재설치 누락·설치 파일 누락)는 저장소 hooks/만 시험해서는 안 보인다.
 
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, rmSync, copyFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -13,13 +15,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const source = path.resolve(process.argv[2] ?? path.join(repo, 'hooks'));
+console.log(`시험 대상: ${source}`);
 const work = mkdtempSync(path.join(tmpdir(), 'jyp-hook-test-'));
 const SHORT_MS = 4_000;   // 시험용 시간 한도 — 원본 상수(270초·170초)를 복사본에서만 줄인다
 
 // 1) 훅 복사본 — 시간 한도만 줄인다. 상수 이름이 바뀌어 치환이 안 되면 시험이 무의미하므로 바로 실패한다
 const hooksDir = path.join(work, 'hooks');
 mkdirSync(hooksDir);
-for (const f of readdirSync(path.join(repo, 'hooks')).filter((n) => n.endsWith('.mjs'))) copyFileSync(path.join(repo, 'hooks', f), path.join(hooksDir, f));
+for (const f of readdirSync(source).filter((n) => n.endsWith('.mjs'))) copyFileSync(path.join(source, f), path.join(hooksDir, f));
 for (const f of ['stop-test.mjs', 'post-edit-check.mjs']) {
   const p = path.join(hooksDir, f);
   const src = readFileSync(p, 'utf8');

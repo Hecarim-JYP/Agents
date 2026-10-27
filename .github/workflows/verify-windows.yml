@@ -70,3 +70,8 @@ jobs:
       # 3) 훅 — Windows는 프로세스 그룹이 없어 taskkill /T로 트리를 끝낸다. cmd.exe만 죽이면 npm·테스트가 남는다(Linux와 경로가 달라 여기서 따로 본다)
       - name: hooks (timeout, process tree, file-level lint)
         run: node scripts/test-hooks.mjs
+
+      # 4) install.ps1이 설치한 사본도 같은 시험을 통과해야 한다 — 실제로 쓰는 것은 저장소가 아니라 설치본이다 (git pull -> install.ps1로 반영되는지)
+      - name: installed hooks (after install.ps1)
+        shell: powershell
+        run: node scripts/test-hooks.mjs "$env:USERPROFILE\.claude\hooks"
