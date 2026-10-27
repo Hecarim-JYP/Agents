@@ -1,11 +1,15 @@
 // Stop 훅 — 이번 턴에 코드 수정이 있었다면(마커 존재) 턴 종료 시 테스트를 실행한다.
 // 실패 시 exit 2로 턴 종료를 막고 Claude가 테스트를 고치게 한다.
+// 시간 초과·실행 불가는 테스트 실패가 아니므로 막지 않고 사용자에게만 알린다 — 테스트는 프로세스 트리째 끝낸다(run-command.mjs).
 // 코드 수정이 없던 턴(질문/조회)에는 테스트를 돌리지 않는다.
 // 지원 스택: Node(package.json의 test 스크립트) · JVM/Gradle(gradlew test).
 import { readFileSync, existsSync, unlinkSync } from 'node:fs';
-import { execSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { runCommand, notifyUser } from './run-command.mjs';
+
+// settings.json 등록 timeout(300초, register-hooks.mjs)보다 짧게 — 넘기면 Claude Code가 훅을 취소해 결과도 경고도 사라진다
+const TIMEOUT_MS = 270_000;
 
 let data = {};
 try { data = JSON.parse(readFileSync(0, 'utf8')); } catch { process.exit(0); }
@@ -39,11 +43,15 @@ if (isGradle) {
 }
 if (!cmd) process.exit(0);
 
-try {
-  execSync(cmd, { cwd: root, stdio: 'pipe', encoding: 'utf8', timeout: 270_000 });
-} catch (e) {
-  const out = `${e.stdout || ''}${e.stderr || ''}`.trim() || String(e.message);
-  console.error(`[test] 턴 종료 전 테스트 실패 — 고치고 종료하세요:\n${out.split('\n').slice(-50).join('\n')}`);
+const { status, output } = await runCommand(cmd, { cwd: root, timeoutMs: TIMEOUT_MS });
+if (status === 'fail') {
+  console.error(`[test] 턴 종료 전 테스트 실패 — 고치고 종료하세요:\n${output.split('\n').slice(-50).join('\n')}`);
   process.exit(2);
+}
+// 시간 초과를 실패로 막으면 고칠 것이 없는데도 Claude가 한 번 더 이어서 작업한다 (2026-10-27 실측 — 매 턴 한도만큼 대기 + 추가 턴)
+if (status === 'timeout') {
+  notifyUser(`[test] 테스트가 ${TIMEOUT_MS / 1000}초 안에 끝나지 않아 중단했다(결과 미확인) — ${root}에서 직접 \`${cmd}\` 또는 CI로 확인한다`);
+} else if (status === 'error') {
+  notifyUser(`[test] 테스트를 실행하지 못했다(결과 미확인): ${output.split('\n').slice(-3).join(' ')}`);
 }
 process.exit(0);

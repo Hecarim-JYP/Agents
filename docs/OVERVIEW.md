@@ -1,6 +1,6 @@
 # JYP Agents 전체 기능 통합 가이드
 
-> 최종 수정: 2026-10-21 | 버전: 1.16 | 대상 독자: 이 저장소를 처음 보는 개발자, 그리고 전체 구조를 한눈에 복기하려는 관리자(박진영)
+> 최종 수정: 2026-10-27 | 버전: 1.17 | 대상 독자: 이 저장소를 처음 보는 개발자, 그리고 전체 구조를 한눈에 복기하려는 관리자(박진영)
 
 ## 1. 개요
 
@@ -54,9 +54,9 @@ Agents/
 ├── scaffolds/         # 새 프로젝트 초기 구조 스펙 (default.md + templates/ 실물 파일)
 ├── schemas/           # DB 기초 테이블 표준 DDL 29종
 ├── templates/         # 문서 템플릿 8종 (doc-claude용 6 + 개발용 2)
-├── hooks/             # 자동 검증 훅 스크립트 2종 (post-edit-check, stop-test)
+├── hooks/             # 자동 검증 훅 2종 (post-edit-check, stop-test) + 공용 실행 모듈(run-command)
 ├── docs/              # 저장소 자체 문서 (이 파일)
-├── scripts/           # 검증·설치 보조 (check-refs, check-rules-sync, check-versions, template-audit, verify-templates(ps1/sh), register-hooks)
+├── scripts/           # 검증·설치 보조 (check-refs, check-rules-sync, check-versions, template-audit, test-hooks, verify-templates(ps1/sh), register-hooks)
 ├── .github/workflows/ # CI — push/PR마다 check-refs, 주 1회 check-versions, push/PR마다 Windows PowerShell 5.1 검증(verify-windows), 주 1회·관련 변경 시 템플릿 취약점 검사(template-audit)
 ├── install.ps1        # Windows 설치 스크립트
 ├── install.sh         # Mac/Linux 설치 스크립트
@@ -268,10 +268,11 @@ database.md 규칙(PK 네이밍, 공통 컬럼, 논리 FK + 인덱스, utf8mb4)�
 
 | 파일 | 이벤트 | 동작 |
 |---|---|---|
-| `post-edit-check.mjs` | PostToolUse (Write\|Edit) | 코드 수정 직후 프로젝트 루트를 찾아(모노레포 대응) 검사 실행 — **Node**: `lint`·`typecheck` 스크립트 / **JVM**(2026-07-14 추가): `spotlessCheck`·`compileJava`. 실패 시 exit 2로 Claude에게 피드백 |
-| `stop-test.mjs` | Stop | 턴 종료 시 테스트 실행 — Node `npm test` / JVM `./gradlew test`. 실패하면 턴 종료를 막는다 |
+| `post-edit-check.mjs` | PostToolUse (Write\|Edit) | 코드 수정 직후 프로젝트 루트를 찾아(모노레포 대응) 검사 실행 — **Node**: `lint`(스크립트가 ESLint면 **편집한 파일만** — 2026-10-27)·`typecheck` 스크립트 / **JVM**(2026-07-14 추가): `spotlessCheck`·`compileJava`. 실패 시 exit 2로 Claude에게 피드백 |
+| `stop-test.mjs` | Stop | 턴 종료 시 테스트 실행 — Node `npm test` / JVM `./gradlew test`. 실패하면 턴 종료를 막는다. **시간 초과·실행 불가는 막지 않고 사용자에게만 경고**(2026-10-27) |
+| `run-command.mjs` | (등록 안 함) | 두 훅의 명령 실행 모듈 — 시간 한도를 넘으면 **프로세스 트리째 종료**(POSIX 프로세스 그룹·Windows `taskkill /T`). 셸만 죽이면 테스트·`gradlew` 클라이언트가 뒤에서 계속 돈다 |
 
-설계 포인트: post-edit 훅이 임시 마커 파일(세션 ID 기준)을 남기고 stop 훅이 소진하는 방식이라 **코드를 수정한 턴에만 테스트가 실행**된다(질문만 한 턴에는 안 돌아감). `stop_hook_active` 확인으로 무한 루프를 방지한다.
+설계 포인트: post-edit 훅이 임시 마커 파일(세션 ID 기준)을 남기고 stop 훅이 소진하는 방식이라 **코드를 수정한 턴에만 테스트가 실행**된다(질문만 한 턴에는 안 돌아감). `stop_hook_active` 확인으로 무한 루프를 방지한다. 동작 시험은 `node scripts/test-hooks.mjs`(CI가 Linux·Windows에서 실행).
 
 ⚠ 훅은 프로젝트에 `lint` 스크립트(또는 Spotless 설정)가 **있어야** 의미가 있다 — 스캐폴드가 린트 설정을 반드시 포함하는 이유다(scaffolds/default.md 린트 절).
 
@@ -302,7 +303,7 @@ database.md 규칙(PK 네이밍, 공통 컬럼, 논리 FK + 인덱스, utf8mb4)�
 
 - **수정한 규칙이 반영 안 됨** → 저장소 수정 후 `install.ps1` 재실행을 잊은 경우가 대부분. 설치 경로(`~/.claude/jyp/`)가 소비 지점이다.
 - **훅이 발화하지 않음** → install 실행 시 "훅 등록 완료" 메시지가 나왔는지 확인(안 나왔으면 Node 미설치이거나 settings.json이 깨진 JSON이다). `/hooks` 메뉴에서 등록 상태 확인, `node --version` 동작 확인.
-- **훅이 거슬림(대형 프로젝트에서 lint가 느림)** → `/hooks`에서 일시 비활성화하거나, `post-edit-check.mjs`를 파일 단위 lint로 튜닝.
+- **훅이 느림** → lint는 이미 편집한 파일만 검사한다(ESLint). 남는 비용은 편집마다 도는 프로젝트 전체 typecheck와 턴 끝의 전체 테스트다 — 테스트가 한도(270초)를 넘으면 중단하고 경고만 한다(턴을 막지 않음). 그래도 거슬리면 `/hooks`에서 일시 비활성화한다.
 - **스킬이 목록에 없음** → `~/.claude/skills/{이름}/SKILL.md` 존재 확인, frontmatter의 `name`/`description` 확인.
 
 ## 7. 참고 자료

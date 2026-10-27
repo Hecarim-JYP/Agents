@@ -2,7 +2,7 @@
 # 리눅스 검증(install.sh·verify-templates.sh)으로는 5.1 고유의 문제(BOM 없는 한글, 네이티브 명령 stderr 처리)가 보이지 않는다
 # — 2026-10-21까지 install.ps1은 변경 이력 10곳에서 "미수행"이었다.
 # push·PR마다 돈다 (실행 약 30초 — 2026-10-21 실측). install은 저장소 전체를 복사하므로 ps1 밖의 변경
-# (Windows에서 쓸 수 없는 파일명·경로 등)도 여기서 걸린다.
+# (Windows에서 쓸 수 없는 파일명·경로 등)도 여기서 걸린다. 훅의 Windows 전용 경로(taskkill로 프로세스 트리 종료)도 여기서 본다.
 name: verify-windows
 
 on:
@@ -66,3 +66,7 @@ jobs:
       - name: verify-templates.ps1
         shell: powershell
         run: .\scripts\verify-templates.ps1
+
+      # 3) 훅 — Windows는 프로세스 그룹이 없어 taskkill /T로 트리를 끝낸다. cmd.exe만 죽이면 npm·테스트가 남는다(Linux와 경로가 달라 여기서 따로 본다)
+      - name: hooks (timeout, process tree, file-level lint)
+        run: node scripts/test-hooks.mjs

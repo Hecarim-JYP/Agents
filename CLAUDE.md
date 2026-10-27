@@ -53,7 +53,7 @@ Claude Code의 규칙·컨벤션·스킬·훅을 버전 관리하는 저장소. 
 - **비밀값 검사**(test.yml `secrets` job·`.gitignore` 템플릿): 바꾸면 비밀값을 심은 표본(지운 파일 포함)이 검출되고 템플릿 그대로의 표본은 0건인지 확인한다
 - **운영 정보 확인**(`skills/deploy-check/check-ops-info.mjs`·CLAUDE.md 템플릿의 "운영 정보"·"정기 점검" 표): 바꾸면 표본(새 템플릿·기한 초과·정상·형식 오류·표 없음·CRLF)의 판정과 종료 코드를 확인한다
 - **PowerShell 스크립트**(`*.ps1`): 이 환경에 5.1이 없으면 push 후 `verify-windows.yml`(Windows 러너의 5.1 — 인코딩·install 결과의 install.sh 대조·verify-templates.ps1) 결과로 확인한다 — push·PR마다 자동 실행된다(약 30초)
-- **훅**: 깨진 코드로 exit 2(검출), 정상 코드로 exit 0(오탐 없음)을 각각 확인. 훅에 stdin으로 넣는 JSON은 **BOM 없이** 만든다(BOM이면 파싱 실패로 조용히 통과한다)
+- **훅**: 깨진 코드로 exit 2(검출), 정상 코드로 exit 0(오탐 없음)을 각각 확인. 훅에 stdin으로 넣는 JSON은 **BOM 없이** 만든다(BOM이면 파싱 실패로 조용히 통과한다) — `node scripts/test-hooks.mjs`가 표본 프로젝트로 판정·시간 초과(막지 않음 + 손자 프로세스까지 종료)·파일 단위 lint를 확인한다(CI verify.yml·verify-windows.yml이 push/PR마다 실행, 대조군: 2026-10-27 이전 훅은 9건 실패). Gradle 경로를 바꾸면 Spring 표본에서 `gradlew test` 시간 초과 뒤 테스트 JVM·클라이언트가 남지 않는지 직접 확인한다
 - 스택별 규칙(Dockerfile·빌드·헬스체크)을 바꾸면 그 스택을 실제로 기동해 확인한다
 
 ## Git
