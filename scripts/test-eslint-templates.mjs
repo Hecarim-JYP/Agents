@@ -20,6 +20,7 @@ const modules = args.includes('--modules') ? path.resolve(args[args.indexOf('--m
 
 // ── 사례: [파일, 코드, 걸려야 하는 것(메시지 일부 또는 ruleId) — 빈 배열이면 어떤 규칙에도 안 걸려야 한다] ──
 const SQL = 'SQL에 요청 값';
+const ENV = '환경변수에 하드코딩 폴백';
 const sqlCases = (x) => [
   // 위험 — 요청 값을 SQL에 직접 끼움
   [`src/sql-like.${x}`, "export const f = (params) => `SELECT * FROM t WHERE name LIKE '%${params.keyword}%'`;", [SQL]],
@@ -49,9 +50,25 @@ const sqlCases = (x) => [
 ];
 const serverCases = (x) => [
   ...sqlCases(x),
-  [`src/env-or.${x}`, "export const url = process.env.DB_URL || 'mysql://localhost';", ['환경변수에 하드코딩 폴백']],
-  [`src/env-nullish.${x}`, "export const url = process.env.DB_URL ?? 'mysql://localhost';", ['환경변수에 하드코딩 폴백']],
+  // 환경변수 폴백 — 그대로·변환을 거친 것·구조 분해 기본값
+  [`src/env-or.${x}`, "export const url = process.env.DB_URL || 'mysql://localhost';", [ENV]],
+  [`src/env-nullish.${x}`, "export const url = process.env.DB_URL ?? 'mysql://localhost';", [ENV]],
+  [`src/env-computed.${x}`, "export const url = process.env['DB_URL'] || 'mysql://localhost';", [ENV]],
+  [`src/env-number.${x}`, 'export const max = Number(process.env.CACHE_MAX_ENTRIES) || 50000;', [ENV]],
+  [`src/env-parseint.${x}`, 'export const port = parseInt(process.env.PORT, 10) || 3000;', [ENV]],
+  [`src/env-chain.${x}`, "export const origins = process.env.ORIGINS?.split(',') ?? ['http://localhost:5173'];", [ENV]],
+  [`src/env-method.${x}`, "export const api = process.env.API_URL.trim() || 'http://internal:8080';", [ENV]],
+  [`src/env-destructure.${x}`, 'export const { PORT = 3000 } = process.env;', [ENV]],
+  [`src/env-destructure-rename.${x}`, "const { DB_HOST: host = 'localhost' } = process.env;\nexport { host };", [ENV]],
   [`src/env-ok.${x}`, 'export const url = process.env.DB_URL;', []],
+  [`src/env-ok-number.${x}`, 'export const port = Number(process.env.PORT);', []],
+  [`src/env-ok-destructure.${x}`, 'export const { PORT } = process.env;', []],
+  [`src/env-ok-condition.${x}`, "const isOn = (v) => v === '1';\nexport const f = (force) => isOn(process.env.FEATURE_X) || force;", []],   // 조건끼리의 ||
+  [`src/env-ok-compare.${x}`, "export const f = (isTest) => process.env.NODE_ENV === 'production' || isTest;", []],
+  [`src/env-ok-other.${x}`, 'export const f = (cfg) => Number(cfg.timeout) || 3000;', []],
+  // 알려진 한계 — 템플릿 주석의 ⚠("lint 0 ≠ 폴백 0")와 같다
+  [`src/env-limit-ternary.${x}`, 'const t = Number(process.env.TTL);\nexport const ttl = Number.isFinite(t) ? t : 300000;', []],
+  [`src/env-limit-default.${x}`, 'export const parse = (raw, fallback = 60_000) => Number(raw) || fallback;', []],
   [`src/log-bare.${x}`, 'export const f = (err) => console.error(err);', ['console.error(err)']],
   [`src/log-ok.${x}`, "export const f = (err, id) => console.error('[order] 저장 실패', { id, err });", []],
   // 순환 — 확장자를 붙인 ESM 경로(TS는 '.js'로 쓴 TS 경로)를 따라가야 잡힌다

@@ -38,7 +38,15 @@ export default tseslint.config(
         'error',
         {
           // patterns.md 4절 — 시크릿·내부 주소에 하드코딩 폴백 금지 (미설정이면 기동 실패로 드러나야 한다)
-          selector: "LogicalExpression[operator=/^(\\|\\||\\?\\?)$/][left.object.object.name='process'][left.object.property.name='env']",
+          // 잡는 형태: ① process.env.X || 값 · ?? 값  ② 변환을 거친 Number(process.env.X) || 50000 · process.env.X?.split(',') ?? [...]
+          // — 오른쪽이 리터럴일 때만(isOn(process.env.FLAG) || force 같은 조건끼리의 ||는 폴백이 아니다)  ③ 구조 분해 기본값
+          // const { PORT = 3000 } = process.env (2026-10-27 — ①만 잡아 ②③ 폴백이 오류 없이 통과했다)
+          // ⚠ lint 0 ≠ 폴백 0: 변수에 옮긴 뒤의 삼항(Number.isFinite(t) ? t : 300000)·함수 기본 인자(fallback = 60_000)는 못 잡는다 — 리뷰에서 본다
+          selector: [
+            "LogicalExpression[operator=/^(\\|\\||\\?\\?)$/][left.object.object.name='process'][left.object.property.name='env']",
+            "LogicalExpression[operator=/^(\\|\\||\\?\\?)$/][right.type=/^(Literal|ArrayExpression|ObjectExpression|TemplateLiteral|UnaryExpression)$/] > :matches(CallExpression, ChainExpression).left:has(MemberExpression[object.object.name='process'][object.property.name='env'])",
+            "VariableDeclarator[init.object.name='process'][init.property.name='env'] > ObjectPattern > Property > AssignmentPattern",
+          ].join(', '),
           message: '환경변수에 하드코딩 폴백 금지 — 미설정이면 기동 실패로 즉시 드러나게 한다 (patterns.md 4절).',
         },
         {
