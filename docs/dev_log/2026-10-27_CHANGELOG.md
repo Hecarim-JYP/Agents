@@ -41,7 +41,8 @@ Gradle 보충 실측: 클라이언트의 프로세스 그룹에 SIGINT·SIGTERM�
 | 실제 ESLint 10.13 + 템플릿 `eslint.config.server-js.mjs`, 파일 400개 | 편집 1회 **3.8초 → 0.5초**(3회 측정). `no-unused-vars`·`import-x/no-cycle` 위반은 파일 단위에서도 exit 2, `dist/`(무시 대상)는 exit 0 |
 | `install.sh` 재실행 후 설치본(`~/.claude/hooks/`)으로 실행 | 공용 모듈 import 정상, settings.json 등록 2건 유지 |
 | check-refs · check-rules-sync | 통과 |
-| Windows(`taskkill` 경로) | push 후 verify-windows 결과로 확인 — **미수행** |
+| Windows(`taskkill` 경로) | verify-windows run 12(windows-latest, Node 24) — `test-hooks.mjs` 16항목 통과(시간 초과 뒤 손자 프로세스까지 종료 포함) |
+| CI | verify run 59(`test-hooks` job 포함)·verify-windows run 12 성공 (커밋 15b1618) |
 
 ### 1-4. 남은 것 (이번에 하지 않음)
 
