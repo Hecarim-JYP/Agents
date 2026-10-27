@@ -3,6 +3,7 @@
 // (근거: 학습 데이터의 기본값은 Boot 3.x — 3.x는 2026-06-25 3.5.16을 끝으로 OSS 지원이 끝났다).
 // ⚠ 생성 시 아래 버전을 Maven Central·Gradle Plugin Portal의 최신 GA로 갱신하고 CLAUDE.md에 기록한다.
 //   실빌드 검증: Boot 4.1.1 · Gradle 9.8.2 · Spotless 8.10.4 · Checkstyle 14.3.0 · ArchUnit 1.5.1 — Java 21(2026-10-19)·Java 25(2026-10-20)
+//   테스트 클래스 병렬 + ArchitectureTest 병렬 규칙: Java 25(2026-10-27) — spring.md 7절
 //   Java는 LTS만 (general.md 8-1절) — 25(2031-09 지원 종료). 선택한 버전·지원 종료일을 CLAUDE.md에 기록한다
 // 함께 만드는 파일: config/checkstyle/checkstyle.xml(템플릿), config/header.txt(파일 헤더 주석), .gitattributes(* text=auto eol=lf),
 //   gradle/osv-lock.gradle(템플릿 — 취약점 검사용, ops.md 5-1절)
@@ -62,6 +63,13 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    // 테스트 클래스끼리 병렬 실행 (spring.md 7절) — JUnit 스레드 병렬이라 JVM 하나에서 Spring 컨텍스트 캐시를 함께 쓴다.
+    // 같은 클래스의 메서드는 차례대로. 기본값(병렬 꺼짐)이면 클래스가 하나씩 차례로 돈다 (2026-10-27 실측 수치는 spring.md 7절).
+    // ⚠ 병렬이면 깨지는 것: 같은 테스트 DB를 쓰는 클래스끼리, 같은 컨트롤러의 @WebMvcTest끼리(@MockitoBean 공유) — ArchitectureTest가 잠금·분리를 강제한다
+    // 테스트 JVM 힙 기본값은 512MB(Gradle) — 컨텍스트가 많아 OutOfMemoryError가 나면 maxHeapSize = '1g'
+    systemProperty 'junit.jupiter.execution.parallel.enabled', 'true'
+    systemProperty 'junit.jupiter.execution.parallel.mode.default', 'same_thread'
+    systemProperty 'junit.jupiter.execution.parallel.mode.classes.default', 'concurrent'
     // 실패한 테스트 이름과 단언 내용을 콘솔에 — Stop 훅이 이 출력을 그대로 Claude에게 넘긴다 (없으면 "보고서를 보라"만 남는다)
     // 훅은 `gradlew test --quiet`로 돌기 때문에 quiet 수준에도 같은 설정을 둔다 (기본 수준 설정만으로는 --quiet에서 안 나온다 — 실측)
     testLogging {

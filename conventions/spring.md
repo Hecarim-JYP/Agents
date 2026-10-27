@@ -152,23 +152,110 @@ public class GlobalExceptionHandler {
 - 날짜 직렬화는 ISO 8601 고정(`LocalDate`/`LocalDateTime`), 시간대는 앱·DB 통일(database.md 1절). Boot 4의 Jackson 3은 java.time을 기본 지원한다 — jsr310 모듈을 따로 넣지 않는다 (2026-10-19 실측: `LocalDate` → `"2026-10-19"`, snake_case 전역 설정도 그대로 동작).
 - 테스트: **JUnit Jupiter(Boot 4 관리 버전 — 6.x) + `@WebMvcTest`/`MockMvc`**(API 계약) + 순수 단위 테스트(서비스 도메인 로직 — 컨텍스트 없이). 실행은 `./gradlew test` (testing.md의 `npm test` 대응).
   - Boot 4: `@WebMvcTest`는 `spring-boot-starter-webmvc-test` 의존성 + 패키지 `org.springframework.boot.webmvc.test.autoconfigure`. 목 빈은 **`@MockitoBean`**(`org.springframework.test.context.bean.override.mockito`) — **`@MockBean`은 Boot 4에서 제거됐다**(2026-10-19 실측: `package org.springframework.boot.test.mock.mockito does not exist` 컴파일 오류).
+  - **테스트 클래스는 병렬로 돈다** — 템플릿 build.gradle이 JUnit 스레드 병렬을 켠다(클래스끼리 동시, 같은 클래스의 메서드는 차례대로). JVM 하나라 Spring 컨텍스트 캐시를 함께 쓴다. 병렬이면 깨지는 두 경우를 막는다 (**STRICT**, 2026-10-27 확정) — 아래 `ArchitectureTest`가 강제한다:
+    - **테스트 DB·전체 컨텍스트(`@SpringBootTest`)·DB 슬라이스(`@JdbcTest` 등 `@AutoConfigureTestDatabase`가 붙은 것)를 쓰는 클래스는 `@ResourceLock("test-db")`** — 같은 잠금을 가진 클래스끼리는 차례대로, 다른 테스트와는 겹쳐 돈다
+    - **`@WebMvcTest`는 대상 컨트롤러를 지정하고, 컨트롤러 하나에 테스트 클래스 하나** — 시나리오가 많으면 `@Nested`로 나눈다. 설정이 같은 클래스는 컨텍스트와 `@MockitoBean` 인스턴스를 공유해 서로의 stub·초기화를 덮는다(Spring 문서의 병렬 실행 주의 사항)
+    - 실측 (2026-10-27, Boot 4.1.1·JUnit 6·Java 25, 4코어 표본): 잠금 없이 병렬만 켜면 같은 테이블을 쓰는 두 클래스가 3회 모두 실패(`expected: <3> but was: <8>`), 같은 컨트롤러의 `@WebMvcTest` 두 클래스는 같은 `@MockitoBean` 인스턴스를 받아 9~10건 실패. 규칙을 지킨 표본은 직렬 20.3~20.8초 → 병렬 11.1~11.6초, 3회 모두 통과, DB 테스트끼리는 겹치지 않았다. 포크 병렬(`maxParallelForks`)은 포크마다 JVM과 컨텍스트를 새로 띄워 이득이 작았다(19초 → 13초, 같은 표본에서 JUnit 병렬 8초)
 - **포맷·정적 검사 자동화 (스캐폴드가 설정)**: **Spotless**(google-java-format — 포맷 논쟁 제거)와 **Checkstyle**(미사용·와일드카드 import·네이밍·빈 catch)을 build.gradle에 넣고 `check`에 묶는다 — 규칙을 문서가 아니라 빌드가 강제한다 (TS/React의 ESLint 대응). CI와 훅이 `./gradlew spotlessCheck` / `./gradlew check`를 실행한다. **설정·버전은 `~/.claude/jyp/scaffolds/templates/build.gradle`·`checkstyle.xml`이 단일 출처**(2026-10-19 Boot 4.1.1·Gradle 9.8.2 실빌드 — 정상 코드 통과, 위반 검출). 이전 판의 Spotless 6.25.0은 Gradle 9에서 동작은 하지만 Gradle 11에서 제거될 API를 써서 경고가 나고, 8.10.4는 경고가 없다(실측).
-- **패키지 순환 의존은 ArchUnit 테스트가 막는다** — Checkstyle에는 이 검사가 없다(이전 판의 "Checkstyle이 순환 의존을 검사"는 틀린 기술이었다). ESLint `import/no-cycle` 대응:
+- **패키지 순환 의존은 ArchUnit 테스트가 막는다** — Checkstyle에는 이 검사가 없다(이전 판의 "Checkstyle이 순환 의존을 검사"는 틀린 기술이었다). ESLint `import/no-cycle` 대응. 병렬 테스트 규칙(위 테스트 항목)도 같은 테스트가 강제한다:
 
 ```java
-// src/test/java/{base}/ArchitectureTest.java — 템플릿 build.gradle에 archunit 의존성이 있다
+// src/test/java/{base}/ArchitectureTest.java — 템플릿 build.gradle에 archunit 의존성이 있다 (Spotless 적용 후 형태 그대로)
+/*
+ * 파일명 : ArchitectureTest.java
+ */
+package {base};
+
+import static com.tngtech.archunit.base.DescribedPredicate.describe;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.importer.ClassFileImporter;
+import com.tngtech.archunit.core.importer.ImportOption;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+
+// 패키지 순환 의존 금지 + 병렬 테스트 안전 규칙 (spring.md 7절)
 class ArchitectureTest {
+  private static final JavaClasses MAIN =
+      new ClassFileImporter()
+          .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+          .importPackages("{base}");
+  private static final JavaClasses TESTS =
+      new ClassFileImporter()
+          .withImportOption(ImportOption.Predefined.ONLY_INCLUDE_TESTS)
+          .importPackages("{base}");
+
+  // ESLint import-x/no-cycle 대응 (Checkstyle에는 이 검사가 없다)
   @Test
   void noCycles() {
-    slices().matching("{base}.(**)").should().beFreeOfCycles()
-        .check(new ClassFileImporter()
-            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-            .importPackages("{base}"));
+    slices().matching("{base}.(**)").should().beFreeOfCycles().check(MAIN);
+  }
+
+  // 테스트 클래스는 병렬로 돈다(build.gradle) — 테스트 DB·전체 컨텍스트를 쓰는 클래스는 같은 잠금으로 서로 차례대로
+  @Test
+  void dbTestsHoldTestDbLock() {
+    classes()
+        .that()
+        .areMetaAnnotatedWith(SpringBootTest.class)
+        .or()
+        .areMetaAnnotatedWith(
+            "org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase")
+        .should()
+        .beAnnotatedWith(
+            describe(
+                "@ResourceLock(\"test-db\")",
+                a ->
+                    a.getRawType().isEquivalentTo(ResourceLock.class)
+                        && "test-db".equals(a.get("value").orElse(null))))
+        .allowEmptyShould(true)
+        .check(TESTS);
+  }
+
+  // 같은 컨트롤러의 @WebMvcTest가 여러 클래스면 컨텍스트와 @MockitoBean을 공유해, 병렬일 때 서로의 stub을 덮는다
+  @Test
+  void oneWebMvcTestClassPerController() {
+    Map<String, List<String>> owners = new TreeMap<>();
+    List<String> violations = new ArrayList<>();
+    for (JavaClass c : TESTS) {
+      c.tryGetAnnotationOfType(WebMvcTest.class)
+          .ifPresent(
+              w -> {
+                List<Class<?>> targets = new ArrayList<>(List.of(w.value()));
+                targets.addAll(List.of(w.controllers()));
+                if (targets.isEmpty()) {
+                  violations.add(c.getSimpleName() + ": 대상 컨트롤러를 지정하지 않았다(모든 컨트롤러를 띄워 컨텍스트를 공유한다)");
+                }
+                targets.forEach(
+                    t ->
+                        owners
+                            .computeIfAbsent(t.getSimpleName(), k -> new ArrayList<>())
+                            .add(c.getSimpleName()));
+              });
+    }
+    owners.forEach(
+        (controller, testClasses) -> {
+          if (testClasses.size() > 1) {
+            violations.add(
+                controller + ": @WebMvcTest 클래스 " + testClasses + " — 한 클래스로 합친다(@Nested로 나눈다)");
+          }
+        });
+    assertTrue(violations.isEmpty(), String.join("\n", violations));
   }
 }
 ```
 
   실측 2026-10-19 (ArchUnit 1.5.1 + JUnit 6): 순환 없음 → 통과 / `cyc.a` ↔ `cyc.b` 서로 import → `noCycles() FAILED`로 `check` 실패.
+  실측 2026-10-27 (Java 25): DB 테스트에 잠금 없음 → `dbTestsHoldTestDbLock` 위반으로 해당 클래스 나열(`@JdbcTest` 슬라이스 포함 — 이름으로 찾으므로 jdbc-test 의존성이 없어도 컴파일된다) / 같은 컨트롤러의 `@WebMvcTest` 3개 → `oneWebMvcTestClassPerController` 위반 / 규칙을 지킨 표본 → 템플릿 그대로 `check` 통과.
 - ⚠ **줄바꿈 (Windows 함정, 2026-07-14 실측)**: Spotless의 기본 정책은 `GIT_ATTRIBUTES`라 **`.gitattributes`가 없으면 OS 기본(Windows=CRLF)을 기대**해, LF로 작성한 정상 코드가 `spotlessCheck`에서 실패한다. 저장소에 **`.gitattributes`(`* text=auto eol=lf`)를 두거나** 위처럼 `lineEndings = 'UNIX'`를 명시한다 (둘 다 두는 것을 권장).
 - 포맷 위반은 `./gradlew spotlessApply`로 자동 수정한다 — 검사(`spotlessCheck`)는 CI·훅이 돌린다.
 - 리버스 프록시 뒤에서는 `server.forward-headers-strategy: native` 설정 — Express `trust proxy`의 대응 (docker.md 7절). **`framework`(ForwardedHeaderFilter)는 `X-Forwarded-For`의 맨 왼쪽 값, 즉 클라이언트가 보낸 값을 클라이언트 IP로 쓴다** (spring-web 6.2 소스 확인, 2026-10-16 정정 — Boot 4.1.1·spring-web 7.0.9 실측 2026-10-19: XFF `6.6.6.6, 192.0.2.2` → framework `6.6.6.6`, native `192.0.2.2`). `native`(Tomcat RemoteIpValve)도 사설 대역 IP를 프록시로 보고 건너뛰므로, 어느 쪽이든 **프록시가 `X-Forwarded-For`를 덮어쓰는 것이 전제**다 (features/rate-limit.md 3-1절).
