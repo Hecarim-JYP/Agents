@@ -1,0 +1,30 @@
+# ESLint 템플릿 검사 (scripts/test-eslint-templates.mjs) — 템플릿 4종을 실제 ESLint로 돌려 규칙마다 위반은 걸리고 정상은 안 걸리는지 본다.
+# 선택자·리졸버 설정은 틀려도 오류 없이 아무것도 잡지 않는다(2026-10-19 no-cycle 무력 / 2026-10-27 SQL 보간 오탐·누락, .jsx 순환 누락).
+# push마다 돌리지 않는다 — 템플릿 주석의 설치 명령(버전 미고정 패키지 포함)을 그대로 설치하므로 결과가 외부 배포에도 달려 있다(check-versions와 같은 이유).
+# 템플릿·검사가 바뀔 때 + 주 1회(새 플러그인 릴리스가 규칙을 조용히 끄는지)만 돈다.
+name: eslint-templates
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'scaffolds/templates/eslint.config.*.mjs'
+      - 'scripts/test-eslint-templates.mjs'
+      - '.github/workflows/eslint-templates.yml'
+  pull_request:
+    paths:
+      - 'scaffolds/templates/eslint.config.*.mjs'
+      - 'scripts/test-eslint-templates.mjs'
+  schedule:
+    - cron: '41 0 * * 1'   # 매주 월요일 09:41 KST — 예약 실행은 기본 브랜치(main) 기준
+  workflow_dispatch:
+
+jobs:
+  eslint-templates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - run: node scripts/test-eslint-templates.mjs   # 템플릿 주석의 npm i -D로 실제 패키지를 설치한다 (약 30초)
