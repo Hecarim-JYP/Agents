@@ -51,3 +51,41 @@ Gradle 보충 실측: 클라이언트의 프로세스 그룹에 SIGINT·SIGTERM�
 - typecheck는 여전히 편집마다 프로젝트 전체(`tsc --noEmit`)를 돈다. 파일 단위로는 tsconfig 기준 검사가 안 된다
 - 실패 → 이어진 작업 → `stop_hook_active`로 건너뛴 턴에서 다시 생긴 마커는 다음 턴 끝에 테스트를 한 번 더 돌린다(수정 확인이 한 턴 늦어지는 대신 생략되지는 않는 동작이라 유지)
 - Spring 테스트 직렬 실행(Gradle·JUnit 기본값) — 실측: 같은 표본 19초 → JUnit 클래스 병렬 8초. DB 테스트 잠금 규칙과 함께 정해야 해 별도로 진행한다
+
+---
+
+## 2. Spring 테스트 클래스 병렬 실행 (feat)
+
+### 2-1. 배경
+
+Spring 템플릿에 병렬 설정이 없어 Gradle·JUnit 기본값(테스트 JVM 1개, 병렬 꺼짐)으로 클래스가 하나씩 차례로 돌았다 — 종료 훅이 매 턴 이 직렬 `gradlew test`를 돌린다. Node(Vitest)는 기본이 파일 단위 병렬이라 해당 없음.
+
+### 2-2. 병렬만 켜면 깨지는 것 (실측, Boot 4.1.1·JUnit 6·Java 25, 4코어 표본)
+
+| 경우 | 잠금 없이 병렬 (3회) |
+|---|---|
+| 같은 테스트 DB 테이블을 쓰는 `@SpringBootTest` 두 클래스 | 3회 모두 실패 — `expected: <3> but was: <8>` |
+| 같은 컨트롤러의 `@WebMvcTest` 두 클래스 | 같은 `@MockitoBean` 인스턴스를 받아(직렬 실행에서도 identityHashCode 동일 — 컨텍스트 캐시 공유) 상대의 stub·초기화에 덮여 9~10건 실패 |
+
+### 2-3. 변경
+
+- `scaffolds/templates/build.gradle`: test 블록에 JUnit 스레드 병렬(클래스끼리 동시, 같은 클래스의 메서드는 차례대로). 포크 병렬(`maxParallelForks`)은 포크마다 JVM·컨텍스트를 새로 띄워 이득이 작아 쓰지 않는다(19초 → 13초, JUnit 병렬 8초)
+- `spring.md` 7절: 병렬 규칙 (STRICT, 2026-10-27) — 테스트 DB·`@SpringBootTest`·DB 슬라이스 클래스는 `@ResourceLock("test-db")`, `@WebMvcTest`는 컨트롤러당 한 클래스(`@Nested`로 나눔). `ArchitectureTest` 코드에 두 규칙을 강제하는 테스트 추가(Spotless 적용 후 형태 그대로 — 복사만으로 `check` 통과)
+- `testing.md` 0절 구성 행에 연결, `dev-rules.md` 테스트 줄에 금지 항목명 + 요약 확인일 2026-10-27
+
+### 2-4. 검증
+
+| 확인 | 결과 |
+|---|---|
+| 규칙을 지킨 표본 — 병렬 3회 / 직렬 2회 | 병렬 11.1~11.6초, 3회 모두 통과 / 직렬 20.3~20.8초. DB 테스트끼리는 겹치지 않고 나머지와는 겹침(결과 XML 시작 시각) |
+| `ArchitectureTest` 위반 검출 | 잠금 없는 `DbRaceATest`·`DbRaceBTest` 나열 / 같은 컨트롤러 `@WebMvcTest` 3개 나열 / `@JdbcTest`(jdbc-test 의존성 추가)도 검출 — 애너테이션을 이름으로 찾아 의존성이 없는 프로젝트에서도 컴파일된다 |
+| 순환 의존 대조군 (`cyc.a` ↔ `cyc.b`) | `noCycles() FAILED`로 `check` 실패 — 기존 검사 유지 |
+| 문서 코드를 그대로 꺼내 최종 템플릿과 합친 새 표본 | `spotlessApply` 없이 `./gradlew check` 통과 |
+| 종료 훅(설치본) — 병렬 설정 표본 | 실패 테스트 → exit 2 + `BrokenTest > 합계가_맞다 FAILED` / 정상 → exit 0 |
+| check-refs · check-rules-sync | 통과 |
+
+### 2-5. 남은 것
+
+- **기존 Spring 프로젝트에는 install로 반영되지 않는다** — 템플릿이라 새 프로젝트에만 적용된다. 기존 프로젝트는 build.gradle 3줄 + ArchitectureTest 두 테스트 + DB 테스트 잠금을 직접 옮긴다
+- Node(Vitest)도 파일 단위 병렬이 기본이라, 테스트 DB를 쓰는 테스트 파일끼리 같은 문제가 생길 수 있다 — 이번 범위 밖(확인·규칙 미정)
+- 테스트 JVM 힙 기본값 512MB — 컨텍스트가 많은 프로젝트에서 부족하면 `maxHeapSize`(build.gradle 주석에 안내)
