@@ -43,8 +43,16 @@ export default [
         },
         {
           // sql.md 7절 — 문자열 연결로 쿼리를 조립하지 않는다 (인젝션)
-          selector: "TemplateLiteral[expressions.length>0][quasis.0.value.raw=/\\b(select|insert|update|delete)\\b/i]",
-          message: 'SQL에 템플릿 리터럴 보간 금지 — 값은 항상 바인딩 파라미터로 전달한다 (sql.md 7절).',
+          // 요청 값(params.x · queryParams.x · body.x · query.x · req.*.x)을 SQL 문자열에 직접 끼운 경우만 잡는다 — 코드에 고정된
+          // 조건절 조각·자리표시 목록(`${cond ? 'AND k = :k' : ''}` · `IN (:id_0, …)`)은 정상 설계라 잡지 않는다.
+          // SQL 단어는 모든 글자 조각에서, 절 단어(AND·LIKE·ORDER BY …)까지 찾는다 — 첫 조각의 문장 단어만 보면 `${}`가 앞에 오는
+          // 문자열과 조건절 조각에 넣은 값을 놓친다. 대문자만 본다(sql.md 1절) — 영문 로그·화면 주소(`?mode=update`)는 거른다.
+          // (2026-10-27 — 이전 선택자는 기존 프로젝트에서 정상 코드 81건을 잡고 위 두 형태를 놓쳤다)
+          // ⚠ 못 잡는다: 지역 변수로 옮긴 값(`const { keyword } = params`)·소문자 SQL·요청 키로 만든 컬럼 목록 — 리뷰에서 본다
+          selector:
+            'TemplateLiteral:has(TemplateElement[value.raw=/\\b(SELECT|INSERT|UPDATE|DELETE|FROM|WHERE|AND|OR|LIKE|IN|SET|VALUES|ORDER BY|GROUP BY|HAVING|LIMIT|OFFSET|JOIN|ON)\\b/])' +
+            ' > MemberExpression:matches([object.name=/^(params|queryParams|body|query)$/], [object.object.name="req"])',
+          message: 'SQL에 요청 값 직접 보간 금지 — 값은 바인딩 파라미터로, 컬럼·정렬 방향은 허용 목록에서 골라 넣는다 (sql.md 7절).',
         },
       ],
     },
