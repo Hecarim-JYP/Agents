@@ -15,7 +15,7 @@ Claude Code에서 사용하는 나만의 맞춤형 에이전트(페르소나) �
 | `profiles/` | 프로젝트 생성 프리셋 — 결정 항목의 기본 답안 (`project-default.md`: 사내 업무 시스템 표준) |
 | `scaffolds/` | 새 프로젝트 폴더 구조·초기 파일 스펙 + `templates/`(compose·프록시(nginx-proxy/Caddyfile)·nginx·ESLint·Gradle·백업 스크립트 실물 템플릿) |
 | `rules/` | 프로젝트 CLAUDE.md에 import해서 쓰는 규칙 파일 |
-| `skills/` | 슬래시 커맨드 — `/work-log`(작업 정리), `/deploy-check`(배포 준비), `/live-test`(통합 테스트 — 정적 추적 + 실측), `/paper-test`(정적 추적), `/review`(컨벤션 준수 리뷰), `/new-project`(프로젝트 세팅) |
+| `skills/` | 슬래시 커맨드 — `/work-log`(작업 정리), `/deploy-check`(배포 준비), `/live-test`(통합 테스트 — 정적 추적 + 실측), `/paper-test`(정적 추적), `/project-upgrade`(기존 프로젝트 업그레이드), `/review`(컨벤션 준수 리뷰), `/new-project`(프로젝트 세팅) |
 | `schemas/` | DB 기초 테이블 표준 DDL — 인증·권한, 공통코드, 파일 메타, 감사 로그, 법인(멀티테넌트), 배치 이력, outbox(쓰기 연동 대기열), 변경 이력, 결재, 화면 알림, 장시간 작업, 에러 집계, 운영 설정, 개인정보 접속기록, 로그인 세션, 계정 확인 토큰, 2단계 인증, 소셜 계정 연결, 약관 동의 이력, 탈퇴 후 분리 보관, 문의·신고, 웹훅 수신함, 공개 API 키, 결제, 열람등요구, schema_migrations |
 | `install.ps1` | `~/.claude`에 에이전트·템플릿·컨벤션·스캐폴드를 설치 |
 
@@ -56,6 +56,7 @@ qa-claude로 결제 모듈 깨뜨려봐
 /live-test        # 통합 테스트 (정적 추적 → 개발 환경 실측 → 통합 판정. 실측 불가 환경이면 정적만)
 /paper-test       # 정적 추적만 (코드를 읽어 계층 간 계약 검증)
 /review           # 컨벤션 준수 리뷰 (현재 변경 diff)
+/project-upgrade  # 기존 프로젝트를 최신 템플릿·규칙으로 올리기 (미리보기 → 적용 → 검증)
 ```
 
 ### 방법 2: 프로젝트 전체에 규칙 적용

@@ -32,6 +32,7 @@ doc-claude로 주간 보고서 써줘            # 문서 페르소나 호출
 /live-test                               # 통합 테스트 (정적 추적 + 개발 환경 실측)
 /paper-test                              # 정적 추적만
 /review                                  # 컨벤션 준수 리뷰 (현재 변경 diff)
+/project-upgrade                         # 기존 프로젝트를 최신 템플릿·규칙으로 올리기
 ```
 
 특정 프로젝트에 규칙을 상시 적용하려면 그 프로젝트의 `CLAUDE.md`에 한 줄 추가:
@@ -49,7 +50,7 @@ Agents/
 ├── agents/            # 페르소나 3종 (dev-claude, doc-claude, qa-claude)
 ├── rules/             # 작업 규칙 2종 — 페르소나와 프로젝트 CLAUDE.md가 참조하는 SSOT
 ├── conventions/       # 코딩 컨벤션 17종 (범용 → 스택별 → 운영까지) + features/ 운영 기능 카탈로그·레시피
-├── skills/            # 슬래시 커맨드 6종 (new-project, work-log, deploy-check, paper-test, live-test, review)
+├── skills/            # 슬래시 커맨드 7종 (new-project, work-log, deploy-check, paper-test, live-test, review, project-upgrade)
 ├── profiles/          # 프로젝트 생성 프리셋 (project-default.md — 결정 항목의 기본 답안)
 ├── scaffolds/         # 새 프로젝트 초기 구조 스펙 (default.md + templates/ 실물 파일)
 ├── schemas/           # DB 기초 테이블 표준 DDL 29종
@@ -140,7 +141,7 @@ dev-claude가 읽고, 프로젝트 CLAUDE.md가 `@`로 import하는 파일. 주�
 
 doc-claude 규칙의 프로젝트 import용 축약판 — 템플릿 준수, 추측 금지(모호하면 질문, 복수 해석은 병기 — 2026-07-13 추가), 두괄식, 근거 표기, 수치 우선, 금지사항.
 
-### 4-3. 스킬 (슬래시 커맨드 6종)
+### 4-3. 스킬 (슬래시 커맨드 7종)
 
 자연어("작업 정리해줘")와 슬래시 커맨드(`/work-log`)가 동일하게 동작하는 정식 명령. 절차의 SSOT는 각 SKILL.md다.
 
@@ -169,6 +170,10 @@ doc-claude 규칙의 프로젝트 import용 축약판 — 템플릿 준수, 추�
 #### /live-test — 통합 테스트 (정적 추적 + 실측)
 
 통합 테스트의 상위 명령이다(2026-10-14 신설, 2026-10-16 상위 개념으로 재구성). **0단계** 환경 판별로 모드를 정하고(앱·개발 DB에 닿으면 전체 모드, 아니면 정적 모드 — 전체 모드는 운영 DB 대조 필수), **1단계**에서 /paper-test 절차를 그대로 수행해 넓게 훑고(읽기 전용, 병렬 허용), **2단계**에서 ② 의심 전부·① 버그 재현·③ 핵심 표본·정적으로 못 보는 5축(런타임·실DB·외부 연동·동시성·렌더링)을 개발 환경에서 실제로 돌려 확인하고(하이브리드 — 자동 조작 + 관찰자, 병렬 금지), **3단계**에서 항목마다 정적 판정 × 실측 판정을 합쳐 최종 ①②③을 낸다. 정적으로는 정상이었는데 실측에서 결함이 나온 항목은 **★정적 누락**으로 따로 표시한다. 실측 단계 규칙의 SSOT는 [testing.md](../conventions/testing.md) 6절(운영 DB 접속 금지·개발 DB 허용 범위·작업 폴더·증거). 코드 수정 금지, 백로그 반영은 통합 판정 후 한 번.
+
+#### /project-upgrade — 기존 프로젝트 업그레이드
+
+install은 `~/.claude`만 갱신하므로, 프로젝트에 복사된 템플릿을 최신으로 옮기는 명령이다. 정해진 변경은 `upgrade.mjs`가 단계별로 판정·적용(여러 번 실행해도 같은 결과)하고, 판단이 필요한 것만 Claude가 처리한 뒤 lint·test·`gradlew check`로 검증한다 — 절차는 [skills/project-upgrade/SKILL.md](../skills/project-upgrade/SKILL.md), 변경 목록의 원본은 스크립트의 단계다.
 
 #### /review — 컨벤션 준수 리뷰
 
