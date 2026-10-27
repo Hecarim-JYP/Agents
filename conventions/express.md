@@ -118,4 +118,5 @@ try {
 
 - MariaDB/MySQL 드라이버가 BigInt를 반환하는 값(count, affectedRows, insertId)은 `Number()` 변환 후 사용 (근거: BigInt는 JSON 직렬화 시 오류를 일으킨다).
 - 환경변수 시크릿/내부 주소에 하드코딩 폴백 금지 — 미설정 시 부팅 실패 (patterns.md 4절).
+- DB 접속은 운영과 같은 `DB_*`만 읽는다 — 테스트에서는 Vitest 워커 설정이 `DB_*`를 그 워커의 테스트 DB로 덮어쓴다 (testing.md 0절). 앱에 테스트 분기(`NODE_ENV === 'test'`)를 넣지 않는다.
 - 소프트삭제·쿼리 스타일은 `sql.md` 참조.

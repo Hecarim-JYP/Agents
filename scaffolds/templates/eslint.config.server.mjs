@@ -59,4 +59,10 @@ export default tseslint.config(
     files: ['scripts/**', 'src/migrate/**'],
     rules: { 'no-restricted-syntax': 'off' },
   },
+  {
+    // 설정·테스트 준비 파일(vitest.config.mjs, test/setup/*.mjs)은 JS다 — Node 전역을 주지 않으면
+    // 'process is not defined'로 lint가 실패한다 (2026-10-27 실측)
+    files: ['**/*.{js,mjs}'],
+    languageOptions: { globals: globals.node },
+  },
 );

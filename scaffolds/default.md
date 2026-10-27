@@ -126,7 +126,7 @@
 | 스택 | 조정 내용 |
 |---|---|
 | Python | `pyproject.toml` 추가, `src/<패키지명>/` 레이아웃, `src/<패키지명>/__init__.py`. 테스트: **pytest** |
-| Node/Express 서버 | **언어는 체크리스트 1에서 확인** — `package.json`(`"type": "module"`). TS면 `tsconfig.json`(`strict: true`) + 개발 `tsx watch` / 배포 `tsc` 빌드 — **TypeScript는 `typescript@~6.0.3`으로 고정**(린트 절 — `npm i -D typescript`는 7.x를 설치해 ESLint 설치가 ERESOLVE로 깨진다), JS면 개발 `node --watch` / 빌드 없음. 계층 구조는 `conventions/express.md` 1절, 경계 검증은 **zod**. 테스트: **Vitest + supertest** — 의존성 설치 + `"test"` 스크립트 등록까지 스캐폴드가 한다. DB 사용 시 **마이그레이션 러너**(`npm run migrate` — migration.md 5절) 포함 |
+| Node/Express 서버 | **언어는 체크리스트 1에서 확인** — `package.json`(`"type": "module"`). TS면 `tsconfig.json`(`strict: true`) + 개발 `tsx watch` / 배포 `tsc` 빌드 — **TypeScript는 `typescript@~6.0.3`으로 고정**(린트 절 — `npm i -D typescript`는 7.x를 설치해 ESLint 설치가 ERESOLVE로 깨진다), JS면 개발 `node --watch` / 빌드 없음. 계층 구조는 `conventions/express.md` 1절, 경계 검증은 **zod**. 테스트: **Vitest + supertest** — 의존성 설치 + `"test"` 스크립트 등록까지 스캐폴드가 한다. DB 사용 시 **마이그레이션 러너**(`npm run migrate` — migration.md 5절) 포함. **테스트 DB 사용(체크리스트 21-a)이면** `~/.claude/jyp/scaffolds/templates/`에서 `vitest.config.server.mjs` → `server/vitest.config.mjs`, `vitest-test-db.global.mjs`·`vitest-test-db.worker.mjs` → `server/test/setup/test-db.global.mjs`·`test-db.worker.mjs`로 복사한다 — 워커마다 테스트 DB를 따로 써서 병렬 테스트가 서로의 데이터를 지우지 않는다(testing.md 0절). 의존성: `mysql2`(앱과 같은 드라이버) |
 | Spring Boot 서버 | **Java 25(LTS) + Spring Boot 4.x + Gradle 9.x — Boot 3.x로 시작하지 않는다**(spring.md 0절 STRICT). 구조·패턴은 `conventions/spring.md`. Spring Initializr 산출물로 시작(webmvc, validation, actuator, flyway + DB 드라이버) — **Initializr에 접근할 수 없으면 `~/.claude/jyp/scaffolds/templates/build.gradle`을 복사**하고 버전을 Maven Central 최신 GA로 갱신한다(기억으로 쓰지 않는다 — 학습 데이터 기본값이 Boot 3.x다). `config/checkstyle/checkstyle.xml`은 템플릿 `checkstyle.xml`, `config/header.txt`(파일 헤더 주석), `gradle/osv-lock.gradle`(취약점 검사용 — 템플릿 `osv-lock.gradle`, ops.md 5-1절)도 함께. **데이터 접근 의존성은 체크리스트 24 선택에 따른다**: JdbcClient=`spring-boot-starter-jdbc`(별도 ORM 없음) / JPA=`spring-boot-starter-data-jpa`(+ QueryDSL 포크 `io.github.openfeign.querydsl`) / MyBatis=`mybatis-spring-boot-starter`(⚠ Boot 대응 버전 — 4.0.x↔4.0, 4.1.x↔4.1). **Gradle wrapper jar 확보 필수**(Initializr 산출물, 또는 로컬 Gradle로 `gradle wrapper --gradle-version 9.x`, 둘 다 없으면 spring.md 0절 컨테이너 방식) + `git update-index --chmod=+x gradlew`(Windows 실행 비트 유실 — spring.md 0절). 마이그레이션: **Flyway**(`spring.flyway.enabled=false` + 별도 단계). 테스트: **JUnit Jupiter(Boot 4 관리) + `@MockitoBean`**, `./gradlew test` + **패키지 순환 검사 `ArchitectureTest`(ArchUnit — spring.md 7절)**. **자동 강제: Spotless + Checkstyle을 `check`에 연결**(템플릿에 포함) |
 | React/Next.js | **언어는 체크리스트 1에서 확인** — TS면 Vite `react-ts` 템플릿 / Next.js `create-next-app --typescript` + `strict: true` 고정, JS면 Vite `react` 템플릿 / `create-next-app`(TS 미지정). **CLI 산출물 위에 얹은 뒤 데모 잔재를 정리한다**: ⚠ 최신 Vite 템플릿(create-vite 9.x, 2026-10-19 확인)은 **린트가 oxlint(`"lint": "oxlint"`)이고 TypeScript가 `~7.0`이다** — `oxlint` 의존성을 지우고 `lint` 스크립트를 ESLint로 바꾸며(린트 절), **TS는 `~6.0.3`으로 내린다**(TS 7이면 ESLint 설치가 ERESOLVE). 데모 App/CSS/로고 에셋 제거, `index.html`의 `<title>`·메타를 프로젝트명으로 치환, favicon 결정. 스타일링: **Tailwind + shadcn/ui — `design.md` 8절 셋업 레시피의 체크리스트 전 항목 수행**(JS 프로젝트면 `components.json`의 `tsx: false` 포함). 테스트: **Vitest + Testing Library** — ⚠ Vite 템플릿에는 test 스크립트가 없다: 의존성 설치 + `"test": "vitest run --passWithNoTests"` 등록까지 해야 CI `npm test`가 깨지지 않는다 |
 | 기타 | 해당 언어 커뮤니티의 표준 레이아웃을 조사해서 따르고, CLAUDE.md/docs/는 항상 추가. 테스트 도구는 해당 언어 표준 채택 |
@@ -248,7 +248,8 @@ DB_NAME=<프로젝트명>
 DB_USER=
 DB_PASSWORD=
 DB_ROOT_PASSWORD=
-# 테스트 DB (체크리스트 21 — 사용 시)
+# 테스트 DB (체크리스트 21 — 사용 시). 호스트에서 테스트를 돌리므로 HOST는 127.0.0.1, PORT는 db-test의 노출 포트
+TEST_DB_HOST=127.0.0.1
 TEST_DB_NAME=<프로젝트명>_test
 TEST_DB_USER=
 TEST_DB_PASSWORD=
@@ -352,7 +353,7 @@ jobs:
           "$RUNNER_TEMP/gitleaks" git --redact --no-banner .   # --redact: CI 로그에 비밀값을 다시 찍지 않는다
 ```
 
-- 단일 구조 프로젝트는 해당 스택 job 하나 + docker job으로 축소 (`working-directory` 제거, `docker build .`). 서버가 Node면 test-server도 Node job 형태로 하되 **`services:`와 `env:` 블록은 그대로 유지**한다.
+- 단일 구조 프로젝트는 해당 스택 job 하나 + docker job으로 축소 (`working-directory` 제거, `docker build .`). 서버가 Node면 test-server도 Node job 형태로 하되 **`services:`와 `env:` 블록은 그대로 유지**한다. Node 서버의 워커별 테스트 DB는 root로 만든다 — **`MARIADB_ROOT_PASSWORD`를 `TEST_DB_PASSWORD`와 같게 둔다**(dev compose의 db-test도 같다, testing.md 0절).
 - **테스트 DB를 쓰지 않기로 했으면(체크리스트 21-b) `services:`·`env:` 블록을 제거**한다 — 대신 쿼리 목킹으로 테스트한다.
 - Python 프로젝트는 `setup-python` + `pip install -e .[dev]` + `pytest`로 대체.
 - docker job은 이미지 빌드 성공만 검증한다 — Dockerfile이 깨진 채 배포 시점까지 가는 것을 방지 (push/실행은 하지 않음).

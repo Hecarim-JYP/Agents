@@ -16,7 +16,9 @@ export default [
   { ignores: ['dist/**', 'node_modules/**'] },
   js.configs.recommended,
   {
-    files: ['**/*.js'],
+    // .mjs 포함 — 설정·테스트 준비 파일(vitest.config.mjs, test/setup/*.mjs)이 .mjs다. 빠지면 Node 전역이 없어
+    // 'process is not defined'로 lint가 실패하고 아래 규칙도 적용되지 않는다 (2026-10-27 실측)
+    files: ['**/*.{js,mjs}'],
     languageOptions: { globals: globals.node },
     // import-x/no-cycle이 확장자 없는 경로·jsconfig paths 별칭(@/)까지 따라가게 한다 (2026-10-21 실측)
     settings: {
