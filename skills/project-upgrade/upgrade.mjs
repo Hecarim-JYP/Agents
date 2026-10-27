@@ -120,7 +120,7 @@ const template = (name) => readFileSync(path.join(TEMPLATES, name), 'utf8').repl
 const findFile = (d, name) => [...new Set([d, REPO])].map((x) => path.join(x, name)).find((p) => load(p) !== null) ?? null;
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════
-// 2026-10-27 묶음 (변경 이력 docs/dev_log/2026-10-27_CHANGELOG.md 1~4부)
+// 2026-10-27 묶음 (변경 이력 docs/dev_log/2026-10-27_CHANGELOG.md 1~4부·8부)
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 
 // A. lint 스크립트 — 편집 훅은 단일 eslint 호출(경로 외 옵션은 --max-warnings만)일 때만 편집한 파일만 lint한다
@@ -277,6 +277,56 @@ for (const d of nodePkgs) {
   const setupDir = path.join(d, 'test', 'setup');
   const direct = walk(d, (n) => /\.(m?[jt]s|cjs)$/.test(n)).filter((f) => !f.startsWith(setupDir) && !/vitest\.config/.test(f) && /TEST_DB_/.test(load(f)));
   if (direct.length) report(step, 'manual', `TEST_DB_*를 직접 읽는 코드 — DB_*만 읽게 바꾼다(워커 설정이 덮어쓴다): ${direct.map(rel).join(', ')}`);
+}
+
+// 템플릿 원문의 한 부분을 프로젝트 들여쓰기에 맞춰 가져온다 — m[1]은 템플릿 쪽 들여쓰기
+const reindent = (m, indent) => m[0].split('\n').map((l) => (l.startsWith(m[1]) ? indent + l.slice(m[1].length) : l)).join('\n');
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// B3. ESLint 서버 설정 — SQL 보간 규칙을 "요청 값을 SQL에 직접 끼운 경우"로 (sql.md 7절, 변경 이력 8부)
+// 이전 선택자는 코드에 고정된 조건절 조각·자리표시 목록까지 잡아 정상 코드가 끄기 주석으로 쌓였고, `${}`가 SQL 단어보다 앞인 문자열·
+// 조건절 조각에 넣은 값은 놓쳤다. 템플릿 원문일 때만 바꾼다 — 새 메시지가 있으면(프로젝트가 직접 고친 규칙 포함) 건드리지 않는다
+const OLD_SQL_SELECTOR = String.raw`selector: "TemplateLiteral[expressions.length>0][quasis.0.value.raw=/\\b(select|insert|update|delete)\\b/i]",`;
+const SQL_RULE_MARK = 'SQL에 요청 값 직접 보간 금지';
+for (const d of nodePkgs) {
+  const step = `B3 ESLint SQL 보간 규칙 (${rel(d)})`;
+  if (!isNodeServer(d)) { report(step, 'skip', 'Node 서버가 아니다 (서버 프레임워크 의존성 없음)'); continue; }
+  const file = eslintFile(d);
+  if (!file) { report(step, 'skip', 'eslint 설정 없음'); continue; }
+  const text = load(file);
+  if (text.includes(SQL_RULE_MARK)) { report(step, 'done', rel(file)); continue; }
+  const old = text.match(new RegExp(String.raw`^([ \t]*)// sql\.md 7절[^\n]*\n(?:[ \t]*//[^\n]*\n)*[ \t]*${escapeRe(OLD_SQL_SELECTOR)}\n[ \t]*message: '[^\n]*\n`, 'm'));
+  if (!old) {
+    if (text.includes(OLD_SQL_SELECTOR)) report(step, 'manual', `${rel(file)} — 이전 SQL 선택자가 있지만 주석·메시지 형태가 템플릿과 달라 자동으로 못 바꾼다 — 템플릿 eslint.config.server(-js).mjs의 sql.md 7절 블록으로 교체`);
+    else report(step, 'skip', `${rel(file)} — 템플릿의 SQL 보간 규칙이 없다 (프로젝트가 바꾼 규칙이면 그대로 둔다)`);
+    continue;
+  }
+  // JS·TS 서버 템플릿의 규칙 블록은 같다 (scripts/test-eslint-templates.mjs가 둘 다 확인)
+  const fresh = template('eslint.config.server-js.mjs').match(/^([ \t]*)\/\/ sql\.md 7절[^\n]*\n[\s\S]*?^[ \t]*message: 'SQL에 요청 값 직접 보간 금지[^\n]*\n/m);
+  save(file, text.replace(old[0], () => reindent(fresh, old[1])));   // 함수로 넘긴다 — 문자열이면 블록 안의 $' 같은 치환 패턴이 해석된다
+  report(step, 'apply', `${rel(file)} — 요청 값(params.x·body.x·req.*.x)을 SQL에 직접 끼운 경우만 잡는 선택자로 교체. lint가 새로 잡는 것은 실제 보간이다`);
+  // 이전 규칙의 오탐을 끈 주석은 이제 필요 없을 수 있다 — ESLint가 'Unused eslint-disable directive' 경고로 정확히 가리킨다
+  const disabled = walk(d, (n) => /\.(c|m)?[jt]sx?$/.test(n)).filter((f) => /eslint-disable[^\n]*no-restricted-syntax/.test(load(f)));
+  if (disabled.length) report(step, 'note', `no-restricted-syntax 끄기 주석이 있는 파일 ${disabled.length}개 — npm run lint의 'Unused eslint-disable directive' 경고가 가리키는 것은 지운다`);
+}
+
+// B4. ESLint JS 클라이언트 설정 — .jsx도 순환 검사 대상으로 (변경 이력 8부)
+// import-x는 import-x/extensions(기본 .js·.mjs·.cjs)에 없는 의존 파일을 읽지 않아, .jsx 컴포넌트 사이 순환을 오류 없이 놓쳤다
+const RESOLVER_LINE = /^([ \t]*)'import-x\/resolver-next': \[createTypeScriptImportResolver\(\), createNodeResolver\(\{ extensions: \['\.js', '\.jsx', '\.mjs'\] \}\)\],\n/m;
+for (const d of nodePkgs) {
+  const step = `B4 ESLint .jsx 순환 검사 (${rel(d)})`;
+  const file = eslintFile(d);
+  if (!file) { report(step, 'skip', 'eslint 설정 없음'); continue; }
+  const text = load(file);
+  if (!text.includes("'import-x/no-cycle'")) { report(step, 'skip', `${rel(file)} — import-x/no-cycle을 쓰지 않는다`); continue; }
+  if (!walk(d, (n) => n.endsWith('.jsx')).length) { report(step, 'skip', '.jsx 파일이 없다'); continue; }
+  const exts = text.match(/'import-x\/extensions':\s*\[([^\]]*)\]/);
+  if (exts) { report(step, exts[1].includes("'.jsx'") ? 'done' : 'manual', `${rel(file)}${exts[1].includes("'.jsx'") ? '' : " — import-x/extensions에 '.jsx'가 없다"}`); continue; }
+  const at = text.match(RESOLVER_LINE);
+  if (!at) { report(step, 'manual', `${rel(file)} — 템플릿 형태가 아니다. settings에 'import-x/extensions': ['.js', '.jsx', '.mjs']를 넣는다`); continue; }
+  const fresh = template('eslint.config.client-js.mjs').match(/^([ \t]*)\/\/ import-x는 이 목록[^\n]*\n[ \t]*'import-x\/extensions'[^\n]*\n/m);
+  save(file, text.replace(at[0], () => reindent(fresh, at[1]) + at[0]));
+  report(step, 'apply', `${rel(file)} — settings에 'import-x/extensions' (.jsx 포함). lint가 새로 잡는 순환은 실제 순환이다`);
 }
 
 // C1. Spring Boot 4.1.1 → 4.1.2 — Boot가 Tomcat 11.0.27을 관리하게 돼 Tomcat 덮어쓰기를 지운다 (Jackson 3.1.8 덮어쓰기는 유지)

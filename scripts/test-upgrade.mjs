@@ -124,7 +124,20 @@ const run = (dir, ...a) => {
 // 없는 파일은 빈 값 — 대조군(수정 전 스크립트)이 파일을 안 만들어도 시험이 죽지 않고 ✗로 남게 한다
 const read = (dir, f) => (existsSync(path.join(dir, f)) ? readFileSync(path.join(dir, f), 'utf8') : '');
 const clean = (dir) => git(dir, 'status', '--porcelain').trim() === '';
-const commitAll = (dir) => { git(dir, 'add', '-A'); git(dir, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'upgrade'); };
+// 바뀐 것이 없어도 실패하지 않는다 — 대조군(수정 전 스크립트)이 아무것도 안 바꿔도 시험이 죽지 않고 ✗로 남게 한다
+const commitAll = (dir) => { git(dir, 'add', '-A'); git(dir, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'upgrade', '--allow-empty'); };
+
+// ESLint 규칙 교체(B3·B4)의 이전 템플릿 — 현재 템플릿에서 바뀐 부분만 되돌린다. 적용 뒤 현재 템플릿과 글자까지 같아야 한다
+const tplText = (n) => readFileSync(path.join(repo, 'scaffolds', 'templates', n), 'utf8').replace(/\r\n/g, '\n');
+const OLD_SQL_BLOCK = [
+  '          // sql.md 7절 — 문자열 연결로 쿼리를 조립하지 않는다 (인젝션)',
+  String.raw`          selector: "TemplateLiteral[expressions.length>0][quasis.0.value.raw=/\\b(select|insert|update|delete)\\b/i]",`,
+  "          message: 'SQL에 템플릿 리터럴 보간 금지 — 값은 항상 바인딩 파라미터로 전달한다 (sql.md 7절).',",
+  '',
+].join('\n');
+const oldSql = (n) => tplText(n).replace(/^ *\/\/ sql\.md 7절[^\n]*\n[\s\S]*?^ *message: 'SQL에 요청 값 직접 보간 금지[^\n]*\n/m, () => OLD_SQL_BLOCK);
+const oldJsx = () => tplText('eslint.config.client-js.mjs').replace(/^ *\/\/ import-x는 이 목록[^\n]*\n *'import-x\/extensions'[^\n]*\n/m, '');
+const CLIENT_PKG = JSON.stringify({ name: 'client', scripts: { lint: 'eslint .' }, dependencies: { react: '^19.0.0' } });
 
 let failed = 0;
 const check = (label, ok, detail = '') => {
@@ -223,6 +236,41 @@ try {
   commitAll(s3);
   r = run(s3);
   check('no-undef가 나고 템플릿 형태면 적용 예정 + 원인 파일 표시', /\[적용 예정\] B1 [^\n]*'\*\*\/\*\.js' → '\*\*\/\*\.\{js,mjs\}' \(no-undef: server\/scripts\/migrate\.mjs/.test(r.out), r.out);
+
+  console.log('ESLint 규칙 교체 — B3 SQL 보간 · B4 .jsx 순환');
+  check('표본 전제: 이전 템플릿 형태가 현재 템플릿과 다르다', oldSql('eslint.config.server-js.mjs') !== tplText('eslint.config.server-js.mjs') && oldJsx() !== tplText('eslint.config.client-js.mjs'));
+  const b3 = project('b3-js', {
+    'server/package.json': NODE_JS['server/package.json'],
+    'server/eslint.config.mjs': oldSql('eslint.config.server-js.mjs'),
+    'server/src/item.js': "// eslint-disable-next-line no-restricted-syntax\nexport const q = (ids) => `SELECT * FROM t WHERE id IN (${ids.map((_, i) => `:id_${i}`).join(',')})`;\n",
+  });
+  r = run(b3, '--apply');
+  check('이전 SQL 선택자(JS) → 현재 템플릿 블록으로 교체 (파일 전체가 현재 템플릿과 같다)', read(b3, 'server/eslint.config.mjs') === tplText('eslint.config.server-js.mjs') && /\[적용\] B3 /.test(r.out), r.out);
+  check('no-restricted-syntax 끄기 주석이 있으면 [참고]', /\[참고\] B3 [^\n]*끄기 주석이 있는 파일 1개/.test(r.out), r.out);
+  commitAll(b3);
+  r = run(b3);
+  check('재실행 → B3 이미 적용', /\[이미 적용\] B3 /.test(r.out) && clean(b3), r.out);
+  const b3t = project('b3-ts', { 'server/package.json': NODE_JS['server/package.json'], 'server/eslint.config.mjs': oldSql('eslint.config.server.mjs') });
+  r = run(b3t, '--apply');
+  check('이전 SQL 선택자(TS) → 현재 템플릿과 같다', read(b3t, 'server/eslint.config.mjs') === tplText('eslint.config.server.mjs'), r.out);
+  const custom = project('b3-custom', {
+    'server/package.json': NODE_JS['server/package.json'],
+    'server/eslint.config.mjs': oldSql('eslint.config.server-js.mjs').replace(OLD_SQL_BLOCK, () => "          // 프로젝트가 고친 규칙\n          selector: 'TemplateLiteral > MemberExpression[object.name=\"queryParams\"]',\n          message: 'SQL에 요청 값 직접 보간 금지 — 프로젝트 문구',\n"),
+  });
+  r = run(custom, '--apply');
+  check('프로젝트가 직접 고친 규칙(새 메시지)은 되돌리지 않음 → 이미 적용', /\[이미 적용\] B3 /.test(r.out) && clean(custom), r.out);
+  const odd = project('b3-odd', { 'server/package.json': NODE_JS['server/package.json'], 'server/eslint.config.mjs': oldSql('eslint.config.server-js.mjs').replace('// sql.md 7절 — 문자열 연결로 쿼리를 조립하지 않는다 (인젝션)', '// 인젝션 방지') });
+  r = run(odd);
+  check('이전 선택자는 있는데 주변 형태가 다르면 [수동]', /\[수동\] B3 [^\n]*이전 SQL 선택자가 있지만/.test(r.out), r.out);
+  const b4 = project('b4', { 'client/package.json': CLIENT_PKG, 'client/eslint.config.mjs': oldJsx(), 'client/src/App.jsx': 'export const App = () => null;\n' });
+  r = run(b4, '--apply');
+  check('.jsx가 있는 JS 클라이언트 → import-x/extensions 추가 (현재 템플릿과 같다)', read(b4, 'client/eslint.config.mjs') === tplText('eslint.config.client-js.mjs') && /\[적용\] B4 /.test(r.out), r.out);
+  commitAll(b4);
+  r = run(b4);
+  check('재실행 → B4 이미 적용 · 클라이언트에 B3 해당 없음', /\[이미 적용\] B4 /.test(r.out) && /\[해당 없음\] B3 [^\n]*Node 서버가 아니다/.test(r.out) && clean(b4), r.out);
+  const b4n = project('b4-nojsx', { 'client/package.json': CLIENT_PKG, 'client/eslint.config.mjs': oldJsx(), 'client/src/main.js': 'export const main = () => null;\n' });
+  r = run(b4n);
+  check('.jsx가 없으면 B4 해당 없음', /\[해당 없음\] B4 [^\n]*\.jsx 파일이 없다/.test(r.out), r.out);
 
   console.log('프로젝트 아님');
   mkdirSync(path.join(work, 'empty'));

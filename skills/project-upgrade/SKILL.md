@@ -14,11 +14,13 @@ install은 `~/.claude`만 갱신한다 — 프로젝트에 복사해 둔 템플�
    - 같은 컨트롤러의 `@WebMvcTest`가 여러 클래스 → 한 클래스로 합치고 시나리오는 `@Nested`로 나눈다(테스트 내용·단정은 그대로)
    - 기존 vitest 설정과 합치기, CI workflow env(`TEST_DB_HOST`·root 비밀번호), `TEST_DB_*`를 직접 읽는 코드 → `DB_*`만 읽게
    - lint 스크립트 단순화(`eslint .` + 별도 스크립트)
+   - ESLint 설정이 템플릿 형태가 아니라 자동으로 못 바꾼 규칙(B3 SQL 보간 블록 교체·B4 `import-x/extensions`) → 템플릿의 해당 블록으로 옮긴다
    - 테스트를 지우거나 단정을 바꾸는 등 **의미가 바뀌는 변경은 하지 않는다** — 판단이 갈리면 사용자에게 묻는다. 처리 뒤 스크립트를 다시 돌려 [수동]이 남지 않을 때까지 반복한다.
 5. **검증** — 테스트 DB(db-test)를 띄운 상태에서:
    - Spring: `./gradlew spotlessApply` → `./gradlew check`를 **2회** — ArchitectureTest가 남은 잠금·`@WebMvcTest` 위반을 나열한다. 병렬로 바뀐 뒤 간헐적으로 실패하는 클래스(static 상태·시스템 속성·공유 파일)에는 `@Isolated`
    - Node 서버: `npm run lint`, `npm test`를 **2회** — `[test-db] 테스트 DB 준비 실패:`가 나오면 그 원인대로 고친다
+   - B3·B4 뒤 lint가 새로 잡는 것(SQL에 요청 값 보간·`.jsx` 순환)은 원래 있던 문제다 — 고치지 말고 위치와 함께 보고한다. `Unused eslint-disable directive` 경고가 가리키는 끄기 주석은 지운다
    - 실패는 이 업그레이드가 만든 것만 고친다 — 원래 있던 버그로 보이면 고치지 않고 보고한다.
-6. **보고** — 단계별 결과 표 + 검증 결과(명령·종료 코드·통과 수) + 남은 수동 항목. 커밋은 사용자 요청 시, **단계별로 나눠 제안**한다(B1 ESLint / B2 워커별 테스트 DB / C1 Boot / C2 테스트 병렬 — 되돌리기 쉽게). 변경 이력은 `/work-log`.
+6. **보고** — 단계별 결과 표 + 검증 결과(명령·종료 코드·통과 수) + 남은 수동 항목. 커밋은 사용자 요청 시, **단계별로 나눠 제안**한다(B1 ESLint .mjs / B2 워커별 테스트 DB / B3 SQL 보간 규칙 / B4 .jsx 순환 / C1 Boot / C2 테스트 병렬 — 되돌리기 쉽게). 변경 이력은 `/work-log`.
 
 - 기기 단위 작업은 이 명령 밖이다: `git pull` → `install.ps1`, 예전 시간 초과로 남은 테스트 프로세스 정리(재부팅 또는 `gradlew --stop`).
