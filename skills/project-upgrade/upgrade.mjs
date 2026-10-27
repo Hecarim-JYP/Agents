@@ -11,7 +11,7 @@
 //                 --jyp <설치 경로 대신 읽을 저장소 경로(시험용)>
 // 종료 코드: 0 수동 항목 없음 / 1 수동 항목 있음 / 2 실행할 수 없음 (작업 트리 더러움·설치 경로 없음·프로젝트 아님)
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, realpathSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
@@ -21,13 +21,17 @@ const APPLY = args.includes('--apply');
 const FORCE = args.includes('--force');
 const jypArg = args.indexOf('--jyp');
 const JYP = path.resolve(jypArg >= 0 ? args[jypArg + 1] : path.join(os.homedir(), '.claude', 'jyp'));
-const START = path.resolve(args.find((a, i) => !a.startsWith('--') && (jypArg < 0 || i !== jypArg + 1)) ?? '.');
+// 실제 경로로 정규화 — git은 긴 실제 경로를 돌려주는데 시작 경로는 8.3 짧은 이름(Windows RUNNER~1)이나
+// 심볼릭 링크(macOS /var → /private/var)일 수 있다. 둘의 형태가 다르면 path.relative가 ../../..로 어긋난다.
+// .native만 Windows 짧은 이름까지 펼친다(GetFinalPathNameByHandle)
+const real = (p) => { try { return realpathSync.native(p); } catch { return p; } };
+const START = real(path.resolve(args.find((a, i) => !a.startsWith('--') && (jypArg < 0 || i !== jypArg + 1)) ?? '.'));
 const TEMPLATES = path.join(JYP, 'scaffolds', 'templates');
 // 저장소 루트 — 저장소 단위 파일(CLAUDE.md·.github·docker-compose*)은 항상 여기서 찾는다
 // (2026-10-27 결함: 인자로 준 하위 폴더를 루트로 써서, 그 아래에서 CLAUDE.md·.github를 찾다가 "해당 없음"처럼 조용히 빠졌다)
 let REPO = START;
 try {
-  REPO = path.resolve(execFileSync('git', ['-C', START, 'rev-parse', '--show-toplevel'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim());
+  REPO = real(path.resolve(execFileSync('git', ['-C', START, 'rev-parse', '--show-toplevel'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()));
 } catch { /* git 저장소가 아니다 — 시작 폴더를 루트로 본다 (--apply는 --force일 때만) */ }
 
 // ── 파일 읽기·쓰기: 바꿀 내용을 메모리에 모았다가 --apply일 때만 쓴다 (미리보기와 적용이 같은 계산을 거친다) ──

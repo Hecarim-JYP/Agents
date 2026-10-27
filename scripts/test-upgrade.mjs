@@ -5,7 +5,7 @@
 //
 // 사용법: 저장소 루트에서  node scripts/test-upgrade.mjs   (CI verify.yml·verify-windows.yml이 push/PR마다 실행)
 
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, symlinkSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -190,6 +190,12 @@ try {
   check('Vite 클라이언트(설정 파일에만 globals.node)를 서버로 보지 않음 → B1·B2 해당 없음', /\[해당 없음\] B1 [^\n]*\(app-web\) — Node 서버가 아니다/.test(r.out) && /\[해당 없음\] B2 [^\n]*\(app-web\) — Node 서버가 아니다/.test(r.out), r.out);
   check('eslint 없는 서버 → B1 해당 없음, 테스트 DB 없음 → B2 해당 없음', /\[해당 없음\] B1 [^\n]*\(app-server\) — eslint 설정 없음/.test(r.out) && /\[해당 없음\] B2 [^\n]*\(app-server\) — 테스트 DB를 쓰지 않는다/.test(r.out), r.out);
   check('[수동] 0건 · 두 번 돌려도 같은 결과 · 파일 변경 없음', !/\[수동\]/.test(r.out) && r.out === r2.out && clean(lt), r.out);
+  // 시작 경로와 git이 돌려주는 경로의 형태가 다를 때 — Windows 8.3 짧은 이름(RUNNER~1)·macOS /var → /private/var.
+  // 링크(Windows는 관리자 권한이 필요 없는 junction)로 같은 상황을 만든다
+  const link = path.join(work, 'ltms-link');
+  symlinkSync(lt, link, 'junction');
+  r = run(link);
+  check('링크·짧은 이름 경로로 실행해도 저장소 기준 경로가 어긋나지 않음(../ 없음)', r.code === 0 && /\(app-server\)/.test(r.out) && !/\.\.\//.test(r.out) && !/대상:/.test(r.out), r.out);
 
   const sub = project('spring-sub', { ...Object.fromEntries(Object.entries(SPRING).map(([f, s]) => [f === 'CLAUDE.md' ? f : `api/${f}`, s])), '.github/workflows/test.yml': 'name: test\n' });
   run(sub, '--apply');
