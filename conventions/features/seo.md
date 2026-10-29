@@ -88,7 +88,7 @@ location / {
 ```
 
 - 실측 (위 설정 그대로): `/`·`/about`·`/about/` 200 + 경로별 제목·본문, `/nope`·`/orders/1` 200 껍데기(브라우저에서 404 화면 + `noindex`), 없는 자산 404, HTML 전부 `no-cache`.
-- 프리렌더 단계는 브라우저가 필요하다 — client 이미지 빌더(`node:24-slim`)에는 브라우저가 없다(실측: `/ms-playwright` 없음). 빌드 단계를 **Playwright 공식 이미지**로 바꾼다:
+- 프리렌더 단계는 브라우저가 필요하다 — client 이미지 빌더(`node:26-slim`)에는 브라우저가 없다(실측: `/ms-playwright` 없음). 빌드 단계를 **Playwright 공식 이미지**로 바꾼다:
 
 ```dockerfile
 # 빌드 단계 = Playwright 이미지(브라우저 포함) — 태그는 package.json의 playwright 버전과 같게(devDependencies에 정확한 버전으로)

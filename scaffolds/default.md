@@ -185,7 +185,7 @@
 | 항목 | 값 | 근거 |
 |---|---|---|
 | 운영 개시일 | <미정> | 정기 점검 기한의 기준 (YYYY-MM-DD) |
-| 런타임·DB 버전과 지원 종료일 | <미정> | general.md 8-1절 — 예: Node 24 (2028-04-30) / Java 25 (2031-09-30) / MariaDB 11.4 (2029-05-29). 종료 6개월 전 업그레이드 계획 |
+| 런타임·DB 버전과 지원 종료일 | <미정> | general.md 8-1절 — 예: Node 26 (2029-04-30) / Java 25 (2031-09-30) / MariaDB 11.4 (2029-05-29). 종료 6개월 전 업그레이드 계획 |
 | 운영 서버·DB 식별자 | <미정> | 체크리스트 25, testing.md 6-1절 |
 | 가동 감시 — 헬스 URL·감시 주체·연락처 | <미정> | ops.md 7절 |
 | 운영 감시 URL·알림 수신자 | <미정> | batch.md 3-1절 — 수신자는 개발팀 |
@@ -298,7 +298,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 24        # LTS — Dockerfile의 node 이미지와 같은 메이저 (general.md 8-1절)
+          node-version: 26        # LTS — Dockerfile의 node 이미지와 같은 메이저 (general.md 8-1절)
       - run: npm ci
       - run: npm run lint          # 컨벤션 자동 강제 (린트 절)
       - run: npm test
@@ -416,7 +416,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: 26
       # 운영에 실리는 의존성만(--omit=dev) — 빌드 도구(vite·eslint)의 취약점은 Dependabot 알림으로 받는다
       - run: npm audit --omit=dev --audit-level=high
 

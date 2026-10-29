@@ -46,7 +46,7 @@
 
 | 조건 | 결과 |
 |---|---|
-| 이미지에 든 한글 지원 글꼴 | **WenQuanYi Zen Hei(중국어 글꼴)·Unifont뿐**, 한국어 글꼴 없음 / `node:24-slim`은 `fc-list` 자체가 없음 / `eclipse-temurin:25-jre`는 `/usr/share/fonts/truetype`만 |
+| 이미지에 든 한글 지원 글꼴 | **WenQuanYi Zen Hei(중국어 글꼴)·Unifont뿐**, 한국어 글꼴 없음 / `node:26-slim`은 `fc-list` 자체가 없음 / `eclipse-temurin:25-jre`는 `/usr/share/fonts/truetype`만 |
 | 글꼴 지정 없이(`sans-serif`) PDF | 한글이 **WenQuanYiZenHei**로 그려진다 (PDF 글꼴: WenQuanYiZenHei + LiberationSans) |
 | 이미지에서 CJK 글꼴을 지운 경우 | 한글이 **□□□□□** (스크린샷 확인) |
 | `@font-face` Pretendard | PDF 글꼴 **Pretendard-Regular 서브셋**, 시스템 글꼴과 무관 — 40,205바이트(지정 없음 48,011) |
