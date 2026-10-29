@@ -29,6 +29,6 @@ jobs:
           java-version: 25     # build.gradle 템플릿 toolchain과 같은 LTS (general.md 8-1절)
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
       - run: node scripts/template-audit.mjs            # 템플릿 그대로 — high 이상 0건이어야 한다
       - run: node scripts/template-audit.mjs --control  # 대조군 — 검출해야 통과

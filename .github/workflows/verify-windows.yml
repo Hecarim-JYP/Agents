@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'   # register-hooks.mjs (install이 호출)
+          node-version: '26'   # register-hooks.mjs (install이 호출)
 
       # 1) 인코딩 — 5.1은 BOM 없는 UTF-8을 시스템 코드 페이지로 읽어 한글이 깨진다 (CLAUDE.md 인코딩 표).
       #    5.1 파서로 직접 읽어 한글 음절 토큰이 살아 있는지 본다. 대조군: BOM을 뗀 사본은 반드시 걸려야 한다 —
